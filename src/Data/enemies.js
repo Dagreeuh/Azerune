@@ -1,0 +1,1 @@
+export const ENEMIES=[{id:'e1',name:'Gorvak',icon:'👹',hp:430,atk:35,def:16,spd:96},{id:'e2',name:'Chamane',icon:'🧙',hp:240,atk:29,def:11,spd:109},{id:'e3',name:'Loup du néant',icon:'🐺',hp:195,atk:38,def:9,spd:120}];
