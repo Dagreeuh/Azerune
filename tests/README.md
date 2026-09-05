@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-87 tests, moins d'une seconde. Aucun test ne modifie le code de production.
+128 tests, environ une seconde. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -20,6 +20,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `engine.dot.test.js` | Formules des dégâts périodiques, Virulence, charges d'Agonie, Régénération, expiration |
 | `engine.turn.test.js` | Ordre des tours, vitesse effective, étourdissement, garde-fous de la jauge |
 | `engine.damage.test.js` | Formule de dégâts, variance, critiques, Défense, boucliers, Serment du gardien |
+| `engine.auto.test.js` | Combat AUTO : ordre des compétences, priorité du joueur, conditions d'utilité, choix de cible |
 | `sets.contract.test.js` | Tout set annoncé au joueur est bien lu par le moteur |
 
 ## Déterminisme
@@ -50,9 +51,33 @@ Deux pièges rencontrés en écrivant cette suite :
    traite spécialement les id 3, 7, 8, 13, 14, 19, 21, 23, 25 et 28.
    `makeHero` part de 9000 pour rester sur les règles générales.
 
+3. **Le combat AUTO n'a besoin d'aucune graine.** `chooseAutoSkill`,
+   `chooseAutoEnemyTarget` et `chooseAutoAllyTarget` sont purs. Il suffit de
+   poser `battle.turn` sur le champion voulu ; pas besoin de passer par la
+   jauge.
+
+## Vérifier que la suite mord encore
+
+Un test qui passe ne prouve rien tant qu'on n'a pas vu échouer sa version
+mutée. Avant de faire confiance à un nouveau test, cassez la règle qu'il
+protège dans le moteur et vérifiez qu'il rougit. Repères mesurés sur cette
+suite :
+
+| Mutation dans `src/battle/engine.js` | Tests rouges |
+|---|---|
+| Poison `.06` → `.07` | 8 |
+| Redirection du gardien `.30` → `.40` | 1 |
+| Ordre AUTO par défaut `[2,1,0]` → `[0,1,2]` | 9 |
+| `respectPlayerPriority:customOrder` → `false` | 2 |
+| `affinityRank` inversé | 2 |
+| Tri des cibles alliées `sa-sb` → `sb-sa` | 7 |
+
+La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
+régression que la suite est là pour empêcher de revenir.
+
 ## Ce que la suite ne couvre pas encore
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, la
 campagne, et toute la couche React. Les prochaines cibles utiles, par ordre de
-rentabilité : les priorités du combat AUTO, la persistance de `battleSession`
-entre deux sessions, et les enchaînements de vagues.
+rentabilité : la persistance de `battleSession` entre deux sessions, les
+enchaînements de vagues Mythic+, et les récompenses de fin de mission.
