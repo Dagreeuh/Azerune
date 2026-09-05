@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-195 tests, environ une seconde. Aucun test ne modifie le code de production.
+251 tests, environ une seconde. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -25,6 +25,8 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `sets.contract.test.js` | Tout set annoncé au joueur est bien lu par le moteur |
 | `battleSession.test.js` | Un combat en cours survit à l'aller-retour JSON de la sauvegarde |
 | `storage.test.js` | Export, validation et import d'une sauvegarde, rollback compris |
+| `stats.test.js` | Puissance de champion et d'équipe, progression, équipement, difficulté, XP |
+| `stats.assessment.test.js` | Détection des capacités d'équipe et note de faisabilité affichée avant mission |
 
 ## Déterminisme
 
@@ -80,9 +82,20 @@ suite :
 | Plafond boss désactivé | 4 |
 | Restauration retirée du `catch` d'import | 1 |
 | Contrôle du jeu d'origine retiré | 1 |
+| `shieldExecute` réintroduit dans les boucliers | 3 |
+| Retour au rapprochement par sous-chaîne | 1 |
+| Bornes du score retirées | 1 |
+| Poids de l'Attaque `7.5` → `0.2` | 1 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
+
+Une mutation qui **survit** est une information, pas un détail. Le retour au
+rapprochement par sous-chaîne dans `stats.js` est passé vert au premier essai :
+la liste corrigée suffisait déjà sur le roster actuel, et le cas de test ne
+discriminait pas les deux formes. Il a fallu un effet dont le nom contient un
+effet listé comme sous-chaîne stricte — `rescueShieldBreaker` — pour que le test
+sépare vraiment les deux comportements.
 
 ## Deux zones sans aléatoire
 
