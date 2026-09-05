@@ -36,15 +36,15 @@ function effetsDeclares(){
 /**
  * Sets declares au joueur mais absents du moteur de combat.
  *
- * Ce ne sont PAS des exceptions acceptables : c est une dette identifiee, listee
- * ici pour que la suite reste verte tout en restant visible. Voir
- * Audit/RAPPORT-SUPPRESSION-COMBAT-ENGINE.md — les trois etaient implementes
- * dans l ancien moteur src/combat/engine.js, jamais portes dans src/battle.
+ * La liste est vide, et doit le rester : un set qui promet un bonus dans
+ * l interface doit avoir un comportement dans le moteur. Protection,
+ * Contre-attaque et Incendiaire y ont figure jusqu a leur implementation
+ * (voir Audit/RAPPORT-SETS-ORPHELINS.md).
  *
- * En implementer un fait echouer le test : c est voulu, il faut alors le retirer
- * de cette liste.
+ * N ajouter une entree ici que pour un set volontairement inerte, et en
+ * documentant pourquoi.
  */
-const NON_IMPLEMENTES=['protectionSet','counterSet','incendiarySet'];
+const NON_IMPLEMENTES=[];
 
 describe('effets de set',()=>{
   const declares=effetsDeclares();
@@ -61,10 +61,8 @@ describe('effets de set',()=>{
     expect(orphelins).toEqual([]);
   });
 
-  it('la dette connue est exactement celle qui est documentee',()=>{
-    // Si un set de la liste devient implemente, il faut le retirer d ici.
-    const encoreAbsents=NON_IMPLEMENTES.filter(effet=>!moteur.includes(effet));
-    expect(encoreAbsents).toEqual(NON_IMPLEMENTES);
+  it('aucun set n est laisse inerte',()=>{
+    expect(NON_IMPLEMENTES).toEqual([]);
   });
 
   it('chaque effet de la dette correspond bien a un set reellement declare',()=>{

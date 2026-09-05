@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-128 tests, environ une seconde. Aucun test ne modifie le code de production.
+156 tests, environ une seconde. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -21,6 +21,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `engine.turn.test.js` | Ordre des tours, vitesse effective, étourdissement, garde-fous de la jauge |
 | `engine.damage.test.js` | Formule de dégâts, variance, critiques, Défense, boucliers, Serment du gardien |
 | `engine.auto.test.js` | Combat AUTO : ordre des compétences, priorité du joueur, conditions d'utilité, choix de cible |
+| `engine.sets.test.js` | Sets Protection, Contre-attaque, Incendiaire, et plafond des DOT sur les boss |
 | `sets.contract.test.js` | Tout set annoncé au joueur est bien lu par le moteur |
 
 ## Déterminisme
@@ -71,6 +72,10 @@ suite :
 | `respectPlayerPriority:customOrder` → `false` | 2 |
 | `affinityRank` inversé | 2 |
 | Tri des cibles alliées `sa-sb` → `sb-sa` | 7 |
+| Bouclier Protection `.15` → `.25` | 2 |
+| Seuil de riposte `.20` → `.50` ou `.10` | 1 / 4 |
+| Riposte écrite sur `actor` au lieu de `self` | 3 |
+| Plafond boss désactivé | 4 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.

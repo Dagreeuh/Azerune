@@ -82,17 +82,34 @@ burnTarget.debuffs.burn={...burnTarget.debuffs.burn,source:actor.id,sourceAtk:ac
 `battle/engine.js` écrit déjà `source:actor.id` à ces endroits ; il ne manque
 que `sourceAtk:actor.atk`.
 
-## Décision à prendre
+## Décision prise : le plafond est porté
 
-Le portage n'a **pas** été effectué : c'est un changement d'équilibrage, pas un
-nettoyage. Il affaiblit Brûlure, Saignement et Corruption contre les boss —
-donc contre les raids, le Mythic+ et les boss de campagne, qui sont justement
-le contenu où les DoT en pourcentage de PV sont les plus forts.
+Le comportement de la v1.49.0 est rétabli dans `src/battle/engine.js`.
 
-Deux options :
+- `bossDotAmount` est restauré à l'identique.
+- Brûlure (×1,15), Saignement (×1,05) et Corruption (×0,95) passent par lui,
+  **dans les deux endroits** qui les calculent : l'application des dégâts et
+  l'attribution aux statistiques de combat. Les deux devaient rester d'accord,
+  sinon le rapport de fin de combat surestime les dégâts périodiques.
+- `sourceAtk` est mémorisée à la pose du malus : dans `tryDebuff`, qui couvre le
+  chemin générique, et sur les trois écritures directes.
 
-1. **Porter le plafond** si le comportement voulu est bien celui de la v1.49.0.
-   Rejouer alors le test 9 du HOTFIX-v1.49.0 : comparer les DOT sur un ennemi
-   ordinaire puis sur un boss à hauts PV.
-2. **Acter son abandon** et corriger la note v1.49.0, qui décrit aujourd'hui un
-   comportement que le jeu n'a pas.
+Le drapeau `bossUnit` est bien posé dans les données de campagne, mythic, raids,
+expéditions et world boss : le plafond s'applique donc réellement.
+
+### Dégradation sûre
+
+Un malus sans `sourceAtk` connue — une sauvegarde en cours, un chemin non
+couvert — retombe sur le calcul d'origine. Aucun combat déjà engagé ne change de
+comportement en cours de route.
+
+### Impact d'équilibrage
+
+C'est un affaiblissement réel de Brûlure, Saignement et Corruption contre les
+boss, donc en raid, Mythic+ et boss de campagne. Sur un boss à 100 000 PV, une
+Brûlure posée par un champion à 300 d'Attaque passe de 5 000 à 345 dégâts par
+tour. Le plafond ne mord pas sur les cibles ordinaires : à 1 000 PV, les 5 %
+valent 50, très en dessous du plafond.
+
+Le test 9 du HOTFIX-v1.49.0 — comparer les DOT sur un ennemi ordinaire puis sur
+un boss à hauts PV — est désormais automatisé dans `tests/engine.sets.test.js`.

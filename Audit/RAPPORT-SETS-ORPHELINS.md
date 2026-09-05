@@ -1,4 +1,4 @@
-# Trois sets d'équipement ne font rien en combat
+# Trois sets d'équipement ne faisaient rien en combat — corrigé
 
 ## Constat
 
@@ -44,14 +44,31 @@ travail réel, fait dans le fichier que le jeu n'exécute pas.
 orphelin, et liste ces trois-là comme dette explicite. Implémenter l'un d'eux
 fait échouer le test tant qu'il n'est pas retiré de la liste `NON_IMPLEMENTES`.
 
-## Décision à prendre
+## Décision prise : les trois sont implémentés
 
-Pour chacun des trois, deux issues :
+Plutôt que de retirer du butin déjà distribué aux joueurs, les trois effets ont
+été portés dans `src/battle/engine.js`, au plus près de l'implémentation
+d'origine :
 
-1. **Implémenter l'effet** dans `src/battle/engine.js`. Le code de référence est
-   récupérable dans l'historique : `git show <commit>^:src/Combat/engine.js`.
-2. **Retirer le set** des tables de butin, ou lui donner des `stats` passives à
-   la place de son `effect`, pour que le texte affiché corresponde à la réalité.
+| Set | Où | Comportement |
+|---|---|---|
+| Protection | `createBattle` | Bouclier initial de 15 % des PV max, sur les alliés uniquement |
+| Contre-attaque | `enemyAction`, dans `hit` | 20 % de riposte à 75 % de l'Attaque, réduite par la Défense de l'attaquant, minimum 1 |
+| Incendiaire | `castSkill` | 25 % de chance d'appliquer Brûlure 2 tours sur une compétence offensive ayant infligé des dégâts |
 
-Laisser en l'état n'est pas une option neutre : le jeu promet aujourd'hui au
-joueur quelque chose qu'il ne délivre pas.
+### Un bug latent dans le code d'origine
+
+La riposte de l'ancien moteur écrivait sur `actor`, qui dans `enemyAction`
+désigne l'objet du combat **reçu**, alors que l'état renvoyé est reconstruit à
+partir de copies (`enemies`). Les dégâts de riposte étaient donc perdus, et
+l'entrée mutée au passage.
+
+Le portage applique la riposte sur `self`, la copie effectivement commitée. Sans
+cette correction, le set aurait été rebranché tout en restant sans effet : la
+mutation `self` → `actor` fait échouer 3 tests.
+
+### Couverture
+
+`tests/engine.sets.test.js` couvre les trois effets, seuils compris. La liste
+`NON_IMPLEMENTES` de `tests/sets.contract.test.js` est désormais vide et doit le
+rester.
