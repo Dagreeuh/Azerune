@@ -1,0 +1,90 @@
+{
+  "missions": 80,
+  "monotonic": true,
+  "bossJumps": [
+    {
+      "difficulty": "easy",
+      "continent": "valebrume",
+      "jump": 1.19
+    },
+    {
+      "difficulty": "easy",
+      "continent": "khazdrum",
+      "jump": 1.23
+    },
+    {
+      "difficulty": "easy",
+      "continent": "netherys",
+      "jump": 1.24
+    },
+    {
+      "difficulty": "easy",
+      "continent": "couronne-givree",
+      "jump": 1.26
+    },
+    {
+      "difficulty": "normal",
+      "continent": "valebrume",
+      "jump": 1.21
+    },
+    {
+      "difficulty": "normal",
+      "continent": "khazdrum",
+      "jump": 1.25
+    },
+    {
+      "difficulty": "normal",
+      "continent": "netherys",
+      "jump": 1.25
+    },
+    {
+      "difficulty": "normal",
+      "continent": "couronne-givree",
+      "jump": 1.27
+    },
+    {
+      "difficulty": "hard",
+      "continent": "valebrume",
+      "jump": 1.22
+    },
+    {
+      "difficulty": "hard",
+      "continent": "khazdrum",
+      "jump": 1.26
+    },
+    {
+      "difficulty": "hard",
+      "continent": "netherys",
+      "jump": 1.27
+    },
+    {
+      "difficulty": "hard",
+      "continent": "couronne-givree",
+      "jump": 1.29
+    },
+    {
+      "difficulty": "hardcore",
+      "continent": "valebrume",
+      "jump": 1.23
+    },
+    {
+      "difficulty": "hardcore",
+      "continent": "khazdrum",
+      "jump": 1.28
+    },
+    {
+      "difficulty": "hardcore",
+      "continent": "netherys",
+      "jump": 1.29
+    },
+    {
+      "difficulty": "hardcore",
+      "continent": "couronne-givree",
+      "jump": 1.3
+    }
+  ],
+  "range": {
+    "min": 1737,
+    "max": 6856
+  }
+}

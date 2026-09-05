@@ -1,0 +1,126 @@
+{
+  "passed": 30,
+  "total": 30,
+  "checks": [
+    {
+      "name": "26 champions et 78 compétences",
+      "ok": true
+    },
+    {
+      "name": "DOT poison",
+      "ok": true
+    },
+    {
+      "name": "DOT burn",
+      "ok": true
+    },
+    {
+      "name": "DOT bleed",
+      "ok": true
+    },
+    {
+      "name": "DOT agony",
+      "ok": true
+    },
+    {
+      "name": "DOT corruption",
+      "ok": true
+    },
+    {
+      "name": "persistant healingSeed",
+      "ok": true
+    },
+    {
+      "name": "persistant healingTotem",
+      "ok": true
+    },
+    {
+      "name": "persistant livingGarden",
+      "ok": true
+    },
+    {
+      "name": "persistant regen",
+      "ok": true
+    },
+    {
+      "name": "protection guardianLink",
+      "ok": true
+    },
+    {
+      "name": "protection provoke",
+      "ok": true
+    },
+    {
+      "name": "protection shield",
+      "ok": true
+    },
+    {
+      "name": "protection rescue",
+      "ok": true
+    },
+    {
+      "name": "ressource holyPower",
+      "ok": true
+    },
+    {
+      "name": "ressource feral",
+      "ok": true
+    },
+    {
+      "name": "ressource rogue",
+      "ok": true
+    },
+    {
+      "name": "ressource arcane",
+      "ok": true
+    },
+    {
+      "name": "ressource festering",
+      "ok": true
+    },
+    {
+      "name": "ressource soul",
+      "ok": true
+    },
+    {
+      "name": "critique garanti Visée",
+      "ok": true
+    },
+    {
+      "name": "critique garanti Disparition",
+      "ok": true
+    },
+    {
+      "name": "pénétration",
+      "ok": true
+    },
+    {
+      "name": "affinité sur effets",
+      "ok": true
+    },
+    {
+      "name": "Précision/Résistance",
+      "ok": true
+    },
+    {
+      "name": "maîtrises utilisées",
+      "ok": true
+    },
+    {
+      "name": "événements structurés",
+      "ok": true
+    },
+    {
+      "name": "effets uniques visibles",
+      "ok": true
+    },
+    {
+      "name": "persistance battle complet",
+      "ok": true
+    },
+    {
+      "name": "cycles élémentaires",
+      "ok": true
+    }
+  ]
+}
