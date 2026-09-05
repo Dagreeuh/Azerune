@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-156 tests, environ une seconde. Aucun test ne modifie le code de production.
+195 tests, environ une seconde. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -23,6 +23,8 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `engine.auto.test.js` | Combat AUTO : ordre des compétences, priorité du joueur, conditions d'utilité, choix de cible |
 | `engine.sets.test.js` | Sets Protection, Contre-attaque, Incendiaire, et plafond des DOT sur les boss |
 | `sets.contract.test.js` | Tout set annoncé au joueur est bien lu par le moteur |
+| `battleSession.test.js` | Un combat en cours survit à l'aller-retour JSON de la sauvegarde |
+| `storage.test.js` | Export, validation et import d'une sauvegarde, rollback compris |
 
 ## Déterminisme
 
@@ -76,13 +78,30 @@ suite :
 | Seuil de riposte `.20` → `.50` ou `.10` | 1 / 4 |
 | Riposte écrite sur `actor` au lieu de `self` | 3 |
 | Plafond boss désactivé | 4 |
+| Restauration retirée du `catch` d'import | 1 |
+| Contrôle du jeu d'origine retiré | 1 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
+
+## Deux zones sans aléatoire
+
+Ces deux familles ne demandent aucune graine, ce qui les rend faciles à étendre :
+
+- **Le combat AUTO** (`chooseAutoSkill`, `autoSkillUseful`, les deux fonctions de
+  ciblage) est entièrement pur.
+- **La persistance** se teste par `JSON.parse(JSON.stringify(combat))`, qui est
+  exactement ce que fait `save()` dans `localStorage`. Si l'aller-retour est
+  égal à l'original, aucune valeur n'est perdue en chemin.
+
+Pour `storage.test.js`, `localStorage` et `sessionStorage` sont remplacés par un
+stockage minimal via `vi.stubGlobal` : l'environnement de test est `node`, il
+n'y en a pas.
 
 ## Ce que la suite ne couvre pas encore
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, la
 campagne, et toute la couche React. Les prochaines cibles utiles, par ordre de
-rentabilité : la persistance de `battleSession` entre deux sessions, les
-enchaînements de vagues Mythic+, et les récompenses de fin de mission.
+rentabilité : les enchaînements de vagues Mythic+, les récompenses de fin de
+mission, et le calcul de puissance d'équipe (`utils/stats.js`), qui pilote
+l'évaluation de faisabilité affichée avant chaque combat.
