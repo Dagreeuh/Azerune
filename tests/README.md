@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-251 tests, environ une seconde. Aucun test ne modifie le code de production.
+290 tests, environ une seconde et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -27,6 +27,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `storage.test.js` | Export, validation et import d'une sauvegarde, rollback compris |
 | `stats.test.js` | Puissance de champion et d'équipe, progression, équipement, difficulté, XP |
 | `stats.assessment.test.js` | Détection des capacités d'équipe et note de faisabilité affichée avant mission |
+| `rewards.test.js` | Génération du butin, sets actifs, coût d'amélioration, recyclage, forge |
 
 ## Déterminisme
 
@@ -86,6 +87,10 @@ suite :
 | Retour au rapprochement par sous-chaîne | 1 |
 | Bornes du score retirées | 1 |
 | Poids de l'Attaque `7.5` → `0.2` | 1 |
+| Garde du set inconnu retirée | 1 |
+| Nombre de pièces d'un set ignoré | 1 |
+| Pénalités de recyclage supprimées | 2 |
+| Paliers à sous-stat déplacés | 2 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.

@@ -36,7 +36,12 @@ Le pouvoir majeur des boss de Campagne est aussi progressif. En Facile, les dég
 - Or initial des missions augmenté.
 - Or répétable porté de 15 % à 20 %.
 - Cristaux initiaux légèrement augmentés.
-- Taux de butin et pity au cinquième farm conservés.
+- Taux de butin conservés.
+- **Correction de ce rapport** : la mention d'un « pity au cinquième farm »
+  était périmée. Ce pity a été supprimé par `HOTFIX-CAMPAGNE-SETS-ECONOMIE`
+  (« Suppression de la pity automatique de butin Campagne »), lors de la refonte
+  de la Campagne de 15 à 10 zones. Il n'existe plus dans le code. Voir
+  `RAPPORT-RECOMPENSES-MISSION.md`.
 
 ## Sécurité du moteur
 

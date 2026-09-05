@@ -101,8 +101,12 @@ export function generateCampaignItem(mission){
 export function generateAchievementItem(config={}){const slot=config.slot||'Casque',setId=config.setId||'vitality',mainStat=config.mainStat||MAIN_STATS[slot][0],stars=1,quality='common',itemLevel=5;return{id:`achievement-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,name:`${SLOT_ICONS[slot]} ${slot} ${SETS[setId].name}`,icon:SLOT_ICONS[slot],slot,setId,quality,stars,itemLevel,level:0,mainStat,mainValue:baseValue(mainStat,stars,itemLevel,quality),substats:{},locked:false,source:'Haut fait'};}
 
 export function itemStats(item){return effectiveItemStats(item)}
-export function activeSets(items){const counts={};items.forEach(item=>{if(item?.setId)counts[item.setId]=(counts[item.setId]||0)+1});return Object.entries(counts).flatMap(([id,count])=>Array.from({length:Math.floor(count/SETS[id].pieces)},()=>id))}
-export function setStats(items){const result={};activeSets(items).forEach(id=>Object.entries(SETS[id].stats||{}).forEach(([key,value])=>result[key]=(result[key]||0)+value));return result}
+// Un objet peut porter un setId disparu du jeu : sauvegarde ancienne, set retire
+// lors d'une refonte, ou fichier importe depuis une autre version. Sans ce
+// filtre, SETS[id].pieces leve et fait tomber totalStats, donc toute page qui
+// calcule des statistiques.
+export function activeSets(items){const counts={};(items||[]).forEach(item=>{if(item?.setId&&SETS[item.setId])counts[item.setId]=(counts[item.setId]||0)+1});return Object.entries(counts).flatMap(([id,count])=>Array.from({length:Math.floor(count/SETS[id].pieces)},()=>id))}
+export function setStats(items){const result={};activeSets(items).forEach(id=>Object.entries(SETS[id]?.stats||{}).forEach(([key,value])=>result[key]=(result[key]||0)+value));return result}
 
 export function generateShopItem(config={}){
   const stars=config.stars||2,quality=config.quality||'common',slot=pick(SLOTS),setId=pick(Object.keys(SETS)),mainStat=pick(MAIN_STATS[slot]);
