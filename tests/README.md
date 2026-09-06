@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-536 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
+566 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -37,6 +37,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `progressionStats.test.js` | Agrégation par champion du rapport de combat |
 | `achievements.contract.test.js` | Les 224 hauts faits : compteurs résolus, valeurs dérivées calculées, buts atteignables |
 | `skills.test.js` | Paliers de maîtrise, bonus cumulés, descriptions de compétences |
+| `mythic.test.js` | Missions Mythic+, enchaînement des vagues, affixes et leurs effets |
 
 ## Déterminisme
 
@@ -128,6 +129,9 @@ suite :
 | Palier de maîtrise inatteignable réintroduit | 2 |
 | Description de compétence redupliquée | 1 |
 | Décalage d'un palier dans le cumul des bonus | 3 |
+| Bonus de palier Mythic+ redevenu ponctuel | 1 |
+| Nombre d'affixes qui redescend | 2 |
+| Jauge non ramenée entre deux vagues | 1 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -197,8 +201,18 @@ fois, un test de contrat aurait coûté vingt lignes.
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
 toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
-les enchaînements de vagues Mythic+, et le calcul du score de hauts faits, qui
-reste dans `GameProvider`.
+le calcul du score de hauts faits et l'attribution de leurs récompenses, qui
+restent dans `GameProvider`.
+
+## Tester la monotonie
+
+Une formule peut être juste à chaque point et fausse dans sa progression. La
+difficulté Mythic+ montait correctement de niveau en niveau — sauf après chaque
+dizaine, où elle redescendait. Aucun test ponctuel ne l'aurait vu.
+
+Le contrôle utile est donc : **parcourir tout le domaine et vérifier le sens de
+variation**. Il s'applique partout où une valeur doit croître avec un palier :
+difficulté, coûts, récompenses, bonus de maîtrise.
 
 ## Tester l'atteignabilité, pas seulement le calcul
 
