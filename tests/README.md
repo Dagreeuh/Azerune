@@ -239,3 +239,37 @@ armes uniques — et vérifie qu'aucun haut fait ne reste bloqué.
 C'est ce contrôle qui distingue une valeur réellement calculée d'un nom inconnu
 retombant à zéro : une valeur vivante doit bouger entre l'état vide et l'état
 complet.
+
+## Tester une calibration, pas seulement une formule
+
+`mythic.sablier.test.js` couvre le Sablier d'Azerune. Sa logique pure était
+juste dès la première écriture — et ses chiffres étaient faux.
+
+Le budget de tours avait été calé sur une simulation menée avant
+l'implémentation. Rejouée sur le moteur réel une fois la mécanique câblée, elle
+donnait des durées de course très différentes : un budget fixe aurait mis
+Mythic+ 1 à 8 en échec permanent pendant que Mythic+ 30 restait confortable.
+
+Aucun test unitaire ne pouvait attraper ça : chaque fonction faisait exactement
+ce qu'elle annonçait. Le contrôle qui l'a trouvé est **une simulation qui joue
+de vraies parties sur le code livré**, puis compare la distribution obtenue à
+l'intention de design. Les tests figent ensuite les constantes retenues, en dur,
+avec un renvoi vers le rapport qui les justifie.
+
+La règle : **une constante calibrée se teste par sa valeur littérale, et se
+justifie ailleurs par une mesure.** La recalculer depuis sa propre formule ne
+teste rien, et la déduire d'une intuition ne survit pas au premier joueur.
+
+## Tester le trajet complet d'une valeur
+
+La signature de bug la plus fréquente de ce projet est une moitié de
+fonctionnalité écrite sans l'autre. Le Sablier traverse six fichiers : la donnée
+calcule un budget, la mission le porte, la page le transmet, le moteur le
+consomme, le contexte lit le palier obtenu, l'écran de récompense l'affiche.
+
+Chaque maillon est vérifié par un test de contrat qui lit la source et exige
+l'appel exact — `turnBudget:mission.turnBudget`,
+`finishMythicMission(mission,battle)`, `mythicCollapseFactor(battle.mythicState)`.
+Un maillon coupé laisse tout le reste vert : le budget retombe silencieusement
+sur sa valeur par défaut, le palier est toujours « parfait », et personne ne
+voit rien.
