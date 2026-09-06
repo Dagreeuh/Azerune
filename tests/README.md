@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-515 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
+536 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -36,6 +36,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `progression.test.js` | Niveaux, évolution, Résonance, valeur des doublons — l'économie du jeu |
 | `progressionStats.test.js` | Agrégation par champion du rapport de combat |
 | `achievements.contract.test.js` | Les 224 hauts faits : compteurs résolus, valeurs dérivées calculées, buts atteignables |
+| `skills.test.js` | Paliers de maîtrise, bonus cumulés, descriptions de compétences |
 
 ## Déterminisme
 
@@ -124,6 +125,9 @@ suite :
 | Nom de valeur dérivée mal orthographié | 2 |
 | But de campagne porté au-delà du possible | 2 |
 | Seuil des Chroniques réécrit en dur | 1 |
+| Palier de maîtrise inatteignable réintroduit | 2 |
+| Description de compétence redupliquée | 1 |
+| Décalage d'un palier dans le cumul des bonus | 3 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -193,9 +197,8 @@ fois, un test de contrat aurait coûté vingt lignes.
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
 toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
-les enchaînements de vagues Mythic+, les maîtrises de compétences
-(`utils/skills.js`), et le calcul du score de hauts faits, qui reste dans
-`GameProvider`.
+les enchaînements de vagues Mythic+, et le calcul du score de hauts faits, qui
+reste dans `GameProvider`.
 
 ## Tester l'atteignabilité, pas seulement le calcul
 
