@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-474 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
+505 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -34,6 +34,8 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `shop.test.js` | Rafraîchissements, emplacements, achat d'une offre, offres générées |
 | `inventory.test.js` | Valeur de revente et protections avant destruction d'un objet |
 | `progression.test.js` | Niveaux, évolution, Résonance, valeur des doublons — l'économie du jeu |
+| `progressionStats.test.js` | Agrégation par champion du rapport de combat |
+| `achievements.contract.test.js` | Les 224 compteurs de hauts faits résolvent vers une source alimentée |
 
 ## Déterminisme
 
@@ -115,6 +117,10 @@ suite :
 | Plafond de niveau `×10` → `×12` par étoile | 5 |
 | Bascule doublon → Fragments de sang décalée | 3 |
 | Garde NaN de la normalisation retirée | 1 |
+| Compétences écrasées au lieu d'être cumulées | 3 |
+| Champions absents du combat effacés | 5 |
+| Métrique de mitigation retirée | 5 |
+| Appel à `mergeChampionStats` retiré | 1 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -166,16 +172,24 @@ projet, déclarées séparément, se rejoignent bien.
 - `sets.contract.test.js` — tout set annoncé au joueur est lu par le moteur
 - `stats.assessment.test.js` — tout effet listé dans `SKILL_TAGS` existe et est traité
 - `quests.contract.test.js` — tout événement attendu par une quête est émis
+- `achievements.contract.test.js` — tout compteur de haut fait résout vers une
+  source réellement alimentée
 
 C'est la forme de bug la plus coûteuse du projet : rien ne plante, rien
-n'apparaît dans les logs, et la fonctionnalité est simplement absente. Les trois
-suites ont chacune trouvé un cas réel.
+n'apparaît dans les logs, et la fonctionnalité est simplement absente. Les
+quatre suites ont chacune trouvé un cas réel — la dernière en a trouvé 104 d'un
+coup.
+
+Le point commun de ces bugs : **une des deux moitiés d'une fonctionnalité était
+écrite, l'autre non.** Le moteur enregistrait les utilisations de compétences,
+personne ne les agrégeait. Les quêtes attendaient un événement, personne ne
+l'émettait. Les sets déclaraient un effet, le moteur ne le lisait pas. À chaque
+fois, un test de contrat aurait coûté vingt lignes.
 
 ## Ce que la suite ne couvre pas encore
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
 toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
 les enchaînements de vagues Mythic+, les maîtrises de compétences
-(`utils/skills.js`), et les hauts faits (`data/achievements.js`), dont la
-validation lit des chemins de `progressionStats` sous forme de chaînes — un
-chemin erroné y serait silencieux, exactement comme l'était `skillUsed`.
+(`utils/skills.js`), et les valeurs `derived` des hauts faits, qui restent le
+seul chemin de résolution non couvert par le test de contrat.
