@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-566 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
+573 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -38,6 +38,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `achievements.contract.test.js` | Les 224 hauts faits : compteurs résolus, valeurs dérivées calculées, buts atteignables |
 | `skills.test.js` | Paliers de maîtrise, bonus cumulés, descriptions de compétences |
 | `mythic.test.js` | Missions Mythic+, enchaînement des vagues, affixes et leurs effets |
+| `campaign.contract.test.js` | Chaque continent est reconnu par le moteur et garde sa mécanique |
 
 ## Déterminisme
 
@@ -132,6 +133,7 @@ suite :
 | Bonus de palier Mythic+ redevenu ponctuel | 1 |
 | Nombre d'affixes qui redescend | 2 |
 | Jauge non ramenée entre deux vagues | 1 |
+| Identifiant de zone de campagne périmé | 1 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -185,6 +187,7 @@ projet, déclarées séparément, se rejoignent bien.
 - `quests.contract.test.js` — tout événement attendu par une quête est émis
 - `achievements.contract.test.js` — tout compteur de haut fait résout vers une
   source réellement alimentée, et tout but est atteignable avec les données du jeu
+- `campaign.contract.test.js` — chaque continent est reconnu par le moteur
 
 C'est la forme de bug la plus coûteuse du projet : rien ne plante, rien
 n'apparaît dans les logs, et la fonctionnalité est simplement absente. Les
