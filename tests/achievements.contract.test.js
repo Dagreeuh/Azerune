@@ -15,6 +15,10 @@ import fs from'node:fs';
 import{fileURLToPath}from'node:url';
 import{ACHIEVEMENTS,ACHIEVEMENT_CATEGORIES,achievementProgress,achievementReady}
   from'../src/data/achievements';
+import{UNIQUE_WEAPONS}from'../src/data/legendary';
+import{CONTINENTS,DIFFICULTIES}from'../src/data/campaign';
+import{MAX_RESONANCE,MAX_STARS,MAX_LEVEL,levelCap}from'../src/utils/progression';
+import{ITEM_MAX_UPGRADE}from'../src/data/items';
 import{emptyProgressionStats,emptyChampionStat,mergeChampionStats,CHAMPION_METRICS}
   from'../src/utils/progressionStats';
 import{HEROES}from'../src/data/heroes';
@@ -167,5 +171,113 @@ describe('coherence du catalogue',()=>{
           .toBeGreaterThan(tries[index-1].score);
       }
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Valeurs derivees.
+//
+// Second chemin de resolution, a cote des compteurs : `derived(name, state)`
+// renvoie `{...}[name] || 0`. Un nom non gere retombe donc a 0, exactement
+// comme un chemin qui ne resout pas — meme silence, meme haut fait bloque.
+
+/** Etat de jeu complet, tel que GameContext le transmet. */
+const etatVide=()=>({campaign:{scores:{}},expeditionProgress:{},raidProgress:{},
+  mythicProgress:{},owned:[],championProgress:{},forgeHistory:[],inventory:[],
+  history:[],legendaryChronicles:{obtainedWeapons:{}},
+  progressionStats:emptyProgressionStats()});
+
+/** Etat d'un joueur ayant tout termine. */
+function etatComplet(){
+  const championProgress=Object.fromEntries(HEROES.map(hero=>
+    [hero.id,{level:MAX_LEVEL,xp:0,stars:MAX_STARS,soulFragments:0,resonance:MAX_RESONANCE}]));
+  const scores=Object.fromEntries(CONTINENTS.flatMap(continent=>
+    (continent.stages||[]).flatMap(stage=>
+      DIFFICULTIES.map(difficulte=>[`${difficulte.id}:${continent.id}:${stage.id}`,3]))));
+  return{...etatVide(),
+    owned:HEROES.map(hero=>hero.id),
+    championProgress,
+    campaign:{scores},
+    inventory:[{id:'i1',level:ITEM_MAX_UPGRADE}],
+    legendaryChronicles:{obtainedWeapons:Object.fromEntries(
+      Object.keys(UNIQUE_WEAPONS).map(cle=>[cle,true]))}};
+}
+
+const derives=ACHIEVEMENTS.filter(a=>a.derived);
+
+describe('valeurs derivees',()=>{
+  it('il y en a, et chacune a un but',()=>{
+    expect(derives.length).toBeGreaterThan(5);
+    derives.forEach(a=>expect(a.goal,`${a.id}`).toBeGreaterThan(0));
+  });
+
+  it('chaque valeur derivee est reellement calculee, jamais un repli muet',()=>{
+    // Un nom non gere renvoie 0 en silence. On le detecte en comparant un etat
+    // vide a un etat ou tout est termine : une valeur reellement calculee doit
+    // bouger, sinon elle est indistinguable d'un nom inconnu.
+    const vide=etatVide(),complet=etatComplet();
+    const muettes=[...new Set(derives.map(a=>a.derived))].filter(nom=>{
+      const faux={id:'x',derived:nom,goal:1};
+      return achievementProgress(faux,vide).current===achievementProgress(faux,complet).current;
+    });
+    expect(muettes).toEqual([]);
+  });
+
+  it('chaque valeur derivee reste un nombre fini, meme sur un etat vide',()=>{
+    [...new Set(derives.map(a=>a.derived))].forEach(nom=>{
+      const valeur=achievementProgress({id:'x',derived:nom,goal:1},etatVide()).current;
+      expect(Number.isFinite(valeur),nom).toBe(true);
+      expect(valeur,nom).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  it('tolere un etat incomplet sans lever',()=>{
+    [...new Set(derives.map(a=>a.derived))].forEach(nom=>{
+      expect(()=>achievementProgress({id:'x',derived:nom,goal:1},{}),nom).not.toThrow();
+    });
+  });
+
+  it('aucun haut fait derive n est bloque a zero une fois le jeu termine',()=>{
+    // Le test qu'aucune suite ne faisait : le joueur qui a tout fait peut-il
+    // vraiment tout valider ?
+    const complet=etatComplet();
+    const impossibles=derives.filter(a=>!achievementReady(a,complet))
+      .map(a=>`${a.id} « ${a.name} » — ${a.derived} atteint ` +
+        `${achievementProgress(a,complet).current}/${a.goal}`);
+    expect(impossibles).toEqual([]);
+  });
+});
+
+describe('atteignabilite des buts derives',()=>{
+  it('les buts de collection ne depassent pas le roster',()=>{
+    derives.filter(a=>['ownedCount','sixStarCount','level60Count'].includes(a.derived))
+      .forEach(a=>expect(a.goal,`${a.id}`).toBeLessThanOrEqual(HEROES.length));
+  });
+
+  it('le but de Resonance ne depasse pas le maximum du jeu',()=>{
+    derives.filter(a=>a.derived==='maxResonance')
+      .forEach(a=>expect(a.goal,`${a.id}`).toBeLessThanOrEqual(MAX_RESONANCE));
+  });
+
+  it('le niveau 60 est bien atteignable au maximum d etoiles',()=>{
+    expect(levelCap(MAX_STARS)).toBeGreaterThanOrEqual(MAX_LEVEL);
+  });
+
+  it('le but d etoiles de campagne ne depasse pas ce que la campagne peut rendre',()=>{
+    const etapes=CONTINENTS.reduce((n,c)=>n+(c.stages?.length||0),0);
+    const maximum=etapes*DIFFICULTIES.length*3;
+    derives.filter(a=>a.derived==='campaignStars').forEach(a=>
+      expect(a.goal,`${a.id} vise ${a.goal} etoiles sur ${maximum} possibles`)
+        .toBeLessThanOrEqual(maximum));
+  });
+
+  it('le seuil des Chroniques suit le nombre d armes uniques du jeu',()=>{
+    // Ecrit en dur, il aurait valide le haut fait a 7 sur 8 apres l ajout d une
+    // arme, ou l aurait rendu impossible apres un retrait.
+    const partiel={...etatComplet(),legendaryChronicles:{obtainedWeapons:
+      Object.fromEntries(Object.keys(UNIQUE_WEAPONS).slice(1).map(cle=>[cle,true]))}};
+    const cible=derives.find(a=>a.derived==='uniqueComplete');
+    expect(achievementReady(cible,partiel)).toBe(false);
+    expect(achievementReady(cible,etatComplet())).toBe(true);
   });
 });

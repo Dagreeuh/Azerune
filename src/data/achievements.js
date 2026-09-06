@@ -1,4 +1,5 @@
 import{HEROES}from'./heroes';
+import{UNIQUE_WEAPONS}from'./legendary';
 const get=(o,p,d=0)=>p.split('.').reduce((v,k)=>v?.[k],o)??d;
 const A=(id,category,icon,name,description,counter,goal,reward,extra={})=>({id,category,icon,name,description,counter,goal,reward,score:extra.score||10,...extra});
 const series=(id,category,icon,names,descriptions,counter,goals,rewards)=>goals.map((goal,index)=>A(`${id}-${index+1}`,category,icon,names[index],descriptions[index],counter,goal,rewards[index],{series:id,tier:index+1,score:(index+1)*10}));
@@ -62,7 +63,7 @@ export const ACHIEVEMENTS=[
  A('unique-1','Chroniques','🗡️','Légende forgée','Forger une arme Unique au terme d’une Chronique.','lifetime.chronicles.uniqueWeaponsForged',1,{gold:7500,gems:400,essence:400},{score:50}),
  ...CHAMPION_MASTERIES
 ];
-const derived=(name,state)=>{const progress=Object.values(state.championProgress||{}),owned=(state.owned||[]),weapons=Object.keys(state.legendaryChronicles?.obtainedWeapons||{}).filter(key=>state.legendaryChronicles.obtainedWeapons[key]);return({ownedCount:owned.length,rosterComplete:owned.length>=HEROES.length?1:0,sixStarCount:progress.filter(x=>Number(x?.stars||0)>=6).length,level60Count:progress.filter(x=>Number(x?.level||0)>=60).length,maxResonance:Math.max(0,...progress.map(x=>Number(x?.resonance||0))),plusFifteenCount:(state.inventory||[]).filter(x=>Number(x.level||0)>=15).length,campaignStars:Object.values(state.campaign?.scores||{}).reduce((n,value)=>n+(Number(value)||0),0),uniqueComplete:weapons.length>=7?1:0}[name]||0)};
+const derived=(name,state)=>{const progress=Object.values(state.championProgress||{}),owned=(state.owned||[]),weapons=Object.keys(state.legendaryChronicles?.obtainedWeapons||{}).filter(key=>state.legendaryChronicles.obtainedWeapons[key]);return({ownedCount:owned.length,rosterComplete:owned.length>=HEROES.length?1:0,sixStarCount:progress.filter(x=>Number(x?.stars||0)>=6).length,level60Count:progress.filter(x=>Number(x?.level||0)>=60).length,maxResonance:Math.max(0,...progress.map(x=>Number(x?.resonance||0))),plusFifteenCount:(state.inventory||[]).filter(x=>Number(x.level||0)>=15).length,campaignStars:Object.values(state.campaign?.scores||{}).reduce((n,value)=>n+(Number(value)||0),0),uniqueComplete:weapons.length>=Object.keys(UNIQUE_WEAPONS).length?1:0}[name]||0)};
 export function achievementProgress(a,state){const value=a.derived?derived(a.derived,state):get(state.progressionStats||{},a.counter||'',0);return{current:Math.min(Number(value)||0,a.goal||1),goal:a.goal||1};}
 export const achievementReady=(a,state)=>{const p=achievementProgress(a,state);return p.current>=p.goal};
 export const achievementScore=(state,claims={})=>ACHIEVEMENTS.reduce((n,a)=>n+(achievementReady(a,state)||claims[a.id]?a.score||0:0),0);

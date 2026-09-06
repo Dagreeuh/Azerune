@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-505 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
+515 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -35,7 +35,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `inventory.test.js` | Valeur de revente et protections avant destruction d'un objet |
 | `progression.test.js` | Niveaux, évolution, Résonance, valeur des doublons — l'économie du jeu |
 | `progressionStats.test.js` | Agrégation par champion du rapport de combat |
-| `achievements.contract.test.js` | Les 224 compteurs de hauts faits résolvent vers une source alimentée |
+| `achievements.contract.test.js` | Les 224 hauts faits : compteurs résolus, valeurs dérivées calculées, buts atteignables |
 
 ## Déterminisme
 
@@ -121,6 +121,9 @@ suite :
 | Champions absents du combat effacés | 5 |
 | Métrique de mitigation retirée | 5 |
 | Appel à `mergeChampionStats` retiré | 1 |
+| Nom de valeur dérivée mal orthographié | 2 |
+| But de campagne porté au-delà du possible | 2 |
+| Seuil des Chroniques réécrit en dur | 1 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -173,7 +176,7 @@ projet, déclarées séparément, se rejoignent bien.
 - `stats.assessment.test.js` — tout effet listé dans `SKILL_TAGS` existe et est traité
 - `quests.contract.test.js` — tout événement attendu par une quête est émis
 - `achievements.contract.test.js` — tout compteur de haut fait résout vers une
-  source réellement alimentée
+  source réellement alimentée, et tout but est atteignable avec les données du jeu
 
 C'est la forme de bug la plus coûteuse du projet : rien ne plante, rien
 n'apparaît dans les logs, et la fonctionnalité est simplement absente. Les
@@ -191,5 +194,17 @@ fois, un test de contrat aurait coûté vingt lignes.
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
 toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
 les enchaînements de vagues Mythic+, les maîtrises de compétences
-(`utils/skills.js`), et les valeurs `derived` des hauts faits, qui restent le
-seul chemin de résolution non couvert par le test de contrat.
+(`utils/skills.js`), et le calcul du score de hauts faits, qui reste dans
+`GameProvider`.
+
+## Tester l'atteignabilité, pas seulement le calcul
+
+Un test peut vérifier qu'une formule est juste sans jamais se demander si le
+joueur peut y arriver. `achievements.contract.test.js` construit donc l'état
+d'un joueur ayant **tout terminé** — roster complet, tous les champions 6★
+niveau 60 en Résonance maximale, toutes les étoiles de campagne, toutes les
+armes uniques — et vérifie qu'aucun haut fait ne reste bloqué.
+
+C'est ce contrôle qui distingue une valeur réellement calculée d'un nom inconnu
+retombant à zéro : une valeur vivante doit bouger entre l'état vide et l'état
+complet.
