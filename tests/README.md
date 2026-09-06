@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-586 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
+638 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -40,6 +40,9 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `mythic.test.js` | Missions Mythic+, enchaînement des vagues, affixes et leurs effets |
 | `campaign.contract.test.js` | Chaque continent est reconnu par le moteur et garde sa mécanique |
 | `legendary.contract.test.js` | Chaîne des Chroniques : arme, relique, world boss, forge |
+| `academy.test.js` | Leçons, types de défi, récompenses de l'Académie |
+| `achievements.claim.test.js` | Réclamation d'un haut fait et score global |
+| `identities.contract.test.js` | Les cinq tables du codex couvrent tout le roster |
 
 ## Déterminisme
 
@@ -136,6 +139,10 @@ suite :
 | Jauge non ramenée entre deux vagues | 1 |
 | Identifiant de zone de campagne périmé | 1 |
 | Source d'une relique retirée | 1 |
+| Contrôle de leçon déjà encaissée retiré | 1 |
+| Récompense finale accordée trop tôt | 1 |
+| Contrôle de haut fait déjà réclamé retiré | 2 |
+| Un champion retiré du codex | 2 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -191,6 +198,7 @@ projet, déclarées séparément, se rejoignent bien.
   source réellement alimentée, et tout but est atteignable avec les données du jeu
 - `campaign.contract.test.js` — chaque continent est reconnu par le moteur
 - `legendary.contract.test.js` — chaque relique est accordée par une activité
+- `identities.contract.test.js` — aucun champion ne retombe sur la fiche générique
 
 C'est la forme de bug la plus coûteuse du projet : rien ne plante, rien
 n'apparaît dans les logs, et la fonctionnalité est simplement absente. Les
@@ -207,8 +215,8 @@ fois, un test de contrat aurait coûté vingt lignes.
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
 toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
-le calcul du score de hauts faits et l'attribution de leurs récompenses, qui
-restent dans `GameProvider`.
+la couche React elle-même — pages et composants — qui demanderait
+`@testing-library/react`, et les kits de champions un par un.
 
 ## Tester la monotonie
 
