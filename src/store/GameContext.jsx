@@ -4,6 +4,7 @@ import{ITEMS,SLOTS,generateCampaignItem,generateAchievementItem,generateShopItem
 import{QUESTS,WEEKLY_QUESTS,MONTHLY_QUESTS,QUEST_GROUPS,FINAL_CHESTS,QUEST_PERIOD_CONFIG}from'../data/quests';
 import{CONTINENTS,DIFFICULTIES,STAR_MILESTONES,allMissionKeys,milestoneKey,createMission}from'../data/campaign';
 import{load,save,day}from'../utils/storage';
+import{campaignLootRate,campaignStoneChance,campaignStoneCapped,CAMPAIGN_STONE_DAILY_LIMIT,campaignBaseXp,campaignFarmGold,campaignMissionRewards,campaignProgressionGift,raidQualityBonus,raidBonusLootAllowed,RAID_BONUS_LOOT_CHANCE,raidRelicChance,expeditionGearChance,expeditionRewardAmount}from'../utils/rewards'
 import{totalStats,progressionStats as championProgressionStats,championPower,teamPower,missionDifficulty,campaignXp,calibratedEncounterPower,assessTeamForMission}from'../utils/stats';
 import{addChampionXp,defaultChampionProgress,evolveFromDuplicate,normalizeChampionProgress,normalizeResonanceOverflow,evolutionStatus,evolveChampion,resonanceStatus,strengthenResonance}from'../utils/progression';
 import{skillInfo,skillMaxLevel}from'../utils/skills';
@@ -367,15 +368,14 @@ export function GameProvider({children}){
     setInventory(current=>current.filter(entry=>entry.id!==itemId));
     return{ok:true,value,message:`${item.name} vendu pour ${value.toLocaleString('fr-FR')} or.`};
   };
-  const campaignFarmLootRate=mission=>{const rates={normal:{stage:42,boss:58},hard:{stage:54,boss:68},hardcore:{stage:66,boss:80}},entry=rates[mission.difficultyId]||rates.normal;return mission.boss?entry.boss:entry.stage;};
-  const rollCampaignLoot=(mission,guaranteed=false)=>{const lootChance=campaignFarmLootRate(mission),dropped=guaranteed||Math.random()<lootChance/100;if(!dropped)return{item:null,lootChance};const setIds=mission.setIds||[mission.setId].filter(Boolean),randomSetId=setIds[Math.floor(Math.random()*setIds.length)]||mission.setId,item=generateCampaignItem({...mission,setId:randomSetId});setInventory(current=>[item,...current].slice(0,300));return{item,lootChance};};
+  const rollCampaignLoot=(mission,guaranteed=false)=>{const lootChance=campaignLootRate(mission),dropped=guaranteed||Math.random()<lootChance/100;if(!dropped)return{item:null,lootChance};const setIds=mission.setIds||[mission.setId].filter(Boolean),randomSetId=setIds[Math.floor(Math.random()*setIds.length)]||mission.setId,item=generateCampaignItem({...mission,setId:randomSetId});setInventory(current=>[item,...current].slice(0,300));return{item,lootChance};};
   const claimAchievement=id=>{const achievement=ACHIEVEMENTS.find(item=>item.id===id);if(!achievement)return{ok:false,message:'Haut fait introuvable.'};if(achievementClaims[id])return{ok:false,message:'Récompense déjà réclamée.'};const achievementState={campaign,expeditionProgress,raidProgress,mythicProgress,owned,championProgress,forgeHistory,inventory,history,legendaryChronicles,progressionStats};if(!achievementReady(achievement,achievementState))return{ok:false,message:'Objectif non terminé.'};const reward=achievement.reward||{};if(reward.gold)setGold(value=>value+reward.gold);if(reward.gems)setGems(value=>value+reward.gems);if(reward.essence)setForgeEssence(value=>value+reward.essence);const gear=[...(reward.gear?[reward.gear]:[]),...(reward.gearPack||[])].map(generateAchievementItem);if(gear.length)setInventory(current=>[...gear,...current].slice(0,300));setAchievementClaims(current=>({...current,[id]:Date.now()}));return{ok:true,message:`Récompense de ${achievement.name} reçue.`};};
   const finishMythicMission=mission=>{const uniqueRelic=rollLegendaryMythic(mission);const level=mission.mythicLevel,reward=mission.reward||{},first=!mythicProgress.claimed?.[level];if(!first)return{mythic:true,first:false,gold:0,gems:0,essence:0,uniqueRelic};if(reward.gold)setGold(v=>v+reward.gold);if(reward.gems)setGems(v=>v+reward.gems);if(reward.stones)setHearthstones(v=>v+reward.stones);if(reward.essence)setForgeEssence(v=>v+reward.essence);if(reward.tomes)setMasteryTomes(v=>v+reward.tomes);if(reward.souls)setUniversalSoul5(v=>v+reward.souls);const loot=reward.gear?generateMythicItem({level,source:`Mythic+ · ${mission.mythicSeason} · Niveau ${level}`}):null;if(loot)setInventory(v=>[loot,...v].slice(0,300));setMythicProgress(current=>({...current,completed:Math.max(current.completed||0,level),claimed:{...(current.claimed||{}),[level]:true}}));emitProgressEvent('mythicLevelReached',{amount:1,value:level});return{mythic:true,first:true,gold:reward.gold||0,gems:reward.gems||0,essence:reward.essence||0,stones:reward.stones||0,tomes:reward.tomes||0,souls:reward.souls||0,loot,uniqueRelic};};
   const chooseSundayExpeditionHonor=id=>{if(new Date().getDay()!==0)return{ok:false,message:'Le choix manuel est réservé au dimanche.'};if(!EXPEDITIONS.some(entry=>entry.id===id))return{ok:false,message:'Expédition inconnue.'};if(expeditionProgress.honor?.locked)return{ok:false,message:'Le choix du dimanche est déjà verrouillé.'};setExpeditionProgress(current=>({...current,honor:{...(current.honor||{}),sundayChoice:id,locked:true}}));return{ok:true,message:'Expédition à l’honneur choisie pour aujourd’hui.'};};
   const claimExpeditionHonor=()=>{const honor=expeditionProgress.honor||{},featuredId=expeditionHonorForDate(new Date(),honor.sundayChoice),reward=expeditionHonorReward(featuredId);if(!featuredId||!reward)return{ok:false,message:'Choisis d’abord l’Expédition à l’honneur.'};if(honor.claimed)return{ok:false,message:'Le coffre a déjà été récupéré aujourd’hui.'};if((honor.wins||0)<EXPEDITION_HONOR_WINS)return{ok:false,message:`Il faut ${EXPEDITION_HONOR_WINS} victoires récompensées.`};if(reward.gold)setGold(value=>value+reward.gold);if(reward.xp)grantXp(team,reward.xp);if(reward.essence)setForgeEssence(value=>value+reward.essence);if(reward.ascension)setAscensionEssences(value=>({minor:value.minor+(reward.ascension.minor||0),major:value.major+(reward.ascension.major||0),mythic:value.mythic+(reward.ascension.mythic||0)}));setExpeditionProgress(current=>({...current,honor:{...(current.honor||{}),claimed:true,locked:true}}));return{ok:true,message:`Coffre quotidien reçu : ${reward.label}.`};};
   const finishExpeditionMission=mission=>{
-    const id=mission.expeditionId,level=mission.expeditionLevel,key=mission.key,first=!expeditionProgress.firstWins?.[key],rewarded=expeditionProgress.seals>0,base=mission.expeditionData.reward,factor=first?1.25:1,amount=typeof base==='number'?(rewarded?Math.round(base*factor):0):0,ascension=typeof base==='object'&&rewarded?Object.fromEntries(Object.entries(base).map(([grade,value])=>[grade,Math.round(value*factor)])):{minor:0,major:0,mythic:0};
-    const loot=rewarded&&Math.random()<(mission.expeditionData.gearChance??(0.30+level*0.035))?generateExpeditionItem({expeditionId:id,level,source:`${mission.expeditionData.name} · Niveau ${level}`}):null;const reward={expedition:true,rewardType:mission.expeditionData.rewardType,amount,ascension,improved:first,rewarded,loot,sealsLeft:expeditionProgress.seals};if(loot)setInventory(value=>[loot,...value].slice(0,300));
+    const id=mission.expeditionId,level=mission.expeditionLevel,key=mission.key,first=!expeditionProgress.firstWins?.[key],rewarded=expeditionProgress.seals>0,base=mission.expeditionData.reward,{amount,ascension}=expeditionRewardAmount(base,first,rewarded);
+    const loot=rewarded&&Math.random()<expeditionGearChance(mission.expeditionData,level)?generateExpeditionItem({expeditionId:id,level,source:`${mission.expeditionData.name} · Niveau ${level}`}):null;const reward={expedition:true,rewardType:mission.expeditionData.rewardType,amount,ascension,improved:first,rewarded,loot,sealsLeft:expeditionProgress.seals};if(loot)setInventory(value=>[loot,...value].slice(0,300));
     if(rewarded){if(reward.rewardType==='gold')setGold(value=>value+amount);if(reward.rewardType==='xp')grantXp(team,amount);if(reward.rewardType==='essence')setForgeEssence(value=>value+amount);if(reward.rewardType==='ascension')setAscensionEssences(value=>({minor:value.minor+ascension.minor,major:value.major+ascension.major,mythic:value.mythic+ascension.mythic}));}
     setExpeditionProgress(current=>{const honor=current.honor||{},featuredId=expeditionHonorForDate(new Date(),honor.sundayChoice),eligible=rewarded&&featuredId===id,nextWins=eligible?Math.min(EXPEDITION_HONOR_WINS,(honor.wins||0)+1):(honor.wins||0);return{...current,seals:Math.max(0,current.seals-(rewarded?1:0)),completed:{...current.completed,[id]:Math.max(current.completed?.[id]||0,level)},firstWins:{...current.firstWins,[key]:true},honor:{...honor,wins:nextWins,locked:honor.locked||Boolean(eligible)}}});
     reward.sealsLeft=Math.max(0,expeditionProgress.seals-(rewarded?1:0));return reward;
@@ -384,43 +384,34 @@ export function GameProvider({children}){
   const finishRaidMission=(mission,stars,battle=null)=>{
     const raidId=mission.raidId,level=mission.raidLevel,key=mission.key,first=!raidProgress.firstWins?.[key],rewarded=raidProgress.attempts>0;
     const performance=battle?.raidState?{championActions:battle.raidState.championActions||0,mechanicFailures:battle.raidState.mechanicFailures||0,enraged:Boolean(battle.raidState.enraged),flawless:(battle.allies||[]).every(unit=>!unit.dead)}:null;const reward={gold:0,gems:0,stones:0,improved:first,loot:null,bonusLoot:null,raid:true,performance,attemptsLeft:raidProgress.attempts};
-    if(rewarded){if(raidId==='heartforge'&&[9,10].includes(level)){const chance=level===9?.0005:.0015;if(Math.random()<chance)reward.uniqueRelic=grantRelic('heartworld-eye',`Fournaise niveau ${level}`);}reward.gold=mission.reward.gold;reward.gems=mission.reward.gems;reward.stones=mission.reward.stones||0;reward.loot=generateRaidItem({...mission.raidData.loot,qualityBonus:performance?.flawless?5:0});if(performance&&performance.mechanicFailures===0&&Math.random()<.10)reward.bonusLoot=generateRaidItem(mission.raidData.loot);setGold(value=>value+reward.gold);setGems(value=>value+reward.gems);if(reward.stones)setHearthstones(value=>value+reward.stones);setInventory(current=>[reward.loot,...(reward.bonusLoot?[reward.bonusLoot]:[]),...current].slice(0,300));}
+    if(rewarded){const relicChance=raidRelicChance(raidId,level);if(relicChance&&Math.random()<relicChance)reward.uniqueRelic=grantRelic('heartworld-eye',`Fournaise niveau ${level}`);reward.gold=mission.reward.gold;reward.gems=mission.reward.gems;reward.stones=mission.reward.stones||0;reward.loot=generateRaidItem({...mission.raidData.loot,qualityBonus:raidQualityBonus(performance)});if(raidBonusLootAllowed(performance)&&Math.random()<RAID_BONUS_LOOT_CHANCE)reward.bonusLoot=generateRaidItem(mission.raidData.loot);setGold(value=>value+reward.gold);setGems(value=>value+reward.gems);if(reward.stones)setHearthstones(value=>value+reward.stones);setInventory(current=>[reward.loot,...(reward.bonusLoot?[reward.bonusLoot]:[]),...current].slice(0,300));}
     setRaidProgress(current=>({...current,attempts:Math.max(0,current.attempts-(rewarded?1:0)),completed:{...current.completed,[raidId]:Math.max(current.completed?.[raidId]||0,level)},firstWins:{...current.firstWins,[key]:true}}));
     reward.attemptsLeft=Math.max(0,raidProgress.attempts-(rewarded?1:0));return reward;
   };
 
   const rollCampaignStone=mission=>{
-    const used=Number(daily.campaignStones||0);if(used>=3)return{dropped:false,count:used,limit:3};
-    const rates={normal:mission.boss?.0075:.0035,hard:mission.boss?.01:.0055,hardcore:mission.boss?.015:.008};
-    const dropped=Math.random()<(rates[mission.difficultyId]||0);
+    const used=Number(daily.campaignStones||0);
+    if(campaignStoneCapped(used))return{dropped:false,count:used,limit:CAMPAIGN_STONE_DAILY_LIMIT};
+    const dropped=Math.random()<campaignStoneChance(mission);
     if(dropped){setHearthstones(value=>value+1);setDaily(current=>({...current,campaignStones:Number(current.campaignStones||0)+1}));}
-    return{dropped,count:used+(dropped?1:0),limit:3};
+    return{dropped,count:used+(dropped?1:0),limit:CAMPAIGN_STONE_DAILY_LIMIT};
   };
   const finishCampaignMission=(mission,stars,members=team)=>{
     const previous=campaign.scores[mission.key]||0;
     const improved=stars>previous;
     const teamValue=teamPower(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory));
-    const farmFactor=mission.difficultyId==='hardcore'?.30:mission.difficultyId==='hard'?.275:.25,baseXp=Math.round((mission.reward?.xpBase||180)*(improved?1:farmFactor));
+    const baseXp=campaignBaseXp(mission,improved);
     const xpResult=campaignXp(baseXp,teamValue,mission.recommended);
     if(xpResult.xp)grantXp(members,xpResult.xp);
-    if(!improved){const farmGold=Math.max(1,Math.round(mission.reward.gold*.20)),lootRoll=rollCampaignLoot(mission,false),campaignStone=rollCampaignStone(mission);setGold(value=>value+farmGold);return{gold:farmGold,gems:0,stones:0,improved:false,farm:true,previousStars:previous,loot:lootRoll.item,lootChance:lootRoll.lootChance,campaignStone,championXp:xpResult.xp,xpFactor:xpResult.factor,xpFarm:true};}
-    const rewardFactors=[0,.45,.72,1],rewardFactor=Math.max(0,rewardFactors[stars]-rewardFactors[previous]);
-    const firstClear=previous===0;
-    const rewards={
-      gold:Math.round(mission.reward.gold*rewardFactor),
-      gems:Math.round(mission.reward.gems*rewardFactor),
-      stones:firstClear?(mission.reward.stones||0):0,
-      improved:true,
-      previousStars:previous,
-      rewardFactor,
-      rewardPercent:Math.round(rewardFactor*100),
-      firstClear
-    };
+    if(!improved){const farmGold=campaignFarmGold(mission),lootRoll=rollCampaignLoot(mission,false),campaignStone=rollCampaignStone(mission);setGold(value=>value+farmGold);return{gold:farmGold,gems:0,stones:0,improved:false,farm:true,previousStars:previous,loot:lootRoll.item,lootChance:lootRoll.lootChance,campaignStone,championXp:xpResult.xp,xpFactor:xpResult.factor,xpFarm:true};}
+    const share=campaignMissionRewards(mission,stars,previous),firstClear=share.firstClear;
+    const rewards={...share,improved:true,previousStars:previous};
     setGold(value=>value+rewards.gold);
     setGems(value=>value+rewards.gems);
     if(rewards.stones)setHearthstones(value=>value+rewards.stones);
     setCampaign(current=>({...current,scores:{...current.scores,[mission.key]:stars}}));emitProgressEvent('campaignStarsEarned',{amount:Math.max(0,stars-previous)});
-    const lootRoll=rollCampaignLoot(mission,firstClear),campaignStone=rollCampaignStone(mission);let progressionGift=null;if(firstClear&&mission.difficultyId==='normal'&&mission.boss){const gifts={valebrume:{slot:'Casque',setId:'vitality',mainStat:'hp',label:'Initiation Vitalité'},khazdrum:{slot:'Arme',setId:'attack',mainStat:'atk',label:'Initiation Attaque'},'bastion-pierre':{slot:'Épaules',setId:'defense',mainStat:'def',label:'Initiation Défense'},'coeur-ignifuge':{slot:'Torse',setId:'fireproof',mainStat:'resistance',label:'Préparation Cœur-Monde'}};const gift=gifts[mission.continentId];if(gift){progressionGift=generateAchievementItem(gift);progressionGift={...progressionGift,stars:mission.continentId==='coeur-ignifuge'?3:2,quality:mission.continentId==='coeur-ignifuge'?'rare':'common',itemLevel:Number(lootRoll.item?.itemLevel||0)||Math.max(1,(Number(mission.continentIndex)||0)+1),source:`${gift.label} · ${mission.continentName}`,giftLabel:gift.label,giftType:mission.continentId==='coeur-ignifuge'?'fireproof':'tutorial'};setInventory(current=>[progressionGift,...current].slice(0,300));}}
+    const lootRoll=rollCampaignLoot(mission,firstClear),campaignStone=rollCampaignStone(mission);const progressionGift=campaignProgressionGift(mission,firstClear,lootRoll.item?.itemLevel);
+    if(progressionGift)setInventory(current=>[progressionGift,...current].slice(0,300));
     return{...rewards,farm:false,loot:lootRoll.item,progressionGift,lootChance:lootRoll.lootChance,campaignStone,championXp:xpResult.xp,xpFactor:xpResult.factor,xpFarm:false};
   };
 

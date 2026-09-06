@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-290 tests, environ une seconde et demie. Aucun test ne modifie le code de production.
+335 tests, environ une seconde et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -28,6 +28,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `stats.test.js` | Puissance de champion et d'équipe, progression, équipement, difficulté, XP |
 | `stats.assessment.test.js` | Détection des capacités d'équipe et note de faisabilité affichée avant mission |
 | `rewards.test.js` | Génération du butin, sets actifs, coût d'amélioration, recyclage, forge |
+| `rewards.mission.test.js` | Calcul des récompenses de fin de mission : campagne, raid, expédition |
 
 ## Déterminisme
 
@@ -91,6 +92,11 @@ suite :
 | Nombre de pièces d'un set ignoré | 1 |
 | Pénalités de recyclage supprimées | 2 |
 | Paliers à sous-stat déplacés | 2 |
+| Paliers d'étoiles `45/72` → `50/75` | 4 |
+| Or de farm `20 %` → `35 %` | 1 |
+| Pierres hors premier passage | 1 |
+| Chances de relique de raid inversées | 1 |
+| Bonus de première victoire retiré | 2 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -116,10 +122,23 @@ Pour `storage.test.js`, `localStorage` et `sessionStorage` sont remplacés par u
 stockage minimal via `vi.stubGlobal` : l'environnement de test est `node`, il
 n'y en a pas.
 
+## Rendre testable ce qui ne l'est pas
+
+`GameProvider` est un composant de 70 Ko : ses fonctions internes ne sont
+atteignables par aucun test sans monter React. La voie utilisée ici, sans
+ajouter de dépendance de test, est de séparer la décision de l'effet.
+
+`src/utils/rewards.js` en est l'exemple : il calcule **ce que** le joueur
+reçoit — parts par étoiles, or de farm, taux de butin, cadeaux de progression,
+montants d'expédition — pendant que `GameContext` garde les `setState`.
+`finishCampaignMission` est passée d'un bloc mêlant calcul et effets à une
+orchestration lisible, et ses règles sont couvertes par 45 tests.
+
+La même découpe reste à faire pour les quêtes, la forge et la boutique.
+
 ## Ce que la suite ne couvre pas encore
 
-Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, la
-campagne, et toute la couche React. Les prochaines cibles utiles, par ordre de
-rentabilité : les enchaînements de vagues Mythic+, les récompenses de fin de
-mission, et le calcul de puissance d'équipe (`utils/stats.js`), qui pilote
-l'évaluation de faisabilité affichée avant chaque combat.
+Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
+toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
+les quêtes et leur validation, la forge et la boutique, puis les enchaînements
+de vagues Mythic+.

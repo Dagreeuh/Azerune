@@ -75,11 +75,35 @@ liste nulle, et `setStats` accède aux statistiques du set de façon défensive.
 Aucun changement de comportement sur des données valides : le joueur perd
 seulement le bonus d'un set qui n'existe plus, au lieu de perdre l'écran.
 
-## 3. Couverture
+## 3. Le calcul des récompenses est sorti du composant
+
+`finishCampaignMission`, `finishRaidMission` et `finishExpeditionMission`
+étaient des closures de `GameProvider`, mêlant le calcul de la récompense et
+les `setState` qui l'appliquent. Aucun test ne pouvait les atteindre sans
+monter React.
+
+Le calcul est extrait dans `src/utils/rewards.js`, en fonctions pures :
+parts de récompense par étoiles, or de farm, XP de base, taux de butin et de
+Pierres, plafond quotidien, cadeaux de progression, bonus de raid, montants
+d'expédition. `GameContext` garde les effets de bord et se contente de les
+appeler.
+
+Les formules sont reprises à l'identique. Les seuls écarts, volontaires, sont
+des garde-fous sur des entrées qui faisaient lever : une mission sans bloc
+`reward` renvoie désormais zéro au lieu de planter, et un nombre d'étoiles hors
+plage est borné au lieu de produire `NaN`.
+
+## 4. Couverture
 
 `tests/rewards.test.js` — 39 tests sur les générateurs de butin de campagne,
 raid, expédition, Mythic+, boutique et haut fait, sur la normalisation d'objet,
 les sets actifs, le coût d'amélioration, la valeur de recyclage et la forge.
+
+`tests/rewards.mission.test.js` — 45 tests sur le calcul des récompenses :
+paliers d'étoiles et leur recomposition à 100 %, or de farm, XP de farm par
+difficulté, taux de butin et de Pierres, plafond quotidien, cadeaux de
+progression par continent, chances de relique de raid, bonus de première
+victoire d'expédition et Essences d'ascension par grade.
 
 Les générateurs sont vérifiés par invariants sur des dizaines de graines : slot
 connu, qualité connue, set existant, nombre de sous-statistiques conforme à la
