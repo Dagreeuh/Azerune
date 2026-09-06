@@ -18,7 +18,12 @@ const bossDotAmount=(unit,debuff,percent,fallback)=>{const raw=Math.round(unit.m
 const decay=group=>Object.fromEntries(Object.entries(group||{}).map(([key,value])=>[key,{...value,turns:value.turns-1}]).filter(([,value])=>value.turns>0));
 
 const DEBUFF_LABELS={atkDown:'Attaque réduite',defDown:'Défense réduite',slow:'Vitesse réduite',mark:'Marque',poison:'Poison',burn:'Brûlure',bleed:'Saignement',stun:'Étourdissement',provoke:'Provocation',hunt:'Traque',virulence:'Virulence',exposed:'Armure exposée',agony:'Agonie',corruption:'Corruption',festering:'Blessure purulente',healingDown:'Soins reçus réduits'};
-const debuffChance=(actor,target,baseChance,mastery=0)=>clamp(baseChance+mastery+(actor.accuracy||0)/100-(target.resistance||0)/100,.15,.95);
+// Precision reduite : le malus applique par la zone Oeil-Clair etait annonce
+// au joueur mais n'etait lu nulle part. Il divise desormais reellement la
+// Precision du lanceur, donc sa capacite a placer ses propres malus.
+const ACCURACY_DOWN_FACTOR=.65;
+const effectiveAccuracy=unit=>(unit?.accuracy||0)*(unit?.debuffs?.accuracyDown?ACCURACY_DOWN_FACTOR:1);
+const debuffChance=(actor,target,baseChance,mastery=0)=>clamp(baseChance+mastery+effectiveAccuracy(actor)/100-(target.resistance||0)/100,.15,.95);
 const tryDebuff=(actor,target,key,turns,baseChance,mastery,resisted)=>{
   const chance=debuffChance(actor,target,baseChance,mastery);
   if(Math.random()<=chance){target.debuffs[key]={turns,source:actor.id,sourceAtk:actor.atk};return true;}
@@ -155,7 +160,7 @@ export function enemyAction(battle){
     return{damage,absorbed,critical,relation};
   };
   let text='';
-  const expeditionBoss=enemies.find(unit=>unit.bossUnit&&!unit.dead);
+  const expeditionBoss=enemies.find(unit=>unit.bossUnit&&!unit.dead);const raidBoss=enemies.find(unit=>unit.raidRole==='boss'&&!unit.dead);
   if(actor.expeditionRole==='minor-shard'){
     enemies.filter(unit=>!unit.dead).forEach(unit=>{unit.atb=Math.min(100,(unit.atb||0)+14);unit.buffs.speedUp={turns:2};});text=`${actor.name} libère une impulsion : l’équipe ennemie gagne de la jauge et de la Vitesse.`;
   }else if(actor.expeditionRole==='major-shard'&&expeditionBoss){
@@ -171,7 +176,7 @@ export function enemyAction(battle){
   }else if(actor.expeditionRole==='offense-crystal'&&expeditionBoss){expeditionBoss.buffs.atkUp={turns:2};text=`${actor.name} augmente l’Attaque du Golem astral.`;
   }else if(actor.expeditionRole==='defense-crystal'&&expeditionBoss){expeditionBoss.buffs.defUp={turns:2};text=`${actor.name} augmente la Défense du Golem astral.`;
   }else if(actor.expeditionRole==='healing-crystal'&&expeditionBoss){const heal=Math.round(expeditionBoss.maxHp*.08);expeditionBoss.hp=Math.min(expeditionBoss.maxHp,expeditionBoss.hp+heal);actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}`,sourceId:actor.id,targetId:expeditionBoss.id,amount:heal,type:'heal',affinity:'neutral',critical:false});text=`${actor.name} rend ${heal} PV au Golem astral.`;
-  }else if(actor.raidRole==='priest'&&cooldowns[0]===0){const boss=enemies.find(unit=>unit.raidRole==='boss'&&!unit.dead);const heal=Math.round(boss.maxHp*.08);boss.hp=Math.min(boss.maxHp,boss.hp+heal);actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}`,sourceId:actor.id,targetId:boss.id,amount:heal,type:'heal',affinity:'neutral',critical:false});boss.buffs.atkUp={turns:2};cooldowns[0]=3;text=`${actor.name} canalise Flamme nourricière : ${heal} PV rendus à Rhazakar et Attaque augmentée.`;
+  }else if(actor.raidRole==='priest'&&cooldowns[0]===0&&raidBoss){const boss=raidBoss;const heal=Math.round(boss.maxHp*.08);boss.hp=Math.min(boss.maxHp,boss.hp+heal);actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}`,sourceId:actor.id,targetId:boss.id,amount:heal,type:'heal',affinity:'neutral',critical:false});boss.buffs.atkUp={turns:2};cooldowns[0]=3;text=`${actor.name} canalise Flamme nourricière : ${heal} PV rendus à Rhazakar et Attaque augmentée.`;
   }else if(actor.raidRole==='guardian'&&cooldowns[0]===0){choices.forEach(target=>tryDebuff(actor,target,'provoke',1,.55,0,resisted));actor.buffs.defUp={turns:2};cooldowns[0]=3;text=`${actor.name} utilise Rempart de lave : Provocation et Défense augmentée.`;
   }else if(actor.aiRole==='lunar-stag'){
     if(cooldowns[0]===0&&turnCount%2===0){let total=0;for(const target of choices.filter(unit=>!unit.dead)){const result=hit(target,.55);total+=result.damage;}cooldowns[0]=3;text=`${actor.name} utilise Onde lunaire : ${total} dégâts de zone.`;}
