@@ -249,3 +249,17 @@ aucune condition d'échec. Le Sablier crée aujourd'hui la **pression et le
 gradient de récompense** ; il ne deviendra létal qu'une fois l'Attaque des
 ennemis Mythic+ remontée. Les deux moitiés se complètent, et la seconde reste
 à faire.
+
+---
+
+> **Seconde correction — voir `RAPPORT-PUISSANCE-ENNEMIS-MYTHIC.md`.**
+> La « calibration finale » ci-dessus reste fausse sur un point : son équipe de
+> mesure était synthétique, ses statistiques calées à la main sur la puissance
+> recommandée. Une équipe portant du vrai butin Mythic+ a une Défense bien plus
+> élevée et termine ses courses bien plus vite. Les durées mesurées (135 tours
+> au palier 1, 89 au palier 30) sont donc surestimées ; les vraies sont de
+> l'ordre de 50 à 70 tours. Le facteur de budget est passé de 133 à 120 et la
+> puissance recommandée a été entièrement recalée.
+>
+> La leçon vaut d'être notée : **un banc de simulation qui fabrique ses joueurs
+> au lieu de les équiper avec les tables du jeu mesure autre chose que le jeu.**

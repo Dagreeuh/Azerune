@@ -122,13 +122,17 @@ describe('createMythicMission',()=>{
         .toBeGreaterThan(calibratedEncounterPower(createMythicMission(niveau-1)));
   });
 
-  it('chaque dizaine franchie ajoute un cran de difficulte',()=>{
+  it('la puissance recommandee ne redescend jamais et n’a aucun palier mou',()=>{
+    // Le bug d'origine : la difficulte reculait apres chaque dizaine. La
+    // formule est desormais lisse, donc on verifie la propriete elle-meme —
+    // croissance stricte, et un ecart qui ne se retrecit jamais — plutot que
+    // la forme particuliere qui la produisait.
     const saut=niveau=>createMythicMission(niveau).recommended
       -createMythicMission(niveau-1).recommended;
-    // Le niveau 30 est le dernier : pas de 31 auquel le comparer.
-    [10,20].forEach(palier=>
-      expect(saut(palier),`palier ${palier}`).toBeGreaterThan(saut(palier+1)));
-    expect(saut(30),'palier 30').toBeGreaterThan(saut(29));
+    for(let niveau=2;niveau<=30;niveau+=1){
+      expect(saut(niveau),`niveau ${niveau}`).toBeGreaterThan(0);
+      if(niveau>2)expect(saut(niveau),`niveau ${niveau}`).toBeGreaterThanOrEqual(saut(niveau-1));
+    }
   });
 
   it('annonce une equipe de quatre et un boss decrit',()=>{
@@ -141,6 +145,85 @@ describe('createMythicMission',()=>{
   it('la cle de mission est unique par saison et par niveau',()=>{
     const cles=MYTHIC_LEVELS.map(niveau=>createMythicMission(niveau).key);
     expect(new Set(cles).size).toBe(cles.length);
+  });
+});
+
+describe('montee en puissance des ennemis',()=>{
+  const total=(level,cle)=>createMythicMission(level).waves.flat()
+    .reduce((somme,ennemi)=>somme+ennemi[cle],0);
+  const croissance=cle=>total(30,cle)/total(1,cle);
+  const croissancePuissance=()=>
+    createMythicMission(30).recommended/createMythicMission(1).recommended;
+
+  it('l’Attaque ennemie croit plus vite que la puissance recommandee',()=>{
+    // C'est la propriete qui manquait : l'Attaque suivait 1,035 par palier
+    // quand la puissance des joueurs suivait davantage. Les ennemis de haut
+    // niveau devenaient inoffensifs exactement la ou ils devaient mordre.
+    expect(croissance('atk')).toBeGreaterThan(croissancePuissance());
+  });
+
+  it('l’Attaque doit croitre plus vite parce que la Defense alliee la divise',()=>{
+    // La mitigation vaut 100/(100+DEF*3). Un joueur equipe pour le palier 30
+    // encaisse environ 6 % de l'Attaque annoncee, contre 17 % au palier 1 :
+    // l'Attaque doit donc au moins doubler ce rapport pour rester constante.
+    expect(croissance('atk')).toBeGreaterThan(2*croissancePuissance());
+  });
+
+  it('la Defense ennemie croit reellement avec le palier',()=>{
+    // Elle etait quasi plate : les degats du joueur montaient sans resistance
+    // et les derniers paliers se terminaient plus vite que ceux du milieu.
+    expect(croissance('def')).toBeGreaterThan(2);
+  });
+
+  it('les PV ennemis croissent avec le palier',()=>{
+    expect(croissance('hp')).toBeGreaterThan(croissancePuissance());
+  });
+
+  it('l’Attaque ennemie est calibree en valeur absolue, pas seulement en pente',()=>{
+    // Une pente juste sur des bases trop faibles laisse les ennemis inoffensifs
+    // a tous les paliers : ces bornes fixent le niveau reel, mesure par
+    // simulation contre un joueur equipe pour le palier.
+    expect(total(1,'atk')).toBeGreaterThan(8000);
+    expect(total(1,'atk')).toBeLessThan(11500);
+    expect(total(30,'atk')).toBeGreaterThan(55000);
+    expect(total(30,'atk')).toBeLessThan(75000);
+  });
+
+  it('un ennemi frappe fort pour ses propres PV',()=>{
+    // Le rapport qui a change : les ennemis Mythic+ etaient des sacs a PV
+    // inoffensifs. Ils encaissent moins et menacent davantage.
+    expect(total(15,'atk')/total(15,'hp')).toBeGreaterThan(1.5);
+    expect(total(15,'atk')/total(15,'hp')).toBeLessThan(3);
+  });
+
+  it('aucune statistique ennemie ne recule d’un palier au suivant',()=>{
+    ['hp','atk','def'].forEach(cle=>{
+      for(let niveau=2;niveau<=30;niveau+=1)
+        expect(total(niveau,cle),`${cle} au niveau ${niveau}`)
+          .toBeGreaterThanOrEqual(total(niveau-1,cle));
+    });
+  });
+
+  it('la derniere vague du palier 30 compte une escouade, pas un boss seul',()=>{
+    // Le palier final etait la course la plus courte du mode : sa quatrieme
+    // vague n'alignait qu'une seule unite quand toutes les autres en ont trois.
+    const vagues=createMythicMission(30).waves;
+    expect(vagues[3].length).toBe(3);
+    expect(vagues[3][0].bossUnit).toBe(true);
+    expect(vagues[3].filter(unite=>unite.mythicElite).length).toBe(2);
+  });
+
+  it('les identifiants de la derniere vague restent uniques',()=>{
+    // Deux unites partageant un identifiant se confondraient en combat.
+    const ids=createMythicMission(30).waves[3].map(unite=>unite.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('la puissance recommandee reflete un equipement du palier',()=>{
+    // Elle annoncait 2 925 au palier 1 quand un joueur pret en avait 12 500.
+    // Une jauge de preparation qui se trompe d'un facteur quatre ne sert a rien.
+    expect(createMythicMission(1).recommended).toBeGreaterThan(10000);
+    expect(createMythicMission(30).recommended).toBeGreaterThan(35000);
   });
 });
 

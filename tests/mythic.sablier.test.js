@@ -32,8 +32,8 @@ describe('constantes du Sablier',()=>{
   // Valeurs calibrees par simulation (Audit/PROPOSITION-SABLIER-MYTHIC.md).
   // Volontairement en dur : les recalculer depuis leur propre formule ne
   // testerait rien.
-  it('le facteur de budget est de 133 tours par unite de ratio',()=>{
-    expect(MYTHIC_BUDGET_FACTOR).toBe(133);
+  it('le facteur de budget est de 120 tours par unite de ratio',()=>{
+    expect(MYTHIC_BUDGET_FACTOR).toBe(120);
   });
 
   it('l’Effondrement coute 5 % d’Attaque ennemie par tour depasse',()=>{
@@ -53,8 +53,8 @@ describe('constantes du Sablier',()=>{
 
 describe('budget propre a chaque niveau',()=>{
   it('le budget suit les PV ennemis rapportes a la puissance recommandee',()=>{
-    // 13 300 PV pour 10 000 de puissance recommandee : 133 x 1,33 = 177.
-    expect(mythicTurnBudget([[{hp:6650}],[{hp:6650}]],10000)).toBe(177);
+    // 13 300 PV pour 10 000 de puissance recommandee : 120 x 1,33 = 160.
+    expect(mythicTurnBudget([[{hp:6650}],[{hp:6650}]],10000)).toBe(160);
   });
 
   it('les quatre vagues comptent, pas seulement la premiere',()=>{
@@ -87,11 +87,22 @@ describe('budget propre a chaque niveau',()=>{
     });
   });
 
-  it('un budget fixe rendrait Mythic+ 1 plus severe que Mythic+ 30',()=>{
-    // Le probleme que la formule corrige : la course la plus longue est la
-    // plus basse, parce que sa puissance recommandee est faible.
-    expect(createMythicMission(1).turnBudget)
-      .toBeGreaterThan(createMythicMission(30).turnBudget);
+  it('le budget varie d’un niveau a l’autre, il n’est jamais constant',()=>{
+    // Le probleme que la formule corrige : deux niveaux dont le contenu differe
+    // ne peuvent pas partager le meme budget sans avantager l'un des deux.
+    const budgets=MYTHIC_LEVELS.map(level=>createMythicMission(level).turnBudget);
+    expect(new Set(budgets).size).toBeGreaterThan(10);
+  });
+
+  it('le budget reste dans une fourchette jouable a tous les niveaux',()=>{
+    // Mesure par simulation : une course menee avec l'equipement du palier dure
+    // 40 a 90 tours. Un budget hors de cette plage rendrait le Sablier soit
+    // decoratif, soit impossible.
+    MYTHIC_LEVELS.forEach(level=>{
+      const budget=createMythicMission(level).turnBudget;
+      expect(budget,`niveau ${level}`).toBeGreaterThanOrEqual(50);
+      expect(budget,`niveau ${level}`).toBeLessThanOrEqual(110);
+    });
   });
 
   it('le seuil parfait vaut les trois quarts du budget du niveau',()=>{

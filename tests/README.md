@@ -273,3 +273,27 @@ l'appel exact — `turnBudget:mission.turnBudget`,
 Un maillon coupé laisse tout le reste vert : le budget retombe silencieusement
 sur sa valeur par défaut, le palier est toujours « parfait », et personne ne
 voit rien.
+
+## Un banc de simulation doit équiper ses joueurs, pas les fabriquer
+
+Le premier banc utilisé pour calibrer le Sablier construisait ses champions en
+multipliant leurs statistiques de base par un facteur choisi pour atteindre la
+puissance recommandée. Toutes les statistiques montaient ensemble, Défense
+comprise.
+
+Un vrai joueur ne ressemble pas à ça. Son équipement vient de
+`generateMythicItem`, ses statistiques passent par `totalStats`, et sa Défense
+suit une courbe bien plus raide. Résultat : le banc synthétique annonçait des
+courses de 135 tours là où le jeu en donne 50, et une équipe qui mourait là où
+le jeu la laisse gagner sans une égratignure.
+
+Deux calibrations successives ont été publiées sur ces mauvais chiffres avant
+que la mesure réelle ne les corrige. La règle qui en sort :
+
+**Un banc de simulation doit construire ses joueurs avec les tables du jeu —
+génération de butin, progression, calcul de statistiques — et jamais avec des
+valeurs choisies pour atteindre un score.** Sinon il mesure le banc, pas le jeu.
+
+Corollaire : un chiffre d'équilibrage n'est acquis qu'une fois mesuré **sur le
+code livré**, mécanique câblée. Une simulation faite avant l'implémentation
+sert à décider s'il faut y aller, pas à fixer les constantes.

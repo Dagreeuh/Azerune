@@ -126,3 +126,14 @@ tests de contrat qui vérifient que le budget de la mission arrive jusqu'au
 moteur, que le combat arrive jusqu'au calcul de récompense, et que la règle est
 affichée au joueur. **34 mutations** ont été appliquées au code livré : toutes
 sont détectées.
+
+---
+
+> **Correction (voir `EQUILIBRAGE-PUISSANCE-ENNEMIS-MYTHIC.md`).** Les budgets
+> et la table de résultats ci-dessus proviennent d'une simulation menée avec une
+> équipe synthétique, dont les statistiques étaient calées artificiellement sur
+> la puissance recommandée. Mesurée avec du vrai butin, cette équipe a une
+> Défense bien plus élevée et des courses bien plus courtes. Les budgets réels
+> vont de **56 tours au palier 1 à 80 au palier 30**, et le facteur de budget
+> est passé de 133 à 120. La mécanique du Sablier, ses trois paliers et ses
+> multiplicateurs de butin sont inchangés.
