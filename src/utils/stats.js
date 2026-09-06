@@ -100,17 +100,21 @@ export function encounterPower(enemies,scale=1,boss=false){
  */
 const SKILL_TAGS={
  heal:['healingSeed','seedBloom','livingGarden','atonementStrike','atonementPenance',
-       'totemHeal','healingTotem','totemTide','soulMetamorphosis'],
- cleanse:['healingSeed','seedBloom'],
+       'totemHeal','healingTotem','totemTide','soulMetamorphosis',
+       'mistStrike','renewingMist','revival'],
+ // Yunmei est la seconde source de purification du jeu : Sylven n'est plus
+ // un point de passage oblige.
+ cleanse:['healingSeed','seedBloom','renewingMist','revival'],
  // aegisStrike accorde un bouclier — shield(low, actor.maxHp*.08) — et manquait.
  shield:['guardianLink','guardianWall','rescueShield','rescueSanctuary','atonementShield',
          'soulMetamorphosis','aegisStrike'],
  // gardenThorn applique Ralentissement — debuff(chosen,'slow',2,.75) — et manquait.
  control:['impactQuake','unstableStun','gardenPrison','refluxStrike','refluxDrain',
-          'bladeDanceDrain','highTide','soulSigil','gardenThorn'],
+          'bladeDanceDrain','highTide','soulSigil','gardenThorn',
+          'frostBolt','frostNova','frostShatter'],
  debuff:['agony','corruption','alchemyPoison','alchemyMix','alchemyCatalyst','emberBurn',
          'virulentPoison','festeringStrike','festeringSpread','impactFracture','herbalThorn',
-         'lowTide','condemnStrip']
+         'lowTide','condemnStrip','frostBolt','frostNova']
 };
 const hasAny=(effects,values)=>values.some(value=>effects.has(value));
 function heroCapabilities(hero){

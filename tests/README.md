@@ -318,3 +318,34 @@ Le test complémentaire est celui de la non-régression : une table de référen
 figée sur les anciennes valeurs, et l'assertion que **chaque palier reçoit au
 moins autant qu'avant**. C'est ce qui distingue « j'ai lissé la courbe » de
 « j'ai déplacé le problème ailleurs ».
+
+## Une liste blanche est un piège à demi-fonctionnalité
+
+Le moteur de combat décide des dégâts par liste blanche : `damageEffects`
+énumère les effets qui frappent. Une compétence offensive absente de cette liste
+s'exécute normalement, applique ses malus, écrit dans le journal de combat — et
+ne retire pas un seul point de vie. Aucune erreur, aucun avertissement.
+
+Les onze compétences offensives des six renforts élémentaires ont frappé dans le
+vide jusqu'à ce qu'un test le révèle.
+
+`degats.contrat.test.js` vérifie donc les deux sens, pour **chacune** des
+compétences du roster qui annonce des dégâts : qu'elle figure dans la liste, et
+qu'elle retire réellement des points de vie en combat. Le second contrôle est le
+seul qui compte vraiment — le premier ne fait que nommer le coupable.
+
+La règle générale : **partout où une fonctionnalité doit être inscrite dans un
+registre pour exister, un test doit parcourir le registre depuis la déclaration,
+et non l'inverse.** Sinon le registre devient une liste de ce que quelqu'un a
+pensé à y mettre.
+
+## Le combat automatique fait partie du kit
+
+Un champion à ressource — accumuler puis dépenser — n'existe vraiment que si le
+combat automatique sait le jouer. Le moteur choisit par une règle propre à
+chaque champion et, sans règle, applique « finisseur d'abord » : Décharge sans
+Maelström, Désintégration sans Charge.
+
+Le test correspondant ne vérifie pas la règle mais son résultat : sur six tours
+d'automatique, le champion doit avoir accumulé au moins deux points de ressource.
+C'est ce qui distingue une règle écrite d'une règle qui fonctionne.

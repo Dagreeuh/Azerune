@@ -155,11 +155,22 @@ Or **Sylven, seule source de purification du jeu, n'apparaît dans aucune des
 compositions gagnantes du Cœur-de-Forge.** L'emmener coûte un emplacement et
 fait perdre.
 
-La raison est mécanique : les ennemis n'appliquent en tout et pour tout que
-**trois malus** — `bleed`, `slow`, `provoke` — auxquels s'ajoute `necrotic` sous
-l'affixe Nécrotique en Mythic+. Et la purification passive de Sylven **ignore
-explicitement `provoke`**. Il reste donc deux malus mineurs à nettoyer, pour un
-conseil que le jeu présente comme structurant.
+La raison est mécanique. *Correction : un premier comptage annonçait trois
+malus ennemis ; il ne recensait que les appels à `tryDebuff` et manquait les
+mécaniques de zone. Les ennemis en appliquent huit —* `bleed`, `slow`,
+`provoke`, `burn`, `mark`, `accuracyDown`, `healingDown`, `necrotic`.
+
+Mais **en Raid**, un seul est infligé : la **Provocation** du Gardien de lave,
+qui force vos attaquants sur la mauvaise cible. Et la purification de Sylven
+**l'ignorait explicitement** :
+
+```js
+const first=Object.keys(unit.debuffs||{}).find(key=>!['provoke'].includes(key));
+```
+
+Elle refusait donc précisément de nettoyer la seule chose qu'il y avait à
+nettoyer — alors que le moteur classe lui-même la Provocation parmi les malus
+les plus dangereux, dans la liste que suit le combat automatique.
 
 Le conseil et la réalité se contredisent : c'est le genre d'écart qui apprend au
 joueur à ne pas faire confiance à l'interface.
@@ -226,3 +237,26 @@ que le jeu annonce à ce qu'il calcule.
 C'est la troisième fois dans ce projet que la simulation trouve ce que la
 lecture ne voit pas. Elle mérite d'être un outil permanent plutôt qu'un banc
 reconstruit à chaque audit.
+
+---
+
+# Suites données à cet audit
+
+| Constat | État |
+|---|---|
+| Plantage du moteur en Raid | **corrigé** (v1.55.1) |
+| Précision réduite inerte | **corrigé** (v1.55.1) |
+| Six effets invisibles, un effet fantôme | **corrigé** (v1.55.1) |
+| Purification qui refuse la Provocation | **corrigé** (v1.56.0) — ordre de gravité partagé |
+| Purification tenue par un seul champion | **corrigé** (v1.56.0) — Yunmei, 4★ Eau |
+| Répartition élémentaire déséquilibrée | **corrigé** (v1.56.0) — six renforts, aucun élément sous 4 |
+| Mythic+ ne teste que l'équipement | **ouvert** — les affixes de saison restent le levier |
+| Raids verrouillés sur peu de champions | **ouvert** — atténué par les renforts, non résolu |
+| Aucune réanimation dans le jeu | **ouvert** — choix de conception à trancher |
+| Caelion absent des compositions gagnantes | **ouvert** — mesure dédiée à faire |
+
+Un défaut supplémentaire a été trouvé en ajoutant les champions, et il mérite
+d'être noté ici parce qu'il piège quiconque en ajoutera d'autres : **le moteur
+décide des dégâts par liste blanche**. Une compétence offensive absente de
+`damageEffects` s'exécute, applique ses malus, écrit dans le journal — et
+n'inflige rien. `tests/degats.contrat.test.js` ferme définitivement ce piège.

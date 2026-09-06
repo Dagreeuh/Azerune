@@ -46,6 +46,9 @@ export function makeHero(overrides={}){
     rarity:3,
     icon:'🧪',
     hp:200,atk:30,def:15,spd:100,
+    // Attention : le moteur n'inflige des degats que pour les effets de sa liste
+    // blanche `damageEffects`. 'basic' n'y figure pas — un pantin qui doit
+    // reellement frapper doit declarer un effet listé (voir degats.contrat.test.js).
     skills:[{name:'Frappe',icon:'⚔️',cd:0,target:'enemy',description:'Frappe simple.',power:1,effect:'basic'}],
     ...overrides
   };

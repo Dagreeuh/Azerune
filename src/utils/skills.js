@@ -1,6 +1,6 @@
 export const skillMaxLevel=index=>index===0?6:index===1?5:4;
 const U=(type,value,label)=>({type,value,label});
-const HEAL=new Set(['healingSeed','seedBloom','rescueShield','rescueSanctuary','livingGarden','atonementStrike','atonementShield','atonementPenance','totemHeal','healingTotem','totemTide','soulMetamorphosis']);
+const HEAL=new Set(['healingSeed','seedBloom','rescueShield','rescueSanctuary','livingGarden','atonementStrike','atonementShield','atonementPenance','totemHeal','healingTotem','totemTide','soulMetamorphosis','mistStrike','renewingMist','revival']);
 const SHIELD=new Set(['guardianWall','rescueShield','rescueSanctuary','atonementShield','soulMetamorphosis']);
 const DURATION=new Set(['guardianLink','huntMark','healingSeed','livingGarden','timeAnchor','atonementShield','healingTotem','agony','corruption','vanish']);
 const CHANCE=new Set(['impactQuake','unstableStun','gardenPrison','highTide','herbalThorn','shieldExpose']);
