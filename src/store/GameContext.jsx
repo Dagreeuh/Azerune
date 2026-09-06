@@ -241,7 +241,7 @@ export function GameProvider({children}){
       let outcome;
       if(!duplicate){ownedDraft.push(hero.id);progressDraft[hero.id]=defaultChampionProgress(hero);outcome={progress:progressDraft[hero.id],result:'new'};}
       else{outcome=evolveFromDuplicate(hero,progressDraft[hero.id]);progressDraft[hero.id]=outcome.progress;if(outcome.bloodFragments)bloodGained+=outcome.bloodFragments;}
-      results.push({...hero,duplicate,summonResult:outcome.result,progress:outcome.progress,pityGuaranteed,x10Guaranteed:x10Guarantee});
+      results.push({...hero,duplicate,summonResult:outcome.result,progress:outcome.progress,bloodFragments:outcome.bloodFragments||0,pityGuaranteed,x10Guaranteed:x10Guarantee});
     }
     setOwned(ownedDraft);setChampionProgress(progressDraft);setPityCounter(pityDraft);if(bloodGained)setBloodFragments(value=>value+bloodGained);
     const now=new Date().toLocaleString('fr-FR');

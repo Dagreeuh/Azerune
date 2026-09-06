@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-430 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
+474 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -33,6 +33,7 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `quests.contract.test.js` | Tout événement attendu par une quête est réellement émis |
 | `shop.test.js` | Rafraîchissements, emplacements, achat d'une offre, offres générées |
 | `inventory.test.js` | Valeur de revente et protections avant destruction d'un objet |
+| `progression.test.js` | Niveaux, évolution, Résonance, valeur des doublons — l'économie du jeu |
 
 ## Déterminisme
 
@@ -109,6 +110,11 @@ suite :
 | Protection des objets verrouillés retirée | 3 |
 | Contrôle d'inventaire plein retiré | 1 |
 | Garde NaN de la valeur de revente retirée | 1 |
+| Coût du dernier palier de Résonance décalé | 5 |
+| Valeur d'un doublon 5★ `10` → `5` | 3 |
+| Plafond de niveau `×10` → `×12` par étoile | 5 |
+| Bascule doublon → Fragments de sang décalée | 3 |
+| Garde NaN de la normalisation retirée | 1 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -169,6 +175,7 @@ suites ont chacune trouvé un cas réel.
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
 toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
-les enchaînements de vagues Mythic+, la progression de champion
-(`utils/progression.js` : évolution, résonance, fragments d'âme), et les
-maîtrises de compétences.
+les enchaînements de vagues Mythic+, les maîtrises de compétences
+(`utils/skills.js`), et les hauts faits (`data/achievements.js`), dont la
+validation lit des chemins de `progressionStats` sous forme de chaînes — un
+chemin erroné y serait silencieux, exactement comme l'était `skillUsed`.
