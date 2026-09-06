@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-335 tests, environ une seconde et demie. Aucun test ne modifie le code de production.
+381 tests, environ une seconde et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -29,6 +29,8 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `stats.assessment.test.js` | Détection des capacités d'équipe et note de faisabilité affichée avant mission |
 | `rewards.test.js` | Génération du butin, sets actifs, coût d'amélioration, recyclage, forge |
 | `rewards.mission.test.js` | Calcul des récompenses de fin de mission : campagne, raid, expédition |
+| `quests.test.js` | Avancement des quêtes, seuils, champions distincts, réclamation, coffres |
+| `quests.contract.test.js` | Tout événement attendu par une quête est réellement émis |
 
 ## Déterminisme
 
@@ -97,6 +99,10 @@ suite :
 | Pierres hors premier passage | 1 |
 | Chances de relique de raid inversées | 1 |
 | Bonus de première victoire retiré | 2 |
+| Plafond au but d'une quête retiré | 1 |
+| Filtre de seuil retiré | 2 |
+| Champions distincts → compteur simple | 3 |
+| Émission de `skillUsed` retirée | 4 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -134,11 +140,26 @@ montants d'expédition — pendant que `GameContext` garde les `setState`.
 `finishCampaignMission` est passée d'un bloc mêlant calcul et effets à une
 orchestration lisible, et ses règles sont couvertes par 45 tests.
 
-La même découpe reste à faire pour les quêtes, la forge et la boutique.
+`src/utils/quests.js` suit le même principe pour l'avancement des quêtes et
+l'ouverture des coffres.
+
+La même découpe reste à faire pour la forge et la boutique.
+
+## Tests de contrat
+
+Trois suites ne vérifient pas un calcul mais un **câblage** : que deux parties du
+projet, déclarées séparément, se rejoignent bien.
+
+- `sets.contract.test.js` — tout set annoncé au joueur est lu par le moteur
+- `stats.assessment.test.js` — tout effet listé dans `SKILL_TAGS` existe et est traité
+- `quests.contract.test.js` — tout événement attendu par une quête est émis
+
+C'est la forme de bug la plus coûteuse du projet : rien ne plante, rien
+n'apparaît dans les logs, et la fonctionnalité est simplement absente. Les trois
+suites ont chacune trouvé un cas réel.
 
 ## Ce que la suite ne couvre pas encore
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
 toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
-les quêtes et leur validation, la forge et la boutique, puis les enchaînements
-de vagues Mythic+.
+la forge et la boutique, puis les enchaînements de vagues Mythic+.
