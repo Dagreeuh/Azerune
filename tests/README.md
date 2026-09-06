@@ -5,7 +5,7 @@ npm test         # une passe
 npm run test:watch
 ```
 
-381 tests, environ une seconde et demie. Aucun test ne modifie le code de production.
+430 tests, environ deux secondes et demie. Aucun test ne modifie le code de production.
 
 ## Pourquoi ces tests-là
 
@@ -31,6 +31,8 @@ priorité les règles transverses, pas les kits de champions un par un.
 | `rewards.mission.test.js` | Calcul des récompenses de fin de mission : campagne, raid, expédition |
 | `quests.test.js` | Avancement des quêtes, seuils, champions distincts, réclamation, coffres |
 | `quests.contract.test.js` | Tout événement attendu par une quête est réellement émis |
+| `shop.test.js` | Rafraîchissements, emplacements, achat d'une offre, offres générées |
+| `inventory.test.js` | Valeur de revente et protections avant destruction d'un objet |
 
 ## Déterminisme
 
@@ -103,6 +105,10 @@ suite :
 | Filtre de seuil retiré | 2 |
 | Champions distincts → compteur simple | 3 |
 | Émission de `skillUsed` retirée | 4 |
+| Protection des objets équipés retirée | 2 |
+| Protection des objets verrouillés retirée | 3 |
+| Contrôle d'inventaire plein retiré | 1 |
+| Garde NaN de la valeur de revente retirée | 1 |
 
 La ligne `respectPlayerPriority` est le correctif v1.49.5 : c'est exactement la
 régression que la suite est là pour empêcher de revenir.
@@ -143,7 +149,8 @@ orchestration lisible, et ses règles sont couvertes par 45 tests.
 `src/utils/quests.js` suit le même principe pour l'avancement des quêtes et
 l'ouverture des coffres.
 
-La même découpe reste à faire pour la forge et la boutique.
+`src/utils/shop.js` et `src/utils/inventory.js` complètent la série pour la
+boutique et les protections d'inventaire.
 
 ## Tests de contrat
 
@@ -162,4 +169,6 @@ suites ont chacune trouvé un cas réel.
 
 Les kits de champions un par un, les vagues Mythic+, les mécaniques de raid, et
 toute la couche React. Les prochaines cibles utiles, par ordre de rentabilité :
-la forge et la boutique, puis les enchaînements de vagues Mythic+.
+les enchaînements de vagues Mythic+, la progression de champion
+(`utils/progression.js` : évolution, résonance, fragments d'âme), et les
+maîtrises de compétences.
