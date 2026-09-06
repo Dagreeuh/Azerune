@@ -76,7 +76,7 @@ reconstruites par interpolation entre paliers-jalons.
 `src/data/mythic.js` : suppression de l'amortissement des dix derniers paliers,
 seuil du Sablier parfait à 70 %.
 
-**18 tests** nouveaux (`tests/loot.mythic.test.js`) verrouillent l'absence de
+**17 tests** nouveaux (`tests/loot.mythic.test.js`) verrouillent l'absence de
 recul palier par palier, les valeurs des jalons, et le fait que l'aperçu affiché
 au joueur et le générateur lisent bien les mêmes tables. **13 mutations**
 appliquées au code livré, dont deux équivalentes et documentées comme telles.
