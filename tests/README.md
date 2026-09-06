@@ -297,3 +297,24 @@ valeurs choisies pour atteindre un score.** Sinon il mesure le banc, pas le jeu.
 Corollaire : un chiffre d'équilibrage n'est acquis qu'une fois mesuré **sur le
 code livré**, mécanique câblée. Une simulation faite avant l'implémentation
 sert à décider s'il faut y aller, pas à fixer les constantes.
+
+## La monotonie vaut aussi pour les récompenses
+
+La section précédente notait qu'une formule peut être juste en chaque point et
+fausse dans sa progression. Le cas s'est reproduit, à l'envers : cette fois
+c'était le **butin** qui reculait.
+
+Les tables de butin Mythic+ donnaient au palier 10 de meilleures pièces qu'aux
+paliers 11 à 15. Chaque table, prise seule, était cohérente. Aucun test
+ponctuel ne pouvait le voir — et la conséquence n'apparaissait qu'en simulation,
+sous la forme d'un palier deux fois plus dur que ses voisins.
+
+`loot.mythic.test.js` vérifie donc la seule propriété qui compte ici :
+**aucun palier ne donne moins que le précédent**, en étoiles, en qualité et en
+niveau d'objet. Elle s'applique partout où le joueur progresse en franchissant
+des paliers — butin, coûts, expérience, bonus.
+
+Le test complémentaire est celui de la non-régression : une table de référence
+figée sur les anciennes valeurs, et l'assertion que **chaque palier reçoit au
+moins autant qu'avant**. C'est ce qui distingue « j'ai lissé la courbe » de
+« j'ai déplacé le problème ailleurs ».

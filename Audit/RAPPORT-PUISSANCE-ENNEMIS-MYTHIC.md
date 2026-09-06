@@ -97,6 +97,11 @@ de cinq paliers en course perdue plutôt qu'en course longue.
 
 ## Ce qui reste imparfait
 
+> **Résolu — voir `RAPPORT-COURBE-BUTIN-MYTHIC.md`.** Les tables de butin sont
+> désormais interpolées entre paliers-jalons : le rapport puissance/recommandée
+> tient entre 1,00 et 1,18 sur les trente paliers, et le palier 15 se comporte
+> comme ses voisins. Le paragraphe ci-dessous décrit le défaut tel qu'il était.
+
 **La courbe d'équipement est en marches d'escalier.** Le butin Mythic+ change de
 qualité et d'étoiles à des paliers fixes, si bien que la puissance réelle fait
 des bonds : 17 983 au palier 15, 25 792 au palier 20, 39 601 au palier 30. La

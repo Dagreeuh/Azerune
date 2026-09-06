@@ -40,8 +40,10 @@ describe('constantes du Sablier',()=>{
     expect(MYTHIC_COLLAPSE_RATE).toBe(.05);
   });
 
-  it('le Sablier parfait demande les trois quarts du budget',()=>{
-    expect(MYTHIC_PERFECT_RATIO).toBe(.75);
+  it('le Sablier parfait demande 70 % du budget',()=>{
+    // Mesure : a equipement du palier, une course tient le budget sans
+    // atteindre ce seuil. Le Sablier parfait demande un ecart d'equipement.
+    expect(MYTHIC_PERFECT_RATIO).toBe(.70);
   });
 
   it('le seuil parfait reste strictement sous le budget',()=>{
@@ -105,9 +107,9 @@ describe('budget propre a chaque niveau',()=>{
     });
   });
 
-  it('le seuil parfait vaut les trois quarts du budget du niveau',()=>{
-    expect(mythicPerfectTurns(100)).toBe(75);
-    expect(mythicPerfectTurns(133)).toBe(100);
+  it('le seuil parfait vaut 70 % du budget du niveau',()=>{
+    expect(mythicPerfectTurns(100)).toBe(70);
+    expect(mythicPerfectTurns(133)).toBe(93);
   });
 
   it('un budget invalide ne rend pas le seuil parfait absurde',()=>{

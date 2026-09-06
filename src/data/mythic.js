@@ -28,7 +28,11 @@ const bosses=[
 // equipe en Mythic+ 30 encaissait 6 % de l'Attaque annoncee — les ennemis
 // devenaient inoffensifs exactement la ou ils devaient devenir mortels.
 // L'exposant d'Attaque suit desormais la courbe d'equipement reelle.
-const mythicScaling=level=>{const raw=Math.max(0,Math.min(29,Number(level||1)-1)),steps=Math.min(20,raw)+Math.max(0,raw-20)*.80;return{hp:Math.pow(1.055,steps),atk:Math.pow(1.072,steps),def:Math.pow(1.045,steps),steps};};
+//
+// Les dix derniers paliers montaient par ailleurs a 80 % du rythme des vingt
+// premiers : la difficulte s'aplatissait exactement la ou elle doit culminer.
+// Chaque palier compte maintenant pour un.
+const mythicScaling=level=>{const raw=Math.max(0,Math.min(29,Number(level||1)-1)),steps=raw;return{hp:Math.pow(1.055,steps),atk:Math.pow(1.072,steps),def:Math.pow(1.045,steps),steps};};
 const enemy=(name,icon,element,level,index,boss=false,elite=false)=>{const scaling=mythicScaling(level),rankHp=boss?1.28:elite?1.12:1,rankAtk=boss?1.18:elite?1.08:1,rankDef=boss?1.14:elite?1.08:1;return{id:`mythic-${level}-${index}-${name}`,name,icon,element,hp:Math.round((boss?840:elite?540:375)*rankHp*scaling.hp),atk:Math.round((boss?1085:elite?880:700)*rankAtk*scaling.atk),def:Math.round((boss?24:elite?19:13)*rankDef*scaling.def),spd:Math.round((boss?104:elite?108:96)+scaling.steps*.7),accuracy:12+level*2+(boss?8:0),resistance:15+level*2+(boss?10:0),bossUnit:boss,mythicUnit:true,mythicElite:elite};};
 const wave=(level,waveIndex,season)=>{const zone=level<=10?'forge':level<=20?'plague':'void',pool=pools[zone];if(waveIndex===4){if(level===30){const b=bosses[season.finalBoss];return[{...enemy(b.name,b.icon,b.element,level,0,true),mythicBossInfo:b},enemy(pool[1][0],pool[1][1],pool[1][2],level,1,false,true),enemy(pool[2][0],pool[2][1],pool[2][2],level,2,false,true)]}const fixed=level===10?{name:'Thane Brise-Enclume',icon:'🔨',element:'Feu'}:level===20?{name:'Seigneur Morvhal',icon:'💀',element:'Ombre'}:{name:`Gardien Mythique +${level}`,icon:'👑',element:pool[0][2]};return[enemy(fixed.name,fixed.icon,fixed.element,level,0,true),enemy(pool[1][0],pool[1][1],pool[1][2],level,1,false,true),enemy(pool[2][0],pool[2][1],pool[2][2],level,2,false,true)]}return[0,1,2].map((_,index)=>{const data=pool[(index+waveIndex-1)%pool.length];return enemy(data[0],data[1],data[2],level,index,false,waveIndex===3&&index===2)});};
 const rewards=level=>level===30?{gems:500,gold:5000,stones:5,essence:2500,tomes:2,souls:20,gear:{milestone:true}}:level%10===0?{gems:level*10,gold:level*120,stones:level/10,essence:level*50,tomes:level===20?1:0,gear:{milestone:true}}:{gems:10+level*3,gold:250+level*65,essence:15+level*5,gear:level%3===0?{milestone:false}:null};
@@ -48,7 +52,7 @@ export function createMythicMission(level){level=Math.max(1,Math.min(30,Number(l
 // juste, le sablier tient de justesse ; au-dela, il tient confortablement.
 // Voir Audit/PROPOSITION-SABLIER-MYTHIC.md.
 export const MYTHIC_BUDGET_FACTOR=120;
-export const MYTHIC_PERFECT_RATIO=.75;
+export const MYTHIC_PERFECT_RATIO=.70;
 export const MYTHIC_COLLAPSE_RATE=.05;
 export const MYTHIC_DEFAULT_BUDGET=100;
 

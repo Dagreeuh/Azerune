@@ -190,25 +190,47 @@ export const MYTHIC_ITEM_LEVEL_RANGES={
  11:[89,92],12:[92,95],13:[95,98],14:[98,101],15:[102,105],16:[105,108],17:[108,111],18:[112,115],19:[116,119],20:[120,124],
  21:[124,128],22:[128,132],23:[132,136],24:[136,140],25:[140,144],26:[145,149],27:[150,154],28:[155,159],29:[160,164],30:[168,174]
 };
+// Butin Mythic+ : etoiles et qualite interpolees entre les paliers-jalons.
+//
+// Les tables precedentes fonctionnaient par blocs, et deux blocs etaient plus
+// genereux que le bloc suivant : le palier 10 donnait de meilleures pieces que
+// les paliers 11 a 15, le palier 20 que les paliers 21 a 24. La puissance d'un
+// joueur stagnait donc — voire reculait — pendant que les ennemis continuaient
+// de monter, ce qui faisait du palier 15 le mur du mode.
+//
+// Les jalons (1, 6, 10, 20, 30) reprennent exactement les valeurs des anciens
+// blocs, si bien qu'aucun palier ne perd au change ;
+// seuls les paliers intermediaires sont releves, pour que l'equipement
+// progresse a chaque palier au lieu d'attendre le jalon suivant.
+// Voir Audit/RAPPORT-COURBE-BUTIN-MYTHIC.md.
+const MYTHIC_QUALITY_SCALE=['normal','common','rare','epic','legendary'];
+const MYTHIC_STAR_MILESTONES=[[1,2],[6,2.2],[10,3],[20,4],[30,5]];
+const MYTHIC_QUALITY_MILESTONES=[[1,.95],[6,1.42],[10,2.20],[20,2.70],[30,3.30]];
+
+/** Interpolation lineaire entre les paliers-jalons. */
+function mythicMilestoneValue(level,milestones){
+ const palier=Math.max(1,Math.min(30,Number(level)||1));
+ for(let index=1;index<milestones.length;index+=1){
+  const[bas,valeurBasse]=milestones[index-1],[haut,valeurHaute]=milestones[index];
+  if(palier<=haut)return valeurBasse+(valeurHaute-valeurBasse)*((palier-bas)/(haut-bas));
+ }
+ return milestones[milestones.length-1][1];
+}
+
+/** Repartit une valeur continue sur les deux crans qui l'encadrent. */
+function mythicSplit(valeur,cran){
+ const bas=Math.floor(valeur),part=Math.round((valeur-bas)*100);
+ if(part<=0)return[[cran(bas),100]];
+ if(part>=100)return[[cran(bas+1),100]];
+ return[[cran(bas),100-part],[cran(bas+1),part]];
+}
+
 function mythicStarRates(level){
- if(level<=5)return[[2,100]];
- if(level<=9)return[[2,80],[3,20]];
- if(level<=15)return[[3,100]];
- if(level<=19)return[[3,75],[4,25]];
- if(level<=24)return[[4,100]];
- if(level<=29)return[[4,80],[5,20]];
- return[[5,100]];
+ return mythicSplit(mythicMilestoneValue(level,MYTHIC_STAR_MILESTONES),rang=>rang);
 }
 function mythicQualityRates(level){
- if(level<=5)return[['normal',20],['common',65],['rare',15]];
- if(level<=9)return[['common',60],['rare',38],['epic',2]];
- if(level===10)return[['rare',80],['epic',20]];
- if(level<=15)return[['common',20],['rare',65],['epic',15]];
- if(level<=19)return[['rare',65],['epic',33],['legendary',2]];
- if(level===20)return[['rare',35],['epic',60],['legendary',5]];
- if(level<=24)return[['rare',40],['epic',55],['legendary',5]];
- if(level<=29)return[['rare',20],['epic',68],['legendary',12]];
- return[['epic',70],['legendary',30]];
+ const borne=rang=>MYTHIC_QUALITY_SCALE[Math.max(0,Math.min(MYTHIC_QUALITY_SCALE.length-1,rang))];
+ return mythicSplit(mythicMilestoneValue(level,MYTHIC_QUALITY_MILESTONES),borne);
 }
 export function mythicLootPreview(level){
  level=Math.max(1,Math.min(30,Number(level)||1));

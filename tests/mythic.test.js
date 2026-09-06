@@ -185,8 +185,8 @@ describe('montee en puissance des ennemis',()=>{
     // simulation contre un joueur equipe pour le palier.
     expect(total(1,'atk')).toBeGreaterThan(8000);
     expect(total(1,'atk')).toBeLessThan(11500);
-    expect(total(30,'atk')).toBeGreaterThan(55000);
-    expect(total(30,'atk')).toBeLessThan(75000);
+    expect(total(30,'atk')).toBeGreaterThan(68000);
+    expect(total(30,'atk')).toBeLessThan(78000);
   });
 
   it('un ennemi frappe fort pour ses propres PV',()=>{
@@ -201,6 +201,22 @@ describe('montee en puissance des ennemis',()=>{
       for(let niveau=2;niveau<=30;niveau+=1)
         expect(total(niveau,cle),`${cle} au niveau ${niveau}`)
           .toBeGreaterThanOrEqual(total(niveau-1,cle));
+    });
+  });
+
+  it('la montee ne ralentit pas dans les dix derniers paliers',()=>{
+    // Les paliers 21 a 30 comptaient pour 0,8 chacun : la difficulte
+    // s'aplatissait exactement la ou elle doit culminer. Un palier vaut un.
+    const cadence=(niveau,cle)=>{
+      const avant=createMythicMission(niveau-1),apres=createMythicMission(niveau);
+      const somme=mission=>mission.waves.flat().reduce((total,unite)=>total+unite[cle],0);
+      // On compare a nombre d'unites egal : la vague 4 change de composition.
+      const parUnite=mission=>somme(mission)/mission.waves.flat().length;
+      return parUnite(apres)/parUnite(avant);
+    };
+    ['hp','atk'].forEach(cle=>{
+      const debut=cadence(5,cle),fin=cadence(28,cle);
+      expect(fin,`${cle} : cadence du haut de courbe`).toBeCloseTo(debut,2);
     });
   });
 
