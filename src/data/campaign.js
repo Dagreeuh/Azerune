@@ -75,6 +75,42 @@ export const missionKey=(difficultyId,continentId,stageId)=>`${difficultyId}:${c
 export const allMissionKeys=difficultyId=>CONTINENTS.flatMap(continent=>continent.stages.map(item=>missionKey(difficultyId,continent.id,item.id)));
 export const milestoneKey=(difficultyId,stars)=>`${difficultyId}:${stars}`;
 /**
+ * Cristaux d'une mission, et palier de fin de continent.
+ *
+ * Les cristaux etaient plats : 11 par palier, 34 par boss, identiques de la
+ * zone 1 a la zone 10. Une zone tardive, qui demande dix fois plus de temps,
+ * versait exactement autant qu'une zone d'ouverture.
+ *
+ * Deux corrections. La recompense de mission suit maintenant la zone, doucement
+ * — le cristal est la monnaie rare, on l'indexe sans l'enfler. Et terminer les
+ * sept missions d'un continent verse un palier, verse une seule fois par
+ * difficulte : c'est la recompense qui recompense l'avancee elle-meme, pas la
+ * repetition. Le farm ne verse aucun cristal, et ce palier n'y change rien.
+ */
+const MISSION_GEM_ZONE_STEP=.14;
+export const missionGems=(zone,boss,multiplier=1)=>
+ Math.round((boss?34:11)*(1+(Math.max(1,zone)-1)*MISSION_GEM_ZONE_STEP)*multiplier);
+// 300 n'est pas un chiffre rond arbitraire : le joueur demarre a 600 cristaux
+// (500 + 100 du tutoriel) et le premier continent en verse une centaine par ses
+// missions. Le palier l'amene donc a 1 000, soit sa premiere invocation x10 a
+// 900. Sans lui, mesure a zero apport exterieur, tous les parcours simules
+// s'arretaient au tout premier boss sans avoir jamais pu s'offrir un rituel.
+export const CONTINENT_CLEAR_BASE=300,CONTINENT_CLEAR_STEP=32;
+/** Palier verse au premier nettoyage complet d'un continent. */
+export function continentClearReward(continentIndex,difficultyId){
+ const difficulty=DIFFICULTIES.find(entry=>entry.id===difficultyId)||DIFFICULTIES[0];
+ const zoneIndex=Math.max(0,Math.min(CONTINENTS.length-1,Number(continentIndex)||0));
+ return{gems:Math.round((CONTINENT_CLEAR_BASE+CONTINENT_CLEAR_STEP*zoneIndex)*difficulty.multiplier),
+  gold:Math.round((900+300*zoneIndex)*difficulty.multiplier),
+  stones:zoneIndex>=4?1:0};
+}
+/** Cle d'un palier de continent, pour ne le verser qu'une fois. */
+export const continentClearKey=(difficultyId,continentId)=>`${difficultyId}:${continentId}`;
+/** Le continent est-il entierement termine, au vu des scores enregistres ? */
+export const continentCleared=(scores,difficultyId,continent)=>
+ (continent?.stages||[]).every(stage=>(scores?.[missionKey(difficultyId,continent.id,stage.id)]||0)>0);
+
+/**
  * XP d'une mission, calee sur la courbe de niveaux.
  *
  * L'ancienne formule (180+55*zone+25*etape) grandissait de facon lineaire — x3,4
@@ -97,7 +133,7 @@ export function missionXpBase(zone,stageId,boss,xpTuning=1.35){
 
 export function createMission(difficulty,continent,item){
  const continentIndex=Math.max(0,CONTINENTS.findIndex(x=>x.id===continent.id)),zone=continentIndex+1,stageId=Number(item.id),scale=(CAMPAIGN_COMBAT_SCALE[difficulty.id]||CAMPAIGN_COMBAT_SCALE.normal)*item.power,tuning=difficultyTuning(difficulty.id,continentIndex),stageRamp=1+(stageId-1)*.045,wall=wallFactor(continentIndex,stageId,item.boss,difficulty.id);
- const baseGold=Math.round((item.boss?330:125)*(1+continentIndex*.10)*difficulty.multiplier),baseGems=Math.round((item.boss?34:11)*difficulty.multiplier);
+ const baseGold=Math.round((item.boss?330:125)*(1+continentIndex*.10)*difficulty.multiplier),baseGems=missionGems(zone,item.boss,difficulty.multiplier);
  const enemies=item.enemies.map((unit,index)=>{const bossUnit=item.boss&&index===0,bossFactor=bossUnit?1.14:1;return{...unit,bossUnit,campaignUnit:true,campaignDifficulty:difficulty.id,campaignZone:continent.id,campaignZoneIndex:continentIndex,campaignRole:bossUnit?'boss':CAMPAIGN_ROLES[index%CAMPAIGN_ROLES.length],campaignMechanic:CAMPAIGN_MECHANICS[continent.id],campaignMechanicTier:tuning.mechanicTier,hp:Math.round(unit.hp*tuning.hp*stageRamp*bossFactor*wall),atk:Math.round(unit.atk*tuning.atk*stageRamp*(bossUnit?1.08:1)*wall),def:Math.round(unit.def*tuning.def*stageRamp*(bossUnit?1.08:1)),spd:Math.round(unit.spd*tuning.spd),resistance:Math.min(90,(unit.resistance||15)+tuning.res+(bossUnit?12:0)),accuracy:Math.min(90,(unit.accuracy||10)+tuning.acc+(bossUnit?7:0))}});
  const xpBase=missionXpBase(zone,stageId,item.boss,tuning.xp);
  const recommended=Math.round(enemies.reduce((sum,u)=>sum+u.hp*.30+u.atk*7.5+u.def*5.5+u.spd*1.7+(u.accuracy||0)*1.5+(u.resistance||0)*1.25,0)*(item.boss?1.52:1.38));

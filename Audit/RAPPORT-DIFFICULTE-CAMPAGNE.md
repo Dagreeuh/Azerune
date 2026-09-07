@@ -201,6 +201,19 @@ un mur.
 
 ## 6. Après correction
 
+> **Correction de méthode.** Les chiffres de cette section viennent d'un
+> simulateur qui créditait les gemmes de mission à **chaque** partie, farm
+> compris. Le jeu n'en verse qu'au premier clear (`campaignMissionRewards`
+> renvoie `gems: 0` dès que le score ne progresse pas). Le joueur simulé
+> encaissait donc des milliers de gemmes fantômes sur ses centaines de parties
+> de farm, et les « campagnes terminées » ci-dessous sont d'autant plus
+> optimistes. Le simulateur corrigé — qui démarre aussi le joueur avec sa
+> vraie dotation, 500 gemmes de départ, 100 du tutoriel et 600 de l'Académie —
+> est décrit dans `Audit/RAPPORT-CRISTAUX-ET-PORTAILS.md`. **Le diagnostic sur
+> l'XP n'en dépend pas** : il se mesure au niveau atteint et au ratio de
+> puissance, que les gemmes n'influencent qu'indirectement, et le balayage
+> XP contre butin de la section 3 reste valable.
+
 Trois graines, parcours continu, aucune remise à zéro entre les difficultés :
 
 ```
@@ -284,15 +297,20 @@ hypothèses, pas des conclusions.
 
 ### 8.1 La campagne finance à peine une invocation multiple
 
-Toute la campagne Normal rapporte **environ 1 000 gemmes** : 11 par palier, 34
-par boss. Un multi coûte 900. Dix continents, soixante-dix missions, pour un
-seul tirage.
+> **Correction.** Cette section disait « toute la campagne Normal rapporte
+> environ 1 000 gemmes ». Le chiffre ne comptait que les récompenses de mission
+> et oubliait les paliers d'étoiles, qui en versent 3 575 de plus. Le total réel
+> pour Normal était de **4 575**, soit cinq invocations multiples et non une.
+> Le constat de fond tient — les 1 000 gemmes de mission sont **plates** : 11
+> par palier et 34 par boss, identiques de la zone 1 à la zone 10 — mais
+> l'ampleur annoncée était fausse. Traité depuis : voir
+> `Audit/RAPPORT-CRISTAUX-ET-PORTAILS.md`.
 
-C'est cohérent avec la volonté que le joueur aille chercher ailleurs — mais
-l'écart est tel que la campagne ne *participe* plus du tout au roster. Une
-récompense en gemmes indexée sur la zone, comme l'XP vient de l'être, rendrait
-le premier clear d'un continent tardif significatif sans toucher au farm (qui ne
-verse pas de gemmes).
+Les gemmes de mission ne suivent pas la zone. Une zone tardive, qui demande dix
+fois plus de temps, verse exactement autant qu'une zone d'ouverture. Une
+récompense indexée sur la zone, comme l'XP vient de l'être, rendrait le premier
+clear d'un continent tardif significatif sans toucher au farm (qui ne verse pas
+de gemmes).
 
 ### 8.2 Le mur est toujours le palier 7
 

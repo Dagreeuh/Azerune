@@ -2,7 +2,8 @@ import React,{createContext,useContext,useEffect,useMemo,useRef,useState}from're
 import{HEROES}from'../data/heroes';
 import{ITEMS,SLOTS,generateCampaignItem,generateAchievementItem,generateShopItem,generateRaidItem,generateMythicItem,generateExpeditionItem,QUALITIES,normalizedItem,upgradeCost,forgeUpgradeItem,recycleEssenceValue}from'../data/items';
 import{QUESTS,WEEKLY_QUESTS,MONTHLY_QUESTS,QUEST_GROUPS,FINAL_CHESTS,QUEST_PERIOD_CONFIG}from'../data/quests';
-import{CONTINENTS,DIFFICULTIES,STAR_MILESTONES,allMissionKeys,milestoneKey,createMission}from'../data/campaign';
+import{CONTINENTS,DIFFICULTIES,STAR_MILESTONES,allMissionKeys,milestoneKey,createMission,continentClearKey,continentClearReward,continentCleared}from'../data/campaign';
+import{BANNERS,DEFAULT_BANNER,bannerById,monthlyFeatured,resolveFiveStar,SUMMON_COST,PITY_THRESHOLD}from'../data/banners';
 import{load,save,day}from'../utils/storage';
 import{emptyProgressionStats,mergeChampionStats}from'../utils/progressionStats'
 import{canClaimAcademyLesson,canClaimAcademyFinal}from'../utils/academy'
@@ -86,6 +87,8 @@ export function GameProvider({children}){
   const[activeTeamSlot,setActiveTeamSlotState]=useState(stored.activeTeamSlot??1),[teamPresets,setTeamPresets]=useState(stored.teamPresets??normalizeTeamPresets(null,stored.team??STARTER_TEAM,stored.owned??STARTER_TEAM));
   const[equipment,setEquipment]=useState(stored.equipment??{}),[inventory,setInventory]=useState((stored.inventory??[]).map(normalizedItem)),[history,setHistory]=useState(stored.history??[]),[redeemedCodes,setRedeemedCodes]=useState(stored.redeemedCodes??[]);
   const[universalSoul5,setUniversalSoul5]=useState(stored.universalSoul5??0);
+  const[electedChampion,setElectedChampionState]=useState(stored.electedChampion??null);
+  const[electedGuarantee,setElectedGuarantee]=useState(stored.electedGuarantee??false);
   const[ascensionEssences,setAscensionEssences]=useState(stored.ascensionEssences??{minor:0,major:0,mythic:0});
   const[conversionHistory,setConversionHistory]=useState(stored.conversionHistory??[]);
   const[masteryTomes,setMasteryTomes]=useState(stored.masteryTomes??0);
@@ -116,7 +119,7 @@ export function GameProvider({children}){
   const[pendingMission,setPendingMission]=useState(null),[preparationMission,setPreparationMission]=useState(null);
   const[daily,setDaily]=useState(()=>{const value=load('azerune-save-daily',freshDaily());return value.date===day()?value:freshDaily()});
 
-  useEffect(()=>save('azerune-save',{version:29,campaignDifficultyMigrationV28:true,autoSkillPriorities,resonanceOverflowMigrated:true,legendaryChronicles,ascensionEssences,conversionHistory,mythicProgress,activeTeamSlot,teamPresets,achievementClaims,progressionStats,permanentQuests,tutorialRewardClaimed,tutorialAcademy,gems,gold,hearthstones,pityCounter,owned,team,equipment,inventory,history,championProgress,campaign,redeemedCodes,summonerProfile,weekly,monthly,trackedQuests,universalSoul5,masteryTomes,skillLevels,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,expeditionProgress,battleSession}),[autoSkillPriorities,legendaryChronicles,ascensionEssences,conversionHistory,mythicProgress,activeTeamSlot,teamPresets,achievementClaims,progressionStats,permanentQuests,tutorialRewardClaimed,tutorialAcademy,gems,gold,hearthstones,pityCounter,owned,team,equipment,inventory,history,championProgress,campaign,redeemedCodes,summonerProfile,weekly,monthly,trackedQuests,universalSoul5,masteryTomes,skillLevels,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,expeditionProgress,battleSession]);
+  useEffect(()=>save('azerune-save',{version:29,campaignDifficultyMigrationV28:true,autoSkillPriorities,resonanceOverflowMigrated:true,legendaryChronicles,ascensionEssences,conversionHistory,mythicProgress,activeTeamSlot,teamPresets,achievementClaims,progressionStats,permanentQuests,tutorialRewardClaimed,tutorialAcademy,gems,gold,hearthstones,pityCounter,electedChampion,electedGuarantee,owned,team,equipment,inventory,history,championProgress,campaign,redeemedCodes,summonerProfile,weekly,monthly,trackedQuests,universalSoul5,masteryTomes,skillLevels,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,expeditionProgress,battleSession}),[autoSkillPriorities,legendaryChronicles,ascensionEssences,conversionHistory,mythicProgress,activeTeamSlot,teamPresets,achievementClaims,progressionStats,permanentQuests,tutorialRewardClaimed,tutorialAcademy,gems,gold,hearthstones,pityCounter,electedChampion,electedGuarantee,owned,team,equipment,inventory,history,championProgress,campaign,redeemedCodes,summonerProfile,weekly,monthly,trackedQuests,universalSoul5,masteryTomes,skillLevels,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,expeditionProgress,battleSession]);
   useEffect(()=>save('azerune-save-daily',daily),[daily]);
   useEffect(()=>{
     const checkDailyReset=()=>{
@@ -225,18 +228,40 @@ export function GameProvider({children}){
     const pool=HEROES.filter(hero=>hero.rarity===rarity);
     return pool[Math.floor(Math.random()*pool.length)];
   };
-  const summonMany=(count,currency)=>{
-    const cost=currency==='stone'?count:(count===10?900:count*100);
+  /** Le 5★ nomme sur le Vœu d'Azerune. Changer d'elu desarme la garantie. */
+  const setElectedChampion=id=>{
+    const hero=HEROES.find(entry=>entry.id===id&&entry.rarity===5);
+    if(id!==null&&!hero)return{ok:false,message:'Seul un champion 5★ peut être nommé.'};
+    if(electedChampion===id)return{ok:true,message:'Élu inchangé.'};
+    setElectedChampionState(id);setElectedGuarantee(false);
+    return{ok:true,message:id?`${hero.name} devient votre élu.`:'Élu retiré.'};
+  };
+  const monthlyBanner=monthlyFeatured(new Date(),HEROES);
+  const summonMany=(count,currency,bannerId=DEFAULT_BANNER)=>{
+    const banner=bannerById(bannerId);
+    if(currency==='stone'&&!banner.acceptsStones)return null;
+    const cost=currency==='stone'?count:(count===10?SUMMON_COST.multi:count*SUMMON_COST.single);
     if(currency==='stone'&&hearthstones<cost)return null;
     if(currency==='gems'&&gems<cost)return null;
     if(currency==='stone')setHearthstones(value=>value-cost);else setGems(value=>value-cost);
     let ownedDraft=[...owned],progressDraft={...championProgress},pityDraft=pityCounter;
+    let guaranteeDraft=electedGuarantee;
     const results=[];
     let obtainedFourPlus=false,bloodGained=0;
     for(let index=0;index<count;index+=1){
-      const pityGuaranteed=pityDraft>=99;
+      const pityGuaranteed=pityDraft>=PITY_THRESHOLD-1;
       const x10Guarantee=count===10&&index===9&&!obtainedFourPlus&&!pityGuaranteed;
-      const hero=pickHero(pityGuaranteed,x10Guarantee?4:3);
+      let hero=pickHero(pityGuaranteed,x10Guarantee?4:3);
+      // Le portail ne change pas la rarete tiree — seulement LEQUEL des 5★ sort.
+      // C'est ce qui garde l'economie identique d'un portail a l'autre.
+      let onTarget=false;
+      if(hero.rarity===5){
+        const cible=resolveFiveStar({bannerId:banner.id,electedId:electedChampion,featured:monthlyBanner,
+          guaranteed:guaranteeDraft,roll:Math.random(),
+          pick:list=>list[Math.floor(Math.random()*list.length)],heroes:HEROES});
+        guaranteeDraft=cible.guaranteed;onTarget=cible.onTarget;
+        hero=HEROES.find(entry=>entry.id===cible.id)||hero;
+      }
       const naturalFive=hero.rarity===5;
       if(hero.rarity>=4)obtainedFourPlus=true;
       pityDraft=naturalFive?0:pityDraft+1;
@@ -244,16 +269,16 @@ export function GameProvider({children}){
       let outcome;
       if(!duplicate){ownedDraft.push(hero.id);progressDraft[hero.id]=defaultChampionProgress(hero);outcome={progress:progressDraft[hero.id],result:'new'};}
       else{outcome=evolveFromDuplicate(hero,progressDraft[hero.id]);progressDraft[hero.id]=outcome.progress;if(outcome.bloodFragments)bloodGained+=outcome.bloodFragments;}
-      results.push({...hero,duplicate,summonResult:outcome.result,progress:outcome.progress,bloodFragments:outcome.bloodFragments||0,pityGuaranteed,x10Guaranteed:x10Guarantee});
+      results.push({...hero,duplicate,summonResult:outcome.result,progress:outcome.progress,bloodFragments:outcome.bloodFragments||0,pityGuaranteed,x10Guaranteed:x10Guarantee,bannerId:banner.id,onTarget});
     }
-    setOwned(ownedDraft);setChampionProgress(progressDraft);setPityCounter(pityDraft);if(bloodGained)setBloodFragments(value=>value+bloodGained);
+    setOwned(ownedDraft);setChampionProgress(progressDraft);setPityCounter(pityDraft);setElectedGuarantee(guaranteeDraft);if(bloodGained)setBloodFragments(value=>value+bloodGained);
     const now=new Date().toLocaleString('fr-FR');
     setHistory(current=>[...results.map((hero,index)=>({id:Date.now()+index+Math.random(),name:hero.name,icon:hero.icon,rarity:hero.rarity,duplicate:hero.duplicate,result:hero.summonResult,stars:hero.progress.stars,level:hero.progress.level,soulFragments:hero.progress.soulFragments,bloodFragments:hero.bloodFragments||0,pityGuaranteed:hero.pityGuaranteed,x10Guaranteed:hero.x10Guaranteed,date:now})),...current].slice(0,50));
     emitProgressEvent('heroSummoned',{amount:count});setProgressionStats(current=>({...current,lifetime:{...current.lifetime,summons:{...current.lifetime.summons,total:current.lifetime.summons.total+count,multi10:current.lifetime.summons.multi10+(count===10?1:0),newHeroes:current.lifetime.summons.newHeroes+results.filter(x=>!x.duplicate).length,duplicates:current.lifetime.summons.duplicates+results.filter(x=>x.duplicate).length,rarity4:current.lifetime.summons.rarity4+results.filter(x=>x.rarity===4).length,rarity5:current.lifetime.summons.rarity5+results.filter(x=>x.rarity===5).length,pity:current.lifetime.summons.pity+results.filter(x=>x.pityGuaranteed).length,gemsSpent:current.lifetime.summons.gemsSpent+(currency==='gems'?cost:0),stonesSpent:current.lifetime.summons.stonesSpent+(currency==='stone'?cost:0)}}}));
     grantSummonerXp(count*8);
     return results;
   };
-  const summon=()=>summonMany(1,'gems')?.[0]||null;
+  const summon=()=>summonMany(1,'gems',DEFAULT_BANNER)?.[0]||null;
 
   const redeemCode=input=>{
     const code=normalizeCode(input||'');
@@ -417,13 +442,26 @@ export function GameProvider({children}){
     setGold(value=>value+rewards.gold);
     setGems(value=>value+rewards.gems);
     if(rewards.stones)setHearthstones(value=>value+rewards.stones);
-    setCampaign(current=>({...current,scores:{...current.scores,[mission.key]:stars}}));emitProgressEvent('campaignStarsEarned',{amount:Math.max(0,stars-previous)});
+    // Palier de continent : verse au premier nettoyage complet des sept
+    // missions, une seule fois par difficulte. On calcule sur les scores
+    // resultants et non sur `campaign.scores`, qui n'a pas encore ete mis a
+    // jour par ce setState.
+    const scoresApres={...campaign.scores,[mission.key]:stars};
+    const continent=CONTINENTS.find(entry=>entry.id===mission.continentId);
+    const clearKey=continent?continentClearKey(mission.difficultyId,continent.id):null;
+    const paliersDeja=campaign.clearedContinents||{};
+    const palier=continent&&!paliersDeja[clearKey]&&continentCleared(scoresApres,mission.difficultyId,continent)
+      ?continentClearReward(CONTINENTS.indexOf(continent),mission.difficultyId):null;
+    if(palier){setGems(value=>value+palier.gems);setGold(value=>value+palier.gold);if(palier.stones)setHearthstones(value=>value+palier.stones);}
+    setCampaign(current=>({...current,scores:{...current.scores,[mission.key]:stars},
+      clearedContinents:palier?{...(current.clearedContinents||{}),[clearKey]:Date.now()}:(current.clearedContinents||{})}));
+    emitProgressEvent('campaignStarsEarned',{amount:Math.max(0,stars-previous)});
     const lootRoll=rollCampaignLoot(mission,firstClear),campaignStone=rollCampaignStone(mission);const progressionGift=campaignProgressionGift(mission,firstClear,lootRoll.item?.itemLevel);
     if(progressionGift)setInventory(current=>[progressionGift,...current].slice(0,INVENTORY_LIMIT));
-    return{...rewards,farm:false,loot:lootRoll.item,progressionGift,lootChance:lootRoll.lootChance,campaignStone,championXp:xpResult.xp,xpFactor:xpResult.factor,xpFarm:false};
+    return{...rewards,continentClear:palier?{...palier,continentName:continent.name}:null,farm:false,loot:lootRoll.item,progressionGift,lootChance:lootRoll.lootChance,campaignStone,championXp:xpResult.xp,xpFactor:xpResult.factor,xpFarm:false};
   };
 
-  const value={HEROES,UNIQUE_WEAPONS,RELICS,CHRONICLE_STEPS,legendaryChronicles,grantRelic,activateRelic,addLegendaryMaterial,setChronicleStep,chooseUniqueOrientation,forgeUniqueWeapon,harmonizeUniqueWeapon,getUniqueWeaponForHero,ITEMS,QUALITIES,RAIDS,EXPEDITIONS,QUESTS,WEEKLY_QUESTS,MONTHLY_QUESTS,QUEST_GROUPS,FINAL_CHESTS,QUEST_PERIOD_CONFIG,DIFFICULTIES,CONTINENTS,STAR_MILESTONES,gems,gold,hearthstones,pityCounter,tutorialRewardClaimed,completeTutorialReward,tutorialAcademy,completeAcademyTutorial,claimAcademyTutorial,claimAcademyFinal,summonRates,redeemedCodes,universalSoul5,ascensionEssences,conversionHistory,convertAscensionEssence,masteryTomes,skillLevels,autoSkillPriorities,getAutoSkillPriority,setAutoSkillPriority,resetAutoSkillPriority,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,setForgeHistory,expeditionProgress,chooseSundayExpeditionHonor,claimExpeditionHonor,shopRefreshCost,shopNextRotation,summonerProfile,weekly,monthly,trackedQuests,toggleTrackedQuest,unlocks,SUMMONER_MAX_LEVEL,summonerXpRequired,owned,team,teamPresets,activeTeamSlot,selectTeamPreset,renameTeamPreset,saveCurrentTeamToPreset,setTeamMember,removeTeamMember,clearCurrentTeam,copyTeamPreset,equipment,inventory,history,daily,championProgress,campaign,mythicProgress,finishMythicMission,achievementClaims,claimAchievement,progressionStats,permanentQuests,emitProgressEvent,recordBattleResult,grantReward,activeMission,battleSession,battleInProgress,pendingMission,preparationMission,cancelMissionPreparation,confirmMissionPreparation,prepareNextMission,setGems,setGold,setHearthstones,setTeam,setEquipment,setInventory,setHistory,equipItem,itemOwner,unequipSlot,toggleItemLock,sellItem,itemSellValue,upgradeItem,getItemUpgradeCost,recycleItem,itemRecycleValue,buyShopOffer,refreshShop,unlockShopSlot,setDaily,setActiveMission,setBattleSession,requestMissionStart,updateBattleSession,abandonBattle,dismissPendingMission,replaceBattleWithPending,progress:progressQuest,claimQuest,claimQuestChest,grantSummonerXp,setSummonerName,isUnlocked,summon,summonMany,redeemCode,grantXp,getProgress,getEvolutionStatus,evolveHero,getResonanceStatus,reinforceResonance,getSkillInfo,upgradeSkill,difficultyUnlocked,continentUnlocked,stageUnlocked,difficultyStars,claimCampaignMilestone,finishExpeditionMission,finishRaidMission,finishCampaignMission,stats:hero=>totalStats(hero,equipment,getProgress(hero),inventory),naturalStats:hero=>championProgressionStats(hero,getProgress(hero)),championPower:hero=>championPower(totalStats(hero,equipment,getProgress(hero),inventory)),teamPower:(members=team)=>teamPower(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory)),missionPower:mission=>calibratedEncounterPower(mission),assessMission:(mission,members=team)=>assessTeamForMission(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory),mission),missionDifficulty,campaignXp};
+  const value={HEROES,UNIQUE_WEAPONS,RELICS,CHRONICLE_STEPS,legendaryChronicles,grantRelic,activateRelic,addLegendaryMaterial,setChronicleStep,chooseUniqueOrientation,forgeUniqueWeapon,harmonizeUniqueWeapon,getUniqueWeaponForHero,ITEMS,QUALITIES,RAIDS,EXPEDITIONS,QUESTS,WEEKLY_QUESTS,MONTHLY_QUESTS,QUEST_GROUPS,FINAL_CHESTS,QUEST_PERIOD_CONFIG,DIFFICULTIES,CONTINENTS,STAR_MILESTONES,gems,gold,hearthstones,pityCounter,tutorialRewardClaimed,completeTutorialReward,tutorialAcademy,completeAcademyTutorial,claimAcademyTutorial,claimAcademyFinal,summonRates,BANNERS,DEFAULT_BANNER,monthlyFeatured:monthlyBanner,electedChampion,electedGuarantee,setElectedChampion,SUMMON_COST,PITY_THRESHOLD,redeemedCodes,universalSoul5,ascensionEssences,conversionHistory,convertAscensionEssence,masteryTomes,skillLevels,autoSkillPriorities,getAutoSkillPriority,setAutoSkillPriority,resetAutoSkillPriority,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,setForgeHistory,expeditionProgress,chooseSundayExpeditionHonor,claimExpeditionHonor,shopRefreshCost,shopNextRotation,summonerProfile,weekly,monthly,trackedQuests,toggleTrackedQuest,unlocks,SUMMONER_MAX_LEVEL,summonerXpRequired,owned,team,teamPresets,activeTeamSlot,selectTeamPreset,renameTeamPreset,saveCurrentTeamToPreset,setTeamMember,removeTeamMember,clearCurrentTeam,copyTeamPreset,equipment,inventory,history,daily,championProgress,campaign,mythicProgress,finishMythicMission,achievementClaims,claimAchievement,progressionStats,permanentQuests,emitProgressEvent,recordBattleResult,grantReward,activeMission,battleSession,battleInProgress,pendingMission,preparationMission,cancelMissionPreparation,confirmMissionPreparation,prepareNextMission,setGems,setGold,setHearthstones,setTeam,setEquipment,setInventory,setHistory,equipItem,itemOwner,unequipSlot,toggleItemLock,sellItem,itemSellValue,upgradeItem,getItemUpgradeCost,recycleItem,itemRecycleValue,buyShopOffer,refreshShop,unlockShopSlot,setDaily,setActiveMission,setBattleSession,requestMissionStart,updateBattleSession,abandonBattle,dismissPendingMission,replaceBattleWithPending,progress:progressQuest,claimQuest,claimQuestChest,grantSummonerXp,setSummonerName,isUnlocked,summon,summonMany,redeemCode,grantXp,getProgress,getEvolutionStatus,evolveHero,getResonanceStatus,reinforceResonance,getSkillInfo,upgradeSkill,difficultyUnlocked,continentUnlocked,stageUnlocked,difficultyStars,claimCampaignMilestone,finishExpeditionMission,finishRaidMission,finishCampaignMission,stats:hero=>totalStats(hero,equipment,getProgress(hero),inventory),naturalStats:hero=>championProgressionStats(hero,getProgress(hero)),championPower:hero=>championPower(totalStats(hero,equipment,getProgress(hero),inventory)),teamPower:(members=team)=>teamPower(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory)),missionPower:mission=>calibratedEncounterPower(mission),assessMission:(mission,members=team)=>assessTeamForMission(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory),mission),missionDifficulty,campaignXp};
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }
 export const useGame=()=>useContext(GameContext);
