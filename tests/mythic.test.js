@@ -376,3 +376,28 @@ describe('affixes — effets en combat',()=>{
     expect(vitesse([],.20)).toBe(100);
   });
 });
+
+describe('cohérence entre la mission et la jauge de préparation',()=>{
+  // Ce défaut n'est apparu qu'en ouvrant le jeu : la page Mythic+ affichait
+  // « Puissance recommandée 43 000 » pendant que la mission calculait son
+  // budget de Sablier sur 12 678. La jauge ignorait la valeur annoncée et la
+  // recalculait depuis des ennemis dont l'Attaque venait d'être multipliée
+  // par vingt. Deux chiffres différents sur le même écran.
+  it('la puissance évaluée est celle que la mission annonce',()=>{
+    MYTHIC_LEVELS.forEach(level=>{
+      const mission=createMythicMission(level);
+      expect(calibratedEncounterPower(mission),`niveau ${level}`).toBe(mission.recommended);
+    });
+  });
+
+  it('elle reste cohérente avec le budget du Sablier',()=>{
+    // Le budget divise par cette meme puissance : s'ils divergent, le Sablier
+    // et la jauge ne parlent plus du meme combat.
+    [1,15,30].forEach(level=>{
+      const mission=createMythicMission(level);
+      const attendu=Math.round(120*mission.waves.flat()
+        .reduce((total,unite)=>total+unite.hp,0)/calibratedEncounterPower(mission));
+      expect(mission.turnBudget,`niveau ${level}`).toBe(attendu);
+    });
+  });
+});

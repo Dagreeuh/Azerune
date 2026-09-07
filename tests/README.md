@@ -394,3 +394,20 @@ provocateur baissent — il aurait échoué immédiatement.
 Corollaire : quand un test d'une fonction interne passe du premier coup sur du
 code qu'on vient d'écrire, se demander s'il vérifie autre chose que sa propre
 copie.
+
+## Certains défauts ne se voient qu'à l'écran
+
+La page Mythic+ affichait deux puissances recommandées à quelques centimètres
+l'une de l'autre : 12 678 pour le budget du Sablier, 43 000 pour la jauge de
+préparation. La jauge recalculait la valeur depuis les statistiques ennemies,
+dont l'Attaque venait d'être multipliée par vingt.
+
+Ni les 1 014 tests, ni la simulation, ni la relecture ne pouvaient le voir :
+**les deux chiffres sont justes séparément**, chacun produit par une fonction
+qui fait exactement ce qu'elle annonce. Ils ne se contredisent que côte à côte.
+
+Il a fallu ouvrir le jeu.
+
+La règle : **quand deux calculs indépendants produisent la même grandeur pour
+le joueur, un test doit les comparer entre eux.** Et une couche sans test —
+ici React — doit au minimum être regardée avant d'être livrée.
