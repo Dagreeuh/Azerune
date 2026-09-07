@@ -6,6 +6,8 @@
 // projet. Les dégâts eux-mêmes sont couverts par degats.contrat.test.js.
 import{describe,it,expect,afterEach,vi}from'vitest';
 import{HEROES}from'../src/data/heroes';
+import{championIdentity}from'../src/data/championIdentities';
+import{skillMechanic}from'../src/utils/skills';
 import fs from'node:fs';
 import{fileURLToPath}from'node:url';
 import{createBattle,nextTurn,castSkill,performAutoAction}from'../src/battle/engine';
@@ -388,5 +390,64 @@ describe('le combat automatique sait jouer les renforts',()=>{
     [31,32,33,34,35,36].forEach(id=>
       expect(moteur.includes(`actor.id===${id}&&!customOrder`),
         `aucune règle automatique pour le champion ${id}`).toBe(true));
+  });
+});
+
+describe('cohérence avec les conventions du jeu',()=>{
+  // Tous les soins du jeu se calculent sur les PV maximum, jamais sur
+  // l'Attaque. Yunmei faisait exception : son conseil d'équipement l'aurait
+  // envoyée chercher de l'Attaque, seule soigneuse du roster dans ce cas.
+  it('les soins de Yunmei ne dépendent pas de son Attaque',()=>{
+    fixedRandom(.5);
+    const soin=attaque=>{
+      const combat=scene(34,{allies:[{}],patchAllie:unite=>
+        unite.id===34?{atk:attaque}:{hp:Math.round(unite.maxHp*.3)}});
+      const avant=findUnit(combat,8100).hp;
+      return findUnit(lance(combat,1,8100),8100).hp-avant;
+    };
+    expect(soin(20)).toBe(soin(400));
+  });
+
+  it('le soin de Paume de brume ne dépend pas non plus de son Attaque',()=>{
+    fixedRandom(.5);
+    const soin=attaque=>{
+      const combat=scene(34,{allies:[{}],patchAllie:unite=>
+        unite.id===34?{atk:attaque}:{hp:Math.round(unite.maxHp*.3)}});
+      const avant=findUnit(combat,8100).hp;
+      return findUnit(lance(combat,0,cible(combat)),8100).hp-avant;
+    };
+    expect(soin(20)).toBe(soin(400));
+    expect(soin(20)).toBeGreaterThan(0);
+  });
+
+  it('le soin de Yunmei suit bien les PV de la cible',()=>{
+    fixedRandom(.5);
+    const soin=pvMax=>{
+      const combat=scene(34,{allies:[{hp:pvMax}],
+        patchAllie:unite=>unite.id===34?{}:{hp:Math.round(unite.maxHp*.3)}});
+      const avant=findUnit(combat,8100).hp;
+      return findUnit(lance(combat,1,8100),8100).hp-avant;
+    };
+    expect(soin(8000)).toBeGreaterThan(soin(2000));
+  });
+
+  it('le conseil d’équipement de chaque renfort correspond à son kit',()=>{
+    // La fiche du champion et l'infobulle de compétence sont écrites à deux
+    // endroits : elles doivent nommer la même statistique principale.
+    const ATTENDU={31:'Attaque',32:'Attaque',33:'Précision',34:'PV',35:'Vitesse',36:'Attaque'};
+    Object.entries(ATTENDU).forEach(([id,stat])=>{
+      const identite=championIdentity(heros(Number(id)));
+      expect(identite.gear.startsWith(stat),
+        `${heros(Number(id)).name} : fiche « ${identite.gear} » attendait « ${stat} »`).toBe(true);
+    });
+  });
+
+  it('les contrôles de Sivrane sont classés sur la Précision',()=>{
+    // Ralentissement et Étourdissement sont des jets qui dépendent de la
+    // Précision : conseiller le Critique enverrait le joueur dans le mur.
+    heros(33).skills.forEach(competence=>{
+      const profil=skillMechanic(competence);
+      expect(profil.scaling[0],`${competence.name}`).toBe('Précision');
+    });
   });
 });
