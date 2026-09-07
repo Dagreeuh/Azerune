@@ -270,8 +270,20 @@ n'inflige rien. `tests/degats.contrat.test.js` ferme définitivement ce piège.
   même réglage ne montre **aucune différence** (écart 1,20 → 1,34, dans le
   bruit), et la renforcer aggrave la concentration au lieu de la réduire.
   Le Raid est une course contre le compteur de charges, et la réponse à une
-  course est toujours plus de dégâts. Le corriger demande une mécanique dont la
-  réponse n'est pas des dégâts — conception de contenu, pas réglage.
+  course est toujours plus de dégâts.
+
+  Une mécanique dont la réponse n'est pas des dégâts a été conçue et livrée —
+  la **Canalisation du Cœur** (v1.58.0) : le Prêtre devient intouchable et seul
+  un étourdissement l'interrompt. Elle atteint son but immédiat — Vexil passe de
+  0,94 à 1,70 fois sa présence attendue, le plus grand déplacement de valeur
+  mesuré sur un champion de tout cet audit — mais **elle ne réduit pas la
+  concentration** : l'écart entre champions monte au lieu de descendre.
+
+  Cinq variantes ont été mesurées, de la plus dure à la plus douce, avec
+  compensation par l'enrage. Toutes donnent le même résultat. **Toute difficulté
+  ajoutée concentre davantage**, quelle que soit sa nature, parce que la
+  condition de victoire ne change pas. Réduire la concentration demanderait un
+  Raid qui ne se gagne pas en tuant vite — une refonte de contenu.
 - **La purification gagne désormais quelque chose de mesurable** (1,00 → 1,07)
   depuis que l'Affliction déborde sur l'équipe à saturation — mais les soigneurs
   y gagnent davantage (1,03 → 1,11). L'affixe reste partiellement absorbable.

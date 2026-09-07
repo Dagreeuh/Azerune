@@ -7,6 +7,7 @@ const mechanics=[
   ['Brûlure volcanique','L’Éruption applique Brûlure à toute l’équipe.'],
   ['Prêtre des flammes','Le serviteur soigne et renforce Rhazakar.'],
   ['Brûlure cumulable','Les Brûlures deviennent plus dangereuses.'],
+  ['Canalisation du Cœur','À partir du niveau 6, le Prêtre canalise et devient intouchable. Seul un contrôle l’interrompt : sans étourdissement, la canalisation aboutit et le Cœur incandescent explose.'],
   ['Gardien de lave','Le Gardien provoque et protège les serviteurs.'],
   ['Fureur du brasier','Après une Éruption, Rhazakar gagne Attaque augmentée.'],
   ['Braises renaissantes','Après sa destruction, l’Élémentaire revient après 7 actions aux niveaux 1 à 3, 5 actions aux niveaux 4 à 7, puis 4 actions aux niveaux 8 à 10.'],
@@ -25,8 +26,8 @@ export const RAIDS=[
 export const raidKey=(raidId,level)=>`${raidId}:${level}`;
 export function raidLevelData(raidId,level){
   const raid=RAIDS.find(value=>value.id===raidId),index=Math.max(0,Math.min(9,level-1));
-  const enrageAt=level<=3?40:level<=6?34:level<=9?30:28,emberRespawnActions=level<=3?7:level<=7?5:4,eruptionDamageRate=level<=3?.60:level<=6?.70:level<=8?.75:level===9?.80:.85;
-  return{...raid,level,teamSize:4,enrageAt,emberRespawnActions,eruptionDamageRate,recommended:RAID_POWER[index],mechanics:mechanics.slice(0,index+1),eruptionAt:level===10?8:Math.max(10,13-Math.ceil(level/2)),reward:{gold:500+level*350,gems:level===10?150:15+level*5,stones:level>=7?1:0},loot:{raidId,stars:level<=3?3:level<=6?4:5,minQuality:level===10?'rare':level>=7?'rare':level>=4?'common':'common'}};
+  const channelFrom=level>=6?8:null,channelActions=level>=9?3:4,enrageAt=level<=3?40:level<=6?34:level<=9?30:28,emberRespawnActions=level<=3?7:level<=7?5:4,eruptionDamageRate=level<=3?.60:level<=6?.70:level<=8?.75:level===9?.80:.85;
+  return{...raid,level,teamSize:4,enrageAt,emberRespawnActions,eruptionDamageRate,channelFrom,channelActions,recommended:RAID_POWER[index],mechanics:mechanics.slice(0,level===10?mechanics.length:index+1),eruptionAt:level===10?8:Math.max(10,13-Math.ceil(level/2)),reward:{gold:500+level*350,gems:level===10?150:15+level*5,stones:level>=7?1:0},loot:{raidId,stars:level<=3?3:level<=6?4:5,minQuality:level===10?'rare':level>=7?'rare':level>=4?'common':'common'}};
 }
 export function createRaidMission(raidId,level){
   const data=raidLevelData(raidId,level),scale=1+(level-1)*.18,bossHp=1.43,bossAtk=1.16,bossDef=1.08,addHp=1.34,addAtk=1.14,addDef=1.06;

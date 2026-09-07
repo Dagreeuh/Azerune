@@ -42,7 +42,7 @@ export function createBattle(team,heroes,getStats,options={}){
     battleId,createdAt:Date.now(),schemaVersion:2,actionSeq:0,tutorialBattle:options.tutorialBattle?{enabled:true,controlled:Boolean(options.tutorialBattle.controlled),scenarioId:options.tutorialBattle.scenarioId||'introduction'}:null,
     allies:team.map(id=>{const hero=heroes.find(item=>item.id===id),stats=getStats(hero),initialShield=stats.setEffects?.includes('protectionSet')?Math.round(stats.hp*.15):0;return{...hero,element:normalizeElement(hero.element),...stats,maxHp:stats.hp,atb:options.tutorialBattle?0:Math.random()*12,cooldowns:[0,0,0],buffs:initialShield?{protectionSet:{turns:99}}:{},debuffs:{},shield:initialShield,maxShield:initialShield,dead:false,side:'ally',currentSpd:stats.spd,skip:false,uniqueWeapon:hero.uniqueWeapon||null,weaponCharge:0,mechanic:{key:hero.id,value:0,max:hero.resourceMax??(hero.name==='Korga'||hero.skills?.some(skill=>skill.effect==='shieldExecute')?0:hero.id===19?3:hero.id===21?60:[7,8,13].includes(hero.id)?3:hero.id===14?4:hero.id===28?6:5),mode:hero.id===25?'high':null,targetId:null,lastSkill:null,danceSteps:[],active:[23,25].includes(hero.id)}}}),
     enemies:makeEnemies(enemySource,enemyScale,1).map(unit=>options.tutorialBattle?{...unit,atb:0}:unit),
-    turn:null,winner:null,rewarded:false,combatStats:Object.fromEntries(team.map(id=>[id,emptyCombatStat()])),mythic:options.mythic||null,mythicState:options.mythic?createMythicState(options.mythic.turnBudget):null,wave:1,totalWaves:options.waves?.length||1,waves:options.waves||null,affixState:affixState(options.affixIds),raid:options.raid||null,raidState:options.raid?{charges:0,maxCharges:options.raid.eruptionAt||10,phaseTwo:false,failedMechanic:null,mechanicFailures:0,championActions:0,enrageAt:options.raid.enrageAt||40,enraged:false,enrageTriggeredAt:null,emberRespawnActions:options.raid.emberRespawnActions||7,emberRespawnAt:null}:null,lastEvents:[],eventSeq:0,log:['Le combat commence.']
+    turn:null,winner:null,rewarded:false,combatStats:Object.fromEntries(team.map(id=>[id,emptyCombatStat()])),mythic:options.mythic||null,mythicState:options.mythic?createMythicState(options.mythic.turnBudget):null,wave:1,totalWaves:options.waves?.length||1,waves:options.waves||null,affixState:affixState(options.affixIds),raid:options.raid||null,raidState:options.raid?{charges:0,maxCharges:options.raid.eruptionAt||10,phaseTwo:false,failedMechanic:null,mechanicFailures:0,championActions:0,enrageAt:options.raid.enrageAt||40,enraged:false,enrageTriggeredAt:null,emberRespawnActions:options.raid.emberRespawnActions||7,emberRespawnAt:null,channelAt:options.raid.channelFrom??null,channelActions:options.raid.channelActions||4,channeling:false,channelEndsAt:null,channelsInterrupted:0,channelsCompleted:0}:null,lastEvents:[],eventSeq:0,log:['Le combat commence.']
   };
 }
 
@@ -110,6 +110,44 @@ export function finish(battle,id,text,retain=0){
     const actor=allies.find(unit=>unit.id===id),ember=enemies.find(unit=>unit.raidRole==='ember'),previousEmber=battle.enemies.find(unit=>unit.raidRole==='ember');
     if(previousEmber&&!previousEmber.dead&&ember?.dead){raidState.charges=Math.max(0,raidState.charges-4);raidState.emberRespawnAt=(raidState.championActions||0)+(raidState.emberRespawnActions||7);events.push(`L’Élémentaire de braise est détruit : 4 charges retirées. Retour dans ${raidState.emberRespawnActions||7} actions.`);}
     if(actor){raidState.charges+=1;raidState.championActions+=1;events.push(`Cœur incandescent : ${raidState.charges}/${raidState.maxCharges} charges.`);}
+    // Canalisation du Coeur : la seule mecanique du Raid dont la reponse n'est
+    // pas des degats. Le Pretre devient intouchable ; seul un controle
+    // l'interrompt.
+    //
+    // Mesure : elle donne au controle une valeur reelle — Vexil passe de 0,94 a
+    // 1,70 fois sa presence attendue dans les compositions gagnantes. Elle ne
+    // reduit pas pour autant la concentration du Raid sur les gros degats, qui
+    // tient a sa condition de victoire et non a ses mecaniques. Voir
+    // Patch_notes/RAID-CANALISATION-DU-COEUR.md.
+    if(actor&&raidState.channelAt!=null){
+      const pretre=enemies.find(unit=>unit.raidRole==='priest'&&!unit.dead);
+      if(!raidState.channeling&&pretre&&raidState.championActions>=raidState.channelAt){
+        raidState.channeling=true;
+        raidState.channelEndsAt=raidState.championActions+raidState.channelActions;
+        events.push(`CANALISATION : ${pretre.name} devient intouchable. Étourdissez-le sous ${raidState.channelActions} actions.`);
+      }else if(raidState.channeling){
+        if(!pretre){
+          raidState.channeling=false;raidState.channelEndsAt=null;
+          raidState.channelAt=raidState.championActions+12;
+        }else if(pretre.debuffs?.stun||pretre.skip){
+          raidState.channeling=false;raidState.channelEndsAt=null;
+          raidState.channelsInterrupted+=1;
+          raidState.channelAt=raidState.championActions+12;
+          // Interrompre n'evite pas seulement une punition : c'est un levier de
+          // plus sur le Coeur incandescent, au meme titre que tuer l'Elementaire.
+          raidState.charges=Math.max(0,raidState.charges-3);
+          events.push(`Canalisation interrompue : ${pretre.name} est réduit au silence, 3 charges retirées.`);
+        }else if(raidState.championActions>=raidState.channelEndsAt){
+          raidState.channeling=false;raidState.channelEndsAt=null;
+          raidState.channelsCompleted+=1;
+          raidState.channelAt=raidState.championActions+12;
+          raidState.charges=Math.min(raidState.maxCharges,raidState.charges+Math.ceil(raidState.maxCharges/2));
+          const cible=enemies.find(unit=>unit.raidRole==='boss'&&!unit.dead);
+          if(cible)cible.hp=Math.min(cible.maxHp,cible.hp+Math.round(cible.maxHp*.06));
+          events.push('CANALISATION ABOUTIE : le Cœur incandescent déborde et Rhazakar récupère 12 % de ses PV.');
+        }
+      }
+    }
     if(actor&&ember?.dead&&raidState.emberRespawnAt!=null&&raidState.championActions>=raidState.emberRespawnAt){const revived={...ember,hp:ember.maxHp,dead:false,atb:0,shield:0,maxShield:0,buffs:{},debuffs:{},skip:false};enemies=enemies.map(unit=>unit.id===ember.id?revived:unit);raidState.emberRespawnAt=null;events.push('Braises renaissantes : l’Élémentaire de braise revient au combat.');}
     if(actor&&!raidState.enraged&&raidState.championActions>=raidState.enrageAt){raidState.enraged=true;raidState.enrageTriggeredAt=raidState.championActions;const enrageBoss=enemies.find(unit=>unit.raidRole==='boss'&&!unit.dead);if(enrageBoss){enrageBoss.atk=Math.round(enrageBoss.atk*1.5);enrageBoss.spd=Math.round(enrageBoss.spd*1.3);enrageBoss.currentSpd=Math.round((enrageBoss.currentSpd||enrageBoss.spd)*1.3);enrageBoss.buffs.raidEnrage={turns:99};}allies=allies.map(unit=>unit.dead?unit:{...unit,debuffs:{...unit.debuffs,raidHealingDown:{turns:99}}});events.push('ENRAGE : le boss gagne 50 % d’Attaque et 30 % de Vitesse ; les soins reçus sont réduits de 30 %.');}
     const boss=enemies.find(unit=>unit.raidRole==='boss'&&!unit.dead);
@@ -279,6 +317,8 @@ function forcedEnemyTarget(battle,actor){
   return (battle?.enemies||[]).find(unit=>unit.id===source&&!unit.dead)||null;
 }
 
+// Competences qui posent un Etourdissement : la reponse a la Canalisation.
+const CONTROL_EFFECTS=new Set(['impactQuake','unstableStun','gardenPrison','frostShatter']);
 const AUTO_CONTROL_DEBUFFS=new Set(['stun','provoke']);
 const AUTO_DANGEROUS_DEBUFFS=new Set(['stun','healingDown','provoke','burn','poison','bleed','agony','corruption']);
 const livingLeft=units=>(units||[]).filter(unit=>!unit.dead);
@@ -287,10 +327,15 @@ const affinityRank=key=>key==='effective'?0:key==='neutral'?1:2;
 
 export function chooseAutoEnemyTarget(battle,actor,skill){
   const enemies=livingLeft(battle?.enemies);if(!enemies.length)return null;
-  const impose=forcedEnemyTarget(battle,actor);if(impose)return impose.id;
+  const impose=forcedEnemyTarget(battle,actor);if(impose)return impose;
   const effect=skill?.effect;
   const score=(enemy,index)=>{
     let special=0;const raidDanger=Boolean(battle?.raidState&&battle.raidState.charges>=Math.ceil(battle.raidState.maxCharges*.60));if(raidDanger&&enemy.raidRole==='ember')special-=5000;
+    // Canalisation en cours : frapper le Pretre ne sert a rien, seul un
+    // controle compte. On y envoie les competences qui etourdissent, et on
+    // detourne les autres.
+    if(battle?.raidState?.channeling&&enemy.raidRole==='priest')
+      special+=CONTROL_EFFECTS.has(effect)?-9000:9000;
     if(['shieldBreaker','shieldExpose'].includes(effect))special=(enemy.shield||0)>0?-1200:0;
     if(effect==='shieldExecute'){if(enemy.debuffs?.exposed)special=-1600;else if(enemy.shieldBroken||(enemy.maxShield||0)>0&&(enemy.shield||0)<=0)special=-1300;else special=0;}
     if(effect==='condemnStrip')special=-120*Object.keys(enemy.buffs||{}).length;
@@ -359,6 +404,14 @@ export function chooseAutoSkill(battle,priorities={}){
   if(actor.id===34&&!customOrder){const souilles=battle.allies.filter(unit=>!unit.dead&&Object.keys(unit.debuffs||{}).length>0).length,blesses=battle.allies.filter(unit=>!unit.dead&&hpRatio(unit)<.6).length;order=souilles>=2||blesses>=2?[2,1,0]:souilles||blesses?[1,0,2]:[0,1,2];}
   if(actor.id===35&&!customOrder){const amplifies=battle.allies.filter(unit=>!unit.dead&&unit.buffs?.damageUp).length,vivants=battle.allies.filter(unit=>!unit.dead).length;order=amplifies>=vivants-1?[0,1,2]:amplifies?[2,1,0]:[1,2,0];}
   if(actor.id===36&&!customOrder){const charges=actor.mechanic?.value||0;order=charges>=3?[1,2,0]:charges>=2&&(actor.cooldowns?.[2]||0)<=0?[2,1,0]:[0,1,2];}
+  // Canalisation du Coeur : tout champion capable d'etourdir le fait en priorite.
+  if(battle?.raidState?.channeling&&!customOrder){
+    const arret=actor.skills.map((skill,index)=>({skill,index}))
+      .filter(({skill,index})=>CONTROL_EFFECTS.has(skill.effect)
+        &&(actor.cooldowns?.[index]||0)<=0
+        &&(index<2||actor.rarity>=4||actor.currentStars>=4));
+    if(arret.length)order=[...arret.map(({index})=>index),...order.filter(index=>!arret.some(a=>a.index===index))];
+  }
   for(const index of order){const skill=actor.skills[index];const unlocked=index<2||actor.rarity>=4||actor.currentStars>=4;if(unlocked&&(actor.cooldowns?.[index]||0)<=0&&autoSkillUseful(battle,actor,skill,{respectPlayerPriority:customOrder}))return index;}
   return order.find(index=>{const unlocked=index<2||actor.rarity>=4||actor.currentStars>=4;return unlocked&&(actor.cooldowns?.[index]||0)<=0})??null;
 }
@@ -391,7 +444,7 @@ export function castSkill(battle,index,targetId){
   const heal=(target,raw,type='heal')=>{const necroticMultiplier=1-.06*Math.min(5,target.debuffs?.necrotic?.stacks||0),healingMultiplier=Math.max(.35,(target.debuffs?.healingDown?.60:1)*(target.debuffs?.raidHealingDown?.70:1)*necroticMultiplier),adjusted=raw*healingMultiplier;const amount=Math.max(0,Math.min(target.maxHp-target.hp,Math.round(adjusted)));target.hp+=amount;healingTotal+=amount;if(amount)event(target,amount,type);return amount};
   const shield=(target,raw)=>{const amount=Math.max(0,Math.round(raw));target.shield+=amount;target.maxShield=Math.max(target.maxShield||0,target.shield);target.buffs.shield={turns:2+mastery.duration,source:actor.id};shieldTotal+=amount;if(amount)event(target,amount,'shield');return amount};
   const debuff=(target,key,turns,chance=.75)=>{const relation=affinity(actor.element,target.element);return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,mastery.effectRate,resisted)};
-  const hit=(target,mult=skill.power||0,opts={})=>{if(!target||target.dead||mult<=0)return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'}};const intangible=battle.mythic&&battle.affixState?.ids?.includes('incorporeal')&&target.hp/target.maxHp<.5&&!target.debuffs?.stun&&!target.debuffs?.slow;const relation=affinity(actor.element,target.element),attack=(opts.defScale?actor.def*(actor.buffs.defUp?1.3:1):actor.atk*(actor.buffs.atkUp?1.25:1))*(1+(actor.buffs.damageUp?.power||0)),defense=target.def*(target.buffs.defUp?1.3:1)*(1+.08*(target.buffs?.mythicBolster?.stacks||0))*(target.debuffs.defDown?.7:1)*(typeof opts.pierce==='number'?opts.pierce:opts.pierce?.15:1);let power=mult*(1+mastery.power)*relation.damage*(opts.bonus||1);if(target.debuffs.mark)power*=1.2;if(actor.setEffects?.includes('volcanicFurySet')&&actor.hp/actor.maxHp<.5)power*=1.12;let base=Math.max(5,Math.round(attack*power*100/(100+defense*3)*(intangible?.45:1))),critical=opts.forceCrit||Math.random()<(actor.crit||5)/100,damage=Math.round(base*(critical?1+(actor.critDamage||50)/100:1));const absorbed=Math.min(target.shield||0,opts.shieldBreaker?damage*2:damage);target.shield=Math.max(0,(target.shield||0)-absorbed);if(absorbed>0&&target.shield<=0)target.shieldBroken=true;if(!opts.shieldOnly){damage=Math.max(0,damage-(opts.shieldBreaker?Math.ceil(absorbed/2):absorbed));target.hp=Math.max(0,target.hp-damage);target.dead=target.hp<=0;}damageTotal+=damage;if(damage>0&&actor.setEffects?.includes('lifestealSet')&&actor.hp<actor.maxHp){const life=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*.25)));actor.hp+=life;healingTotal+=life;event(actor,life,'heal',{sourceType:'lifesteal'});}const hunter=allies.find(unit=>unit.mechanic?.targetId===target.id&&unit.mechanic?.active&&!unit.dead);if(hunter&&hunter.id!==actor.id)hunter.atb=Math.min(100,hunter.atb+(Number(hunter.resonanceLevel||0)>=4?15:12));event(target,damage,'damage',{affinity:relation.key,critical});return{damage,critical,relation,absorbed}};
+  const hit=(target,mult=skill.power||0,opts={})=>{if(!target||target.dead||mult<=0)return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'}};if(battle.raidState?.channeling&&target.raidRole==='priest')return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'},channeled:true};const intangible=battle.mythic&&battle.affixState?.ids?.includes('incorporeal')&&target.hp/target.maxHp<.5&&!target.debuffs?.stun&&!target.debuffs?.slow;const relation=affinity(actor.element,target.element),attack=(opts.defScale?actor.def*(actor.buffs.defUp?1.3:1):actor.atk*(actor.buffs.atkUp?1.25:1))*(1+(actor.buffs.damageUp?.power||0)),defense=target.def*(target.buffs.defUp?1.3:1)*(1+.08*(target.buffs?.mythicBolster?.stacks||0))*(target.debuffs.defDown?.7:1)*(typeof opts.pierce==='number'?opts.pierce:opts.pierce?.15:1);let power=mult*(1+mastery.power)*relation.damage*(opts.bonus||1);if(target.debuffs.mark)power*=1.2;if(actor.setEffects?.includes('volcanicFurySet')&&actor.hp/actor.maxHp<.5)power*=1.12;let base=Math.max(5,Math.round(attack*power*100/(100+defense*3)*(intangible?.45:1))),critical=opts.forceCrit||Math.random()<(actor.crit||5)/100,damage=Math.round(base*(critical?1+(actor.critDamage||50)/100:1));const absorbed=Math.min(target.shield||0,opts.shieldBreaker?damage*2:damage);target.shield=Math.max(0,(target.shield||0)-absorbed);if(absorbed>0&&target.shield<=0)target.shieldBroken=true;if(!opts.shieldOnly){damage=Math.max(0,damage-(opts.shieldBreaker?Math.ceil(absorbed/2):absorbed));target.hp=Math.max(0,target.hp-damage);target.dead=target.hp<=0;}damageTotal+=damage;if(damage>0&&actor.setEffects?.includes('lifestealSet')&&actor.hp<actor.maxHp){const life=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*.25)));actor.hp+=life;healingTotal+=life;event(actor,life,'heal',{sourceType:'lifesteal'});}const hunter=allies.find(unit=>unit.mechanic?.targetId===target.id&&unit.mechanic?.active&&!unit.dead);if(hunter&&hunter.id!==actor.id)hunter.atb=Math.min(100,hunter.atb+(Number(hunter.resonanceLevel||0)>=4?15:12));event(target,damage,'damage',{affinity:relation.key,critical});return{damage,critical,relation,absorbed}};
   const targets=skill.target==='allEnemies'?enemies.filter(unit=>!unit.dead):skill.target==='enemy'?[chosen]:[];
   const e=skill.effect,m=actor.mechanic||(actor.mechanic={value:0,max:5}),resonanceIV=Number(actor.resonanceLevel||0)>=4;const vexilInstabilityBefore=actor.id===24?Math.max(0,Math.min(5,Number(m.value)||0)):0;const ghoulTurns=Math.max(0,m.ghoulTurns||0),offensiveSkill=['enemy','allEnemies'].includes(skill.target),ghoulTarget=chosen?.side==='enemy'&&!chosen.dead?chosen:enemies.find(unit=>!unit.dead);if(ghoulTurns>0&&offensiveSkill&&ghoulTarget){const ghoulDamage=Math.round(actor.atk*.28);ghoulTarget.hp=Math.max(0,ghoulTarget.hp-ghoulDamage);ghoulTarget.dead=ghoulTarget.hp<=0;if(ghoulTarget.dead){ghoulTarget.atb=0;ghoulTarget.shield=0;}damageTotal+=ghoulDamage;event(ghoulTarget,ghoulDamage,'ghoul',{sourceType:'ghoul'});m.ghoulTurns=Math.max(0,ghoulTurns-1);m.value=m.ghoulTurns;m.active=m.ghoulTurns>0;if(m.ghoulTurns>0)actor.buffs.ghoul={turns:m.ghoulTurns+1,source:actor.id,damage:ghoulDamage};else delete actor.buffs.ghoul;logs.push(`💀 La Goule de ${actor.name} frappe ${ghoulTarget.name} : ${ghoulDamage} dégâts.`);}
   // Generic damage first, with unique modifiers.

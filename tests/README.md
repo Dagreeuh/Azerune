@@ -369,3 +369,28 @@ La règle : **quand une correction est censée améliorer un chiffre, il faut
 mesurer ce chiffre avant et après, dans le même réglage.** Sans ce contrôle, on
 attribue à un correctif une amélioration qui n'a pas eu lieu — et on croit le
 problème résolu.
+
+## Un test qui compare à l'implémentation ne teste rien
+
+En corrigeant la Provocation, j'avais écrit :
+
+```js
+expect(chooseAutoEnemyTarget(combat, acteur, competence)).toBe(gardien);
+```
+
+Il passait. Et il était faux. `chooseAutoEnemyTarget` renvoie une **unité**, pas
+un identifiant ; ma correction renvoyait une chaîne. `performAutoAction` lit
+`target?.id` — sur une chaîne, cela vaut `undefined`, et le ciblage retombait
+silencieusement sur le premier ennemi venu. La Provocation ne s'appliquait donc
+pas du tout en mode automatique.
+
+Le test comparait la valeur de retour à ce que ma correction renvoyait. Il
+confirmait l'implémentation au lieu de vérifier l'exigence.
+
+La règle : **tester l'effet observable, pas la valeur de retour intermédiaire.**
+Le test correct fait agir le champion et vérifie que les points de vie du
+provocateur baissent — il aurait échoué immédiatement.
+
+Corollaire : quand un test d'une fonction interne passe du premier coup sur du
+code qu'on vient d'écrire, se demander s'il vérifie autre chose que sa propre
+copie.

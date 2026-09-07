@@ -43,16 +43,36 @@ describe('un allié provoqué ne peut plus choisir sa cible',()=>{
     expect(findUnit(apres,gardien).hp).toBeLessThan(findUnit(combat,gardien).hp);
   });
 
+  it('en combat automatique, la frappe part réellement sur le provocateur',()=>{
+    // Le test precedent ne verifiait que la fonction de ciblage. Elle renvoie
+    // une unite, pas un identifiant : renvoyer une chaine faisait silencieusement
+    // retomber `performAutoAction` sur l'acteur, et la Provocation ne
+    // s'appliquait pas du tout en automatique.
+    const{combat,gardien,fragile}=scene({provoquePar:true});
+    const sortie=performAutoAction(combat,{}),apres=sortie.battle||sortie;
+    expect(findUnit(apres,gardien).hp).toBeLessThan(findUnit(combat,gardien).hp);
+    expect(findUnit(apres,fragile).hp).toBe(findUnit(combat,fragile).hp);
+  });
+
   it('le combat automatique respecte aussi la Provocation',()=>{
     const{combat,gardien}=scene({provoquePar:true});
     const acteur=findUnit(combat,9500);
-    expect(chooseAutoEnemyTarget(combat,acteur,acteur.skills[0])).toBe(gardien);
+    expect(chooseAutoEnemyTarget(combat,acteur,acteur.skills[0])?.id).toBe(gardien);
   });
 
-  it('sans Provocation, le combat automatique vise librement',()=>{
-    const{combat,gardien}=scene();
-    const acteur=findUnit(combat,9500);
-    expect(chooseAutoEnemyTarget(combat,acteur,acteur.skills[0])).not.toBe(gardien);
+  it('le ciblage automatique suit la source de la Provocation, quelle qu’elle soit',()=>{
+    // Comparer a une cible « naturelle » serait fragile : le score peut
+    // legitimement preferer l'un ou l'autre. On verifie donc que le choix suit
+    // la source, en provoquant tour a tour depuis chaque ennemi.
+    const{combat,gardien,fragile}=scene();
+    const acteur=combat.allies[0];
+    [gardien,fragile].forEach(source=>{
+      const provoque=withStatus(combat,9500,{debuffs:{provoke:{turns:2,source}}});
+      const vise=findUnit(provoque,9500);
+      expect(chooseAutoEnemyTarget(provoque,vise,vise.skills[0])?.id,
+        `provoque par ${source}`).toBe(source);
+    });
+    expect(acteur).toBeTruthy();
   });
 
   it('si le provocateur meurt, la contrainte tombe',()=>{
@@ -70,7 +90,7 @@ describe('un allié provoqué ne peut plus choisir sa cible',()=>{
     combat={...combat,enemies:combat.enemies.map(unite=>
       unite.id===gardien?{...unite,hp:0,dead:true}:unite)};
     const acteur=findUnit(combat,9500);
-    expect(chooseAutoEnemyTarget(combat,acteur,acteur.skills[0])).not.toBe(gardien);
+    expect(chooseAutoEnemyTarget(combat,acteur,acteur.skills[0])?.id).not.toBe(gardien);
   });
 
   it('une Provocation sans source ne bloque rien',()=>{
