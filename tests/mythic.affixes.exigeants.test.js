@@ -216,3 +216,61 @@ describe('Retour temporel — la seule réanimation du jeu',()=>{
     expect(findUnit(apres,9300).atb).toBeGreaterThanOrEqual(85);
   });
 });
+
+describe('Affliction à saturation — elle déborde sur l’équipe',()=>{
+  // Un soigneur suffisait à absorber l'Affliction : l'affixe était pénible sans
+  // être exigeant. À cinq cumuls elle contamine l'allié le moins atteint, et
+  // aucun soin ne suit cette progression — seule la purification l'arrête.
+  //
+  // Ce comportement a aussi révélé un plantage : le message de débordement était
+  // écrit dans un tampon déclaré plus bas dans la fonction.
+  function equipeAffligee(cumulsParAllie){
+    fixedRandom(.5);
+    const equipe=cumulsParAllie.map((_,index)=>
+      makeHero({id:9400+index,hp:100000,atk:20,def:0,spd:index===0?300:1,name:`A${index}`}));
+    const cibles=[makeEnemy({id:'c0',hp:40000,atk:1,def:0,spd:1,element:'Arcane'})];
+    let combat=createBattle(equipe.map(hero=>hero.id),equipe.map(hero=>({...hero,currentStars:6})),
+      unite=>({...statsFrom(unite),accuracy:60,resistance:0}),
+      {enemies:cibles,mythic:{level:20,season:'test',turnBudget:80},affixIds:['afflicted']});
+    return{...combat,allies:combat.allies.map((unite,index)=>({...unite,
+      atb:index===0?99.9:0,
+      debuffs:cumulsParAllie[index]?{affliction:{turns:99,stacks:cumulsParAllie[index]}}:{}}))};
+  }
+  const cumuls=(combat,id)=>findUnit(combat,id).debuffs.affliction?.stacks||0;
+
+  it('à cinq cumuls, un allié contamine le moins atteint',()=>{
+    const apres=nextTurn(equipeAffligee([5,0,2]));
+    expect(cumuls(apres,9401)).toBe(1);
+    expect(cumuls(apres,9402)).toBe(2);
+  });
+
+  it('en dessous de cinq cumuls, rien ne déborde',()=>{
+    const apres=nextTurn(equipeAffligee([4,0,0]));
+    expect(cumuls(apres,9401)).toBe(0);
+    expect(cumuls(apres,9402)).toBe(0);
+  });
+
+  it('le débordement ne fait pas planter le tour',()=>{
+    // Le message était écrit dans un tampon déclaré plus bas : la première
+    // saturation levait une exception au lieu d’afficher une ligne de journal.
+    expect(()=>nextTurn(equipeAffligee([5,0,0]))).not.toThrow();
+  });
+
+  it('le joueur est prévenu dans le journal de combat',()=>{
+    const apres=nextTurn(equipeAffligee([5,0,0]));
+    expect(apres.log.some(ligne=>/déborde/.test(ligne))).toBe(true);
+  });
+
+  it('un allié déjà saturé n’est pas choisi comme cible',()=>{
+    const apres=nextTurn(equipeAffligee([5,5,1]));
+    expect(cumuls(apres,9401)).toBe(5);
+    expect(cumuls(apres,9402)).toBe(2);
+  });
+
+  it('sans allié contaminable, rien ne se passe et rien n’est annoncé',()=>{
+    // Toute l'équipe est déjà saturée : annoncer un débordement serait mentir.
+    const apres=nextTurn(equipeAffligee([5,5,5]));
+    expect(apres.allies.every(unite=>cumuls(apres,unite.id)===5)).toBe(true);
+    expect(apres.log.some(ligne=>/déborde/.test(ligne))).toBe(false);
+  });
+});

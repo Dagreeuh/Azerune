@@ -38,9 +38,9 @@ moins un affixe exigeant**.
 L'écart entre champions est **quatre à cinq fois plus grand** — c'était tout
 l'objet. Les champions de contrôle y gagnent nettement.
 
-Réserve honnête : la purification, elle, ne montre pas encore de gain mesurable.
-Deux champions seulement la fournissent, l'échantillon est trop mince pour
-conclure, et les soigneurs absorbent une partie de l'Affliction. À revoir.
+Première réserve, levée depuis : la purification ne montrait aucun gain
+mesurable, parce qu'un soigneur suffisait à absorber l'Affliction. Voir la
+section suivante.
 
 Les deux passages de mesure diffèrent parce que l'équipement est tiré au hasard
 à chaque fois : ce sont les ordres de grandeur qui comptent, pas les décimales.
@@ -82,3 +82,39 @@ temporel est sa fantaisie, et parce que cela donne enfin une raison de le jouer.
 **974 tests**, dont 19 sur les affixes exigeants et la réanimation.
 **13 mutations** appliquées au code livré, toutes détectées. Une garde
 inatteignable a été retirée plutôt que conservée sans test possible.
+
+---
+
+## Suite — l'Affliction déborde désormais sur l'équipe
+
+La première version de l'affixe Affligé était **pénible sans être exigeante** :
+n'importe quel soigneur absorbait les dégâts, et la purification n'apportait
+rien de mesurable.
+
+À **cinq cumuls**, l'Affliction contamine maintenant l'allié le moins atteint, à
+chaque tour de la victime. Sans purification, toute l'équipe finit saturée — et
+aucun soin ne suit cette progression, puisqu'elle croît avec le nombre de
+porteurs.
+
+### Résultat, trois tirages d'équipement indépendants moyennés
+
+| | Sans Affligé | Avec Affligé |
+|---|---|---|
+| Compositions qui passent | 94 % | **86 %** |
+| Écart entre champions | 0,20 | **0,34** |
+| Champions de purification | 1,00 | **1,07** |
+| Soigneurs | 1,03 | **1,11** |
+| Champions de contrôle | 1,03 | 1,04 |
+
+La purification gagne enfin quelque chose de mesurable. Les soigneurs gagnent
+encore davantage — l'Affliction reste partiellement absorbable, la propagation
+n'a fait que réduire l'écart. C'est un progrès, pas une victoire complète, et
+le contrôle ne bouge pas, ce qui est correct : cette saison ne portait pas
+Incorporel.
+
+### Un plantage évité de justesse
+
+Le message de débordement était écrit dans un tampon déclaré **plus bas dans la
+fonction** : la première saturation aurait levé une exception au lieu
+d'afficher une ligne de journal. Le test qui joue une équipe à cinq cumuls l'a
+attrapé avant la mise en service.

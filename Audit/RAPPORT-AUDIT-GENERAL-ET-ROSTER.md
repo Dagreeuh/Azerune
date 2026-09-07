@@ -265,8 +265,8 @@ n'inflige rien. `tests/degats.contrat.test.js` ferme définitivement ce piège.
 
 - **Les Raids restent verrouillés sur peu de champions.** Les renforts ont
   atténué la concentration sans la résoudre.
-- **La purification ne montre toujours pas de gain mesurable**, même avec
-  l'affixe Affligé : deux champions seulement la fournissent et les soigneurs en
-  absorbent une partie. L'échantillon est trop mince pour conclure.
+- **La purification gagne désormais quelque chose de mesurable** (1,00 → 1,07)
+  depuis que l'Affliction déborde sur l'équipe à saturation — mais les soigneurs
+  y gagnent davantage (1,03 → 1,11). L'affixe reste partiellement absorbable.
 - **Le palier 30 reste le plus indulgent du haut de la courbe**, faute de
   contenu au-delà.

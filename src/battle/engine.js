@@ -57,10 +57,10 @@ export function nextTurn(battle){
   let gaugeSteps=0;while(!living.some(unit=>unit.atb>=100)&&gaugeSteps<10000){living.forEach(unit=>unit.atb+=unit.currentSpd/100);gaugeSteps+=1;}if(gaugeSteps>=10000)living.forEach(unit=>unit.atb=Math.max(unit.atb,100));
   living.sort((a,b)=>b.atb-a.atb);
   const actor=living[0],unit=copyUnit(actor),stunned=Boolean(unit.debuffs.stun);
-  let dot=0,healing=0;const periodic=[];
+  let dot=0,healing=0,afflictionSpreads=false,afflictionOverflow=null;const periodic=[];
   if(unit.debuffs.poison){const stacks=Math.max(1,unit.debuffs.virulence?.stacks||1),amount=Math.round(unit.maxHp*.06*(1+.12*(stacks-1)));dot+=amount;periodic.push(`Poison ${amount}`);}
   if(unit.debuffs.burn){const amount=Math.round(bossDotAmount(unit,unit.debuffs.burn,.05,1.15)*(unit.setEffects?.includes('fireproofSet')?.75:1));dot+=amount;periodic.push(`Brûlure ${amount}`);}
-  if(unit.debuffs.bleed){const amount=bossDotAmount(unit,unit.debuffs.bleed,.045,1.05);dot+=amount;periodic.push(`Saignement ${amount}`);}   if(unit.debuffs.affliction){const stacks=Math.min(5,unit.debuffs.affliction.stacks||1),amount=Math.round(unit.maxHp*.012*stacks);dot+=amount;periodic.push(`Affliction ${amount}`);}
+  if(unit.debuffs.bleed){const amount=bossDotAmount(unit,unit.debuffs.bleed,.045,1.05);dot+=amount;periodic.push(`Saignement ${amount}`);}   if(unit.debuffs.affliction){const stacks=Math.min(5,unit.debuffs.affliction.stacks||1),amount=Math.round(unit.maxHp*.012*stacks);dot+=amount;periodic.push(`Affliction ${amount}`);afflictionSpreads=stacks>=5;}
   if(unit.debuffs.agony){const stacks=Math.min(5,unit.debuffs.agony.stacks||1),amount=Math.round(unit.maxHp*(.018+.009*stacks));dot+=amount;periodic.push(`Agonie ${amount}`);unit.debuffs.agony={...unit.debuffs.agony,stacks:Math.min(5,stacks+1)};}
   if(unit.debuffs.corruption){const amount=bossDotAmount(unit,unit.debuffs.corruption,.035,.95);dot+=amount;periodic.push(`Corruption ${amount}`);}
   if(unit.buffs.regen){const amount=Math.round(unit.maxHp*.06);healing+=amount;periodic.push(`Régénération +${amount}`);}
@@ -71,9 +71,21 @@ export function nextTurn(battle){
   unit.buffs=decay(unit.buffs);unit.debuffs=decay(unit.debuffs);
   if(unit.mechanic?.type==='healingTotem'){const ownTotem=unit.buffs?.healingTotem;unit.mechanic.value=ownTotem?.turns||0;unit.mechanic.active=unit.mechanic.value>0;}if(unit.mechanic?.type==='livingGarden'){const ownGarden=unit.buffs?.livingGarden;unit.mechanic.value=ownGarden?.turns||0;unit.mechanic.active=unit.mechanic.value>0;}if(unit.id===11&&expiredBuffs.includes('vanish')){unit.mechanic.active=false;delete unit.buffs.vanish;}if(unit.id===13&&expiredBuffs.includes('aimed')){unit.mechanic.active=false;delete unit.buffs.aimed;}
   allies=allies.map(value=>value.id===unit.id?{...unit,atb:100,skip:stunned}:({...value,atb:living.find(x=>x.id===value.id)?.atb??value.atb}));
+  // Affliction a saturation : elle deborde sur l'allie le moins atteint. Sans
+  // purification, toute l'equipe finit a cinq cumuls — aucun soin ne suit cette
+  // progression, et c'est ce qui rend l'affixe Afflige exigeant plutot que
+  // simplement penible.
+  if(afflictionSpreads&&unit.side==='ally'){
+    const candidats=allies.filter(value=>!value.dead&&value.id!==unit.id&&(value.debuffs?.affliction?.stacks||0)<5);
+    if(candidats.length){
+      const cible=candidats.sort((a,b)=>(a.debuffs?.affliction?.stacks||0)-(b.debuffs?.affliction?.stacks||0))[0];
+      allies=allies.map(value=>value.id!==cible.id?value:{...value,debuffs:{...value.debuffs,affliction:{turns:99,stacks:Math.min(5,(value.debuffs?.affliction?.stacks||0)+1)}}});
+      afflictionOverflow=`🦠 L’Affliction de ${unit.name} déborde sur ${cible.name}.`;
+    }
+  }
   enemies=enemies.map(value=>value.id===unit.id?{...unit,atb:100,skip:stunned}:({...value,atb:living.find(x=>x.id===value.id)?.atb??value.atb}));allies=allies.map(value=>{if(value.id!==3||!value.mechanic?.active)return value;const prey=enemies.find(enemy=>enemy.id===value.mechanic.targetId&&!enemy.dead&&enemy.debuffs?.hunt?.source===value.id);return prey?value:{...value,mechanic:{...value.mechanic,targetId:null,active:false}}});
   const battleWinner=winner(allies,enemies);
-  const events=[];
+  const events=[];if(afflictionOverflow)events.push(afflictionOverflow);
   if(dot)events.push(`${unit.name} subit ${dot} dégâts périodiques (${periodic.filter(entry=>!entry.includes('+')).join(', ')}).`);
   if(healing)events.push(`${unit.name} récupère ${healing} PV (${periodic.filter(entry=>entry.includes('+')).join(', ')}).`);
   if(expiredBuffs.length||expiredDebuffs.length)events.push(`${unit.name} : expiration de ${[...expiredBuffs,...expiredDebuffs].join(', ')}.`);
