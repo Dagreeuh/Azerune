@@ -349,3 +349,23 @@ Maelström, Désintégration sans Charge.
 Le test correspondant ne vérifie pas la règle mais son résultat : sur six tours
 d'automatique, le champion doit avoir accumulé au moins deux points de ressource.
 C'est ce qui distingue une règle écrite d'une règle qui fonctionne.
+
+## Un résultat négatif se mesure et se consigne
+
+La Provocation du Gardien de lave n'était appliquée nulle part côté joueur : sa
+mécanique entière était inerte. La corriger semblait devoir réduire la
+concentration des Raids sur quelques champions.
+
+Une mesure A/B sur le même réglage — 150 compositions, deux tirages
+d'équipement, avec puis sans la contrainte — a montré **aucune différence en
+dehors du bruit**. Et renforcer l'effet aggrave la concentration au lieu de la
+réduire.
+
+Le correctif reste juste : le jeu fait désormais ce qu'il annonce. Mais
+l'hypothèse d'équilibrage était fausse, et c'est écrit tel quel dans la note de
+patch comme dans le rapport d'audit.
+
+La règle : **quand une correction est censée améliorer un chiffre, il faut
+mesurer ce chiffre avant et après, dans le même réglage.** Sans ce contrôle, on
+attribue à un correctif une amélioration qui n'a pas eu lieu — et on croit le
+problème résolu.

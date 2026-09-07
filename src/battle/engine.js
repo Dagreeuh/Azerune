@@ -265,6 +265,20 @@ function cleanseUnit(unit,count=1){
   return retires;
 }
 
+// Provocation subie par un allie.
+//
+// Le Gardien de lave du Raid provoque toute l'equipe, et rien ne lisait ce
+// malus cote joueur : la Provocation etait posee, affichee, et sans le moindre
+// effet. La mecanique entiere du Gardien ne faisait rien, et le Raid se
+// resumait a une course aux degats.
+//
+// Un allie provoque ne peut plus viser que celui qui l'a provoque, tant que
+// celui-ci vit et tant que la Provocation n'est pas purifiee.
+function forcedEnemyTarget(battle,actor){
+  const source=actor?.debuffs?.provoke?.source;
+  return (battle?.enemies||[]).find(unit=>unit.id===source&&!unit.dead)||null;
+}
+
 const AUTO_CONTROL_DEBUFFS=new Set(['stun','provoke']);
 const AUTO_DANGEROUS_DEBUFFS=new Set(['stun','healingDown','provoke','burn','poison','bleed','agony','corruption']);
 const livingLeft=units=>(units||[]).filter(unit=>!unit.dead);
@@ -273,6 +287,7 @@ const affinityRank=key=>key==='effective'?0:key==='neutral'?1:2;
 
 export function chooseAutoEnemyTarget(battle,actor,skill){
   const enemies=livingLeft(battle?.enemies);if(!enemies.length)return null;
+  const impose=forcedEnemyTarget(battle,actor);if(impose)return impose.id;
   const effect=skill?.effect;
   const score=(enemy,index)=>{
     let special=0;const raidDanger=Boolean(battle?.raidState&&battle.raidState.charges>=Math.ceil(battle.raidState.maxCharges*.60));if(raidDanger&&enemy.raidRole==='ember')special-=5000;
@@ -366,6 +381,7 @@ export function castSkill(battle,index,targetId){
   let allies=battle.allies.map(copyUnit),enemies=battle.enemies.map(copyUnit),actor=allies.find(unit=>unit.id===original.id);
   let chosen=[...allies,...enemies].find(unit=>unit.id===targetId&&!unit.dead);
   if(skill.target==='enemy'&&chosen?.side!=='enemy')chosen=enemies.find(unit=>!unit.dead);
+  if(skill.target==='enemy'){const impose=forcedEnemyTarget(battle,original);if(impose)chosen=enemies.find(unit=>unit.id===impose.id&&!unit.dead)||chosen;}
   if(skill.target==='ally'&&chosen?.side!=='ally')chosen=[...allies].filter(unit=>!unit.dead&&(skill.effect!=='guardianLink'||unit.id!==actor.id)).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];if(skill.effect==='guardianLink'&&chosen?.id===actor.id)return{battle,error:'Serment du gardien doit cibler un autre allié.'};
   if(skill.target==='self')chosen=actor;
   if(skill.target==='enemy'&&!chosen)return{battle,error:'Aucune cible ennemie disponible.'};

@@ -263,8 +263,15 @@ n'inflige rien. `tests/degats.contrat.test.js` ferme définitivement ce piège.
 
 ## Ce qui reste après ces trois chantiers
 
-- **Les Raids restent verrouillés sur peu de champions.** Les renforts ont
-  atténué la concentration sans la résoudre.
+- **Les Raids restent verrouillés sur peu de champions, et la cause est
+  structurelle.** Une piste a été testée et écartée : la Provocation du Gardien
+  de lave n'était appliquée nulle part côté joueur — la mécanique entière du
+  Gardien était inerte. Elle fonctionne désormais, mais la mesure A/B sur le
+  même réglage ne montre **aucune différence** (écart 1,20 → 1,34, dans le
+  bruit), et la renforcer aggrave la concentration au lieu de la réduire.
+  Le Raid est une course contre le compteur de charges, et la réponse à une
+  course est toujours plus de dégâts. Le corriger demande une mécanique dont la
+  réponse n'est pas des dégâts — conception de contenu, pas réglage.
 - **La purification gagne désormais quelque chose de mesurable** (1,00 → 1,07)
   depuis que l'Affliction déborde sur l'équipe à saturation — mais les soigneurs
   y gagnent davantage (1,03 → 1,11). L'affixe reste partiellement absorbable.
