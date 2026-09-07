@@ -1,6 +1,8 @@
+import{xpForNextLevel}from'../utils/progression';
+
 export const DIFFICULTIES=[
  {id:'normal',name:'Normal',icon:'⚔️',multiplier:1,level:'1-60',color:'#3b82f6',loot:'1★ à 3★ selon la zone'},
- {id:'hard',name:'Difficile',icon:'🔥',multiplier:1.34,level:'30-60+',color:'#f97316',loot:'3★ à 5★ selon la zone'},
+ {id:'hard',name:'Difficile',icon:'🔥',multiplier:1.34,level:'30-60+',color:'#f97316',loot:'3★ à 4★ selon la zone'},
  {id:'hardcore',name:'Hardcore',icon:'💀',multiplier:1.72,level:'50-60+',color:'#dc2626',loot:'4★ à 5★ · prestige'}
 ];
 export const STAR_MILESTONES=[
@@ -37,7 +39,20 @@ export const CAMPAIGN_MECHANICS={
 const CAMPAIGN_ROLES=['assaulter','support','controller'];
 const REGIONAL_TUNING=[{hp:1,atk:1,def:1,res:0,acc:0},{hp:1.05,atk:1.04,def:1.03,res:1,acc:1},{hp:1.10,atk:1.08,def:1.05,res:2,acc:2},{hp:1.16,atk:1.12,def:1.08,res:4,acc:3},{hp:1.23,atk:1.17,def:1.11,res:6,acc:5},{hp:1.30,atk:1.22,def:1.14,res:8,acc:6},{hp:1.37,atk:1.27,def:1.17,res:10,acc:8},{hp:1.45,atk:1.32,def:1.20,res:12,acc:10},{hp:1.53,atk:1.37,def:1.23,res:15,acc:12},{hp:1.62,atk:1.43,def:1.27,res:18,acc:14}];const normalRegionalTuning=zoneIndex=>REGIONAL_TUNING[Math.max(0,Math.min(9,Number(zoneIndex)||0))];
 const CAMPAIGN_COMBAT_SCALE={normal:1.12,hard:1.38,hardcore:1.70};
-const difficultyTuning=(difficultyId,zoneIndex)=>{const base=normalRegionalTuning(zoneIndex),lateNormal=zoneIndex>=8;if(difficultyId==='hard')return{hp:base.hp*1.25,atk:base.atk*1.24,def:base.def*1.16,res:base.res+14,acc:base.acc+12,spd:1.05,mechanicTier:2,xp:1.55};if(difficultyId==='hardcore')return{hp:base.hp*1.45,atk:base.atk*1.42,def:base.def*1.28,res:base.res+28,acc:base.acc+24,spd:1.10,mechanicTier:3,xp:1.80};return{hp:base.hp*1.06,atk:base.atk*1.08,def:base.def*1.04,res:base.res+(lateNormal?4:0),acc:base.acc+(lateNormal?3:0),spd:lateNormal?1.03:1.01,mechanicTier:lateNormal?2:1,xp:1.35};};
+/**
+ * Continuite d'une difficulte a l'autre.
+ *
+ * La courbe d'objets ne repart pas de zero en Difficile : le niveau d'objet de
+ * la zone 1 Difficile (74-75) prolonge celui de la zone 10 Normal (75-76). La
+ * courbe d'ennemis, elle, repartait bien de la zone 1. Un joueur qui venait de
+ * terminer Normal entrait donc en Difficile a 1,84 fois la puissance
+ * recommandee et traversait la campagne entiere sans un seul farm — mesure sur
+ * trois graines. Ce facteur rattrape l'ecart au debut et s'efface a la zone 10,
+ * la ou les deux courbes se rejoignaient deja.
+ */
+const CONTINUITY={hard:{floor:1.05,slope:.48},hardcore:{floor:1.26,slope:.56}};
+const continuityFactor=(difficultyId,zoneIndex)=>{const entry=CONTINUITY[difficultyId];if(!entry)return 1;const progress=Math.max(0,Math.min(1,(Number(zoneIndex)||0)/9));return entry.floor+entry.slope*(1-progress)};
+const difficultyTuning=(difficultyId,zoneIndex)=>{const base=normalRegionalTuning(zoneIndex),lateNormal=zoneIndex>=8,link=continuityFactor(difficultyId,zoneIndex);if(difficultyId==='hard')return{hp:base.hp*1.25*link,atk:base.atk*1.24*link,def:base.def*1.16*link,res:base.res+14,acc:base.acc+12,spd:1.05,mechanicTier:2,xp:1.55};if(difficultyId==='hardcore')return{hp:base.hp*1.45*link,atk:base.atk*1.42*link,def:base.def*1.28*link,res:base.res+28,acc:base.acc+24,spd:1.10,mechanicTier:3,xp:1.80};return{hp:base.hp*1.06,atk:base.atk*1.08,def:base.def*1.04,res:base.res+(lateNormal?4:0),acc:base.acc+(lateNormal?3:0),spd:lateNormal?1.03:1.01,mechanicTier:lateNormal?2:1,xp:1.35};};
 const wallFactor=(zoneIndex,stageId,boss,difficultyId)=>{if(!boss)return 1;const zone=zoneIndex+1,base=zone===5?1.10:zone===10?1.20:1.06;return base*(difficultyId==='hard'?1.07:difficultyId==='hardcore'?1.13:1)};
 
 const enemy=(name,icon,hp,atk,def,spd,resistance=15,accuracy=10,element=null,aiRole=null)=>({name,icon,hp,atk,def,spd,resistance,accuracy,element,aiRole});
@@ -59,11 +74,32 @@ export const CONTINENTS=ZONES.map((z,zoneIndex)=>{const[id,name,icon,level,setNa
 export const missionKey=(difficultyId,continentId,stageId)=>`${difficultyId}:${continentId}:${stageId}`;
 export const allMissionKeys=difficultyId=>CONTINENTS.flatMap(continent=>continent.stages.map(item=>missionKey(difficultyId,continent.id,item.id)));
 export const milestoneKey=(difficultyId,stars)=>`${difficultyId}:${stars}`;
+/**
+ * XP d'une mission, calee sur la courbe de niveaux.
+ *
+ * L'ancienne formule (180+55*zone+25*etape) grandissait de facon lineaire — x3,4
+ * de la zone 1 a la zone 10 — alors que le cout cumule des niveaux grandit en
+ * puissance 1,28 : x150 sur la meme distance. La campagne couvrait donc 116 % de
+ * sa bande de niveaux en zone 1 et 13 % en zone 10, et un joueur arrivait au
+ * Coeur Ignifuge (bande 55-60) au niveau 25. On ancre desormais la recompense
+ * sur la bande elle-meme : un premier nettoyage complet de la zone verse
+ * ZONE_XP_SHARE de l'XP necessaire pour la traverser. Le reste vient du farm et
+ * des autres contenus — c'est voulu, pas un manque.
+ */
+const ZONE_XP_SHARE=.62;
+const ZONE_BAND_XP=Array.from({length:10},(unused,index)=>{const zone=index+1;let total=0;for(let level=zone*6-5;level<=zone*6;level+=1)total+=xpForNextLevel(level);return total});
+const stageXpWeight=(stageId,boss)=>(180+stageId*25)*(boss?1.65:1);
+const ZONE_XP_WEIGHT=[1,2,3,4,5,6,7].reduce((sum,stageId)=>sum+stageXpWeight(stageId,stageId===7),0);
+export function missionXpBase(zone,stageId,boss,xpTuning=1.35){
+ const band=ZONE_BAND_XP[Math.max(0,Math.min(9,zone-1))];
+ return Math.max(10,Math.round(band*ZONE_XP_SHARE*(stageXpWeight(stageId,boss)/ZONE_XP_WEIGHT)*(xpTuning/1.35)));
+}
+
 export function createMission(difficulty,continent,item){
  const continentIndex=Math.max(0,CONTINENTS.findIndex(x=>x.id===continent.id)),zone=continentIndex+1,stageId=Number(item.id),scale=(CAMPAIGN_COMBAT_SCALE[difficulty.id]||CAMPAIGN_COMBAT_SCALE.normal)*item.power,tuning=difficultyTuning(difficulty.id,continentIndex),stageRamp=1+(stageId-1)*.045,wall=wallFactor(continentIndex,stageId,item.boss,difficulty.id);
  const baseGold=Math.round((item.boss?330:125)*(1+continentIndex*.10)*difficulty.multiplier),baseGems=Math.round((item.boss?34:11)*difficulty.multiplier);
  const enemies=item.enemies.map((unit,index)=>{const bossUnit=item.boss&&index===0,bossFactor=bossUnit?1.14:1;return{...unit,bossUnit,campaignUnit:true,campaignDifficulty:difficulty.id,campaignZone:continent.id,campaignZoneIndex:continentIndex,campaignRole:bossUnit?'boss':CAMPAIGN_ROLES[index%CAMPAIGN_ROLES.length],campaignMechanic:CAMPAIGN_MECHANICS[continent.id],campaignMechanicTier:tuning.mechanicTier,hp:Math.round(unit.hp*tuning.hp*stageRamp*bossFactor*wall),atk:Math.round(unit.atk*tuning.atk*stageRamp*(bossUnit?1.08:1)*wall),def:Math.round(unit.def*tuning.def*stageRamp*(bossUnit?1.08:1)),spd:Math.round(unit.spd*tuning.spd),resistance:Math.min(90,(unit.resistance||15)+tuning.res+(bossUnit?12:0)),accuracy:Math.min(90,(unit.accuracy||10)+tuning.acc+(bossUnit?7:0))}});
- const xpBase=Math.round((180+zone*55+stageId*25)*(item.boss?1.65:1)*tuning.xp);
+ const xpBase=missionXpBase(zone,stageId,item.boss,tuning.xp);
  const recommended=Math.round(enemies.reduce((sum,u)=>sum+u.hp*.30+u.atk*7.5+u.def*5.5+u.spd*1.7+(u.accuracy||0)*1.5+(u.resistance||0)*1.25,0)*(item.boss?1.52:1.38));
  return{key:missionKey(difficulty.id,continent.id,item.id),difficultyId:difficulty.id,difficultyName:difficulty.name,continentId:continent.id,continentName:continent.name,continentIndex,setId:(continent.setIds||[continent.setId])[Math.floor(Math.random()*(continent.setIds||[continent.setId]).length)],setIds:continent.setIds||[continent.setId],stageId:item.id,slotHint:item.slot,name:item.name,icon:item.icon,boss:item.boss,enemies,scale,mechanics:[CAMPAIGN_MECHANICS[continent.id]],mechanicTier:tuning.mechanicTier,progressionWall:item.boss&&[5,10].includes(zone)?zone:null,reward:{gold:baseGold,gems:baseGems,stones:item.boss?1:0,xpBase},recommended};
 }
