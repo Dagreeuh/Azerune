@@ -6,9 +6,15 @@ export const MYTHIC_AFFIXES={
  bolstering:{id:'bolstering',icon:'💪',name:'Galvanisant',description:'Lorsqu’un ennemi meurt, les survivants gagnent 8 % d’Attaque et de Défense pendant 2 tours.'},
  raging:{id:'raging',icon:'😡',name:'Déchaîné',description:'Sous 30 % de PV, les ennemis gagnent 15 % d’Attaque et 20 % de Vitesse.'},
  bursting:{id:'bursting',icon:'💥',name:'Détonant',description:'La mort d’un ennemi inflige 2,5 % des PV max à l’escouade, avec un plafond de 10 % par résolution.'},
- necrotic:{id:'necrotic',icon:'☠️',name:'Nécrotique',description:'Les attaques ennemies appliquent Nécrose : soins reçus -6 % par cumul, jusqu’à 5 cumuls pendant 2 tours.'}
+ necrotic:{id:'necrotic',icon:'☠️',name:'Nécrotique',description:'Les attaques ennemies appliquent Nécrose : soins reçus -6 % par cumul, jusqu’à 5 cumuls pendant 2 tours.'},
+ // Les six affixes ci-dessus ne modifient que des statistiques : aucune
+ // composition n'y est meilleure qu'une autre. Les deux suivants demandent
+ // un outil precis — une purification, un controle — et rendent au mode une
+ // exigence d'equipe. Voir Audit/RAPPORT-AUDIT-GENERAL-ET-ROSTER.md.
+ afflicted:{id:'afflicted',icon:'🦠',name:'Affligé',description:'Les attaques ennemies appliquent Affliction : dégâts périodiques croissants, jusqu’à 5 cumuls. L’Affliction ne s’estompe pas — il faut la purifier.'},
+ incorporeal:{id:'incorporeal',icon:'👻',name:'Incorporel',description:'Sous 50 % de PV, un ennemi devient intangible et ne subit plus que 45 % des dégâts, tant qu’il n’est ni étourdi ni ralenti.'}
 };
-const ROTATIONS=[['fortified','bursting','raging'],['tyrannical','necrotic','bolstering'],['fortified','bolstering','necrotic'],['tyrannical','raging','bursting']];
+const ROTATIONS=[['fortified','bursting','afflicted'],['tyrannical','necrotic','incorporeal'],['afflicted','bolstering','incorporeal'],['tyrannical','raging','afflicted'],['fortified','incorporeal','bursting'],['raging','afflicted','bolstering']];
 export const mythicSeason=()=>{const key=monthKey(),seed=hash(key),rotation=ROTATIONS[seed%ROTATIONS.length];return{key,name:`Saison ${new Date().toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}`,affixes:rotation,finalBoss:seed%3};};
 const pools={
  forge:[['Sentinelle de scories','🗿','Feu'],['Artificier sombre','🧨','Feu'],['Golem de cuivre','🤖','Nature'],['Maître-forge','🔨','Feu']],

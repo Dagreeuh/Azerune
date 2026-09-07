@@ -13,9 +13,25 @@ const source=fs.readFileSync(fileURLToPath(new URL('../src/data/mythic.js',impor
 afterEach(()=>vi.restoreAllMocks());
 
 describe('affixes — contrat de cablage',()=>{
-  it('les six affixes annonces sont declares',()=>{
+  it('les huit affixes annonces sont declares',()=>{
     expect(Object.keys(MYTHIC_AFFIXES).sort())
-      .toEqual(['bolstering','bursting','fortified','necrotic','raging','tyrannical']);
+      .toEqual(['afflicted','bolstering','bursting','fortified','incorporeal',
+        'necrotic','raging','tyrannical']);
+  });
+
+  it('au moins un affixe exige un outil precis, pas seulement des statistiques',()=>{
+    // Les six affixes d'origine ne modifiaient que des valeurs : aucune
+    // composition n'y etait meilleure qu'une autre.
+    expect(MYTHIC_AFFIXES.afflicted.description).toMatch(/purifier/i);
+    expect(MYTHIC_AFFIXES.incorporeal.description).toMatch(/étourdi|ralenti/i);
+  });
+
+  it('chaque saison propose au moins un affixe exigeant une composition',()=>{
+    const exigeants=new Set(['afflicted','incorporeal']);
+    const rotations=[...source.matchAll(/\[('[a-z]+',?)+\]/g)].map(trouve=>trouve[0]);
+    rotations.forEach(rotation=>
+      expect([...exigeants].some(affixe=>rotation.includes(affixe)),
+        `rotation ${rotation}`).toBe(true));
   });
 
   it('chaque affixe declare est reellement lu par le moteur',()=>{

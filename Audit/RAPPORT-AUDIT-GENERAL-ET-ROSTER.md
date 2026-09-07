@@ -250,13 +250,23 @@ reconstruit à chaque audit.
 | Purification qui refuse la Provocation | **corrigé** (v1.56.0) — ordre de gravité partagé |
 | Purification tenue par un seul champion | **corrigé** (v1.56.0) — Yunmei, 4★ Eau |
 | Répartition élémentaire déséquilibrée | **corrigé** (v1.56.0) — six renforts, aucun élément sous 4 |
-| Mythic+ ne teste que l'équipement | **ouvert** — les affixes de saison restent le levier |
+| Mythic+ ne teste que l'équipement | **corrigé** (v1.57.0) — Affligé et Incorporel : écart entre champions ×4 à ×5 |
 | Raids verrouillés sur peu de champions | **ouvert** — atténué par les renforts, non résolu |
-| Aucune réanimation dans le jeu | **ouvert** — choix de conception à trancher |
-| Caelion absent des compositions gagnantes | **ouvert** — mesure dédiée à faire |
+| Aucune réanimation dans le jeu | **corrigé** (v1.57.0) — Retour temporel de Caelion, une fois par combat |
+| Caelion absent des compositions gagnantes | **mesuré, non confirmé** — 60 paires appariées sur trois difficultés : aucun effet mesurable, le zéro initial était du bruit |
 
 Un défaut supplémentaire a été trouvé en ajoutant les champions, et il mérite
 d'être noté ici parce qu'il piège quiconque en ajoutera d'autres : **le moteur
 décide des dégâts par liste blanche**. Une compétence offensive absente de
 `damageEffects` s'exécute, applique ses malus, écrit dans le journal — et
 n'inflige rien. `tests/degats.contrat.test.js` ferme définitivement ce piège.
+
+## Ce qui reste après ces trois chantiers
+
+- **Les Raids restent verrouillés sur peu de champions.** Les renforts ont
+  atténué la concentration sans la résoudre.
+- **La purification ne montre toujours pas de gain mesurable**, même avec
+  l'affixe Affligé : deux champions seulement la fournissent et les soigneurs en
+  absorbent une partie. L'échantillon est trop mince pour conclure.
+- **Le palier 30 reste le plus indulgent du haut de la courbe**, faute de
+  contenu au-delà.
