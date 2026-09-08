@@ -200,7 +200,7 @@ Mythic+, une arme tiède serait une trahison.
 
 ## 5. Vérification
 
-**Tests.** `tests/chroniques.legendaires.test.js` (33).
+**Tests.** `tests/chroniques.legendaires.test.js` (36).
 
 Le plus utile de la série est celui qui a trouvé un bug pendant son écriture :
 il énumère toutes les conditions de victoire déclarées et vérifie que **chaque
@@ -210,7 +210,7 @@ de l'Arc serait restée bloquée pour toujours, sans erreur ni message — le jo
 aurait vaincu la Chasseuse autant de fois qu'il aurait voulu sans rien voir
 avancer.
 
-**Mutation.** 25 mutations appliquées, 25 tuées. Deux avaient survécu :
+**Mutation.** 29 mutations appliquées, 29 tuées. Deux avaient survécu :
 
 - **Faire tomber les Vestiges de n'importe quelle activité.** Mon test vérifiait
   qu'une Chronique active reçoit ses matériaux — avec une seule Chronique
@@ -221,28 +221,46 @@ avancer.
   sauvegarde *pleine* rend son contenu : sans quoi le joueur reperdait Thalassyr
   et ses cent Éclats à chaque lancement.
 
+**Le garde-fou sorti de cette correction.** Les armes désignent leurs porteurs
+par **nom**, pas par identifiant. Renommer un champion orphelinerait son arme en
+silence : la Chronique irait jusqu'au bout, l'arme se forgerait, et
+`equipItem` la refuserait à tout le monde. Trois tests couvrent désormais le
+sujet — chaque porteur existe, aucun champion ne porte deux armes Uniques, et
+aucune arme n'est ouverte à plus d'un quart du roster. Ce dernier est le vrai
+verrou : c'est la rareté qui fait la légende.
+
 **Dans le jeu.** Sauvegarde injectée avec la Chronique du Prince-Tempête à
 l'étape 2 et 40 Éclats sur 100 : barre de progression affichée, bouton « Étape
 incomplète » grisé. À 100 sur 100 : bouton actif. Après validation : étape 3/4,
 message de confirmation, et les cent Éclats consommés. Aucune erreur console.
 
-**1 182 tests, 46 fichiers.**
+**1 185 tests, 46 fichiers.**
 
 ---
 
 ## 6. Ce qui reste ouvert
 
-**La couverture.** Sept armes pour trente-six champions. Vingt-deux champions
-n'ont aucune arme Unique atteignable, et rien dans le système ne le signale au
-joueur — il peut invoquer un 5★ qui n'aura jamais de légendaire. C'est le vrai
-manque de ce côté, et il n'a pas été traité ici.
+> **Correction : la « couverture » n'était pas un problème, et mes chiffres
+> étaient faux.** Cette section affirmait « sept armes pour trente-six
+> champions, vingt-deux champions sans arme atteignable ». Les deux nombres
+> étaient inventés — je ne les avais pas mesurés. Le roster compte **32**
+> champions, pas 36, et **26 d'entre eux** figurent déjà dans la liste de
+> porteurs d'une arme. Seuls six n'en ont aucune : Ragnhild et Sivrane (3★),
+> Vharok, Yunmei et Nyxaris (4★), Aszhal (5★).
+>
+> Et surtout, le raisonnement était mauvais. Une arme que tout le monde peut
+> obtenir n'est plus unique : la rareté *est* le sujet. Chaque Chronique ne
+> produit qu'un seul exemplaire, et la liste de porteurs dit seulement qui peut
+> le manier — exactement comme Thunderfury, ouvert aux guerriers et aux voleurs.
+> À 26 sur 32 éligibles, l'écueil serait plutôt l'inverse : des armes trop
+> largement compatibles. Il n'y a rien à corriger ici.
 
+**Aucun signal quand une relique tombe.**
 **Le nouvel équilibrage des taux n'est pas mesuré en jeu.** Les 116 à 198
 passages sont un calcul de probabilité, pas une observation. Un joueur qui
 alterne les niveaux de Mythic+ voit plusieurs reliques éligibles à la fois, ce
 qui raccourcit l'attente d'une *première* Chronique sans changer celle d'une
 relique précise. Le chiffre à surveiller à l'usage est celui-là.
 
-**Aucun signal de découverte.** Quand une relique tombe, rien n'attire l'œil du
-joueur autrement que la ligne de butin. Une légendaire qui s'ouvre mérite un
-moment.
+Quand une relique tombe, rien n'attire l'œil du joueur autrement que la ligne de
+butin. Une légendaire qui s'ouvre mérite un moment.

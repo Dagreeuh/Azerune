@@ -5,6 +5,7 @@ import{UNIQUE_WEAPONS,RELICS,CHRONICLE_STEPS,CHRONICLE_REQUIREMENTS,LEGENDARY_MA
   chronicleRequirement,chronicleStepStatus,chronicleStepCost,legendaryMaterialDrops,
   materialYield,chronicleGrindLength,normalizeChronicles,defaultChronicles}from'../src/data/legendary';
 import{WORLD_BOSSES}from'../src/data/worldBosses';
+import{HEROES}from'../src/data/heroes';
 import{emptyProgressionStats}from'../src/utils/progressionStats';
 
 const lire=chemin=>fs.readFileSync(fileURLToPath(new URL(chemin,import.meta.url)),'utf8');
@@ -39,6 +40,33 @@ describe('chaque étape déclare ce qu’elle exige',()=>{
     expect(chronicleRequirement('heartworld',99).kind).toBe('free');
     expect(chronicleRequirement('inexistante',0).kind).toBe('free');
     expect(()=>chronicleStepStatus('inexistante',0,{})).not.toThrow();
+  });
+});
+
+describe('les porteurs déclarés existent',()=>{
+  // Les armes designent leurs porteurs par NOM, pas par identifiant. Renommer
+  // un champion orphelinerait son arme en silence : la Chronique irait jusqu'au
+  // bout, l'arme se forgerait, et equipItem la refuserait a tout le monde.
+  it('chaque porteur déclaré est un champion réel',()=>{
+    const noms=new Set(HEROES.map(hero=>hero.name));
+    Object.values(UNIQUE_WEAPONS).forEach(arme=>{
+      expect(arme.heroes.length,arme.name).toBeGreaterThan(0);
+      arme.heroes.forEach(nom=>expect(noms.has(nom),`${arme.name} → « ${nom} »`).toBe(true));
+    });
+  });
+
+  it('une arme n’appartient jamais à deux Chroniques',()=>{
+    const porteurs=Object.values(UNIQUE_WEAPONS).flatMap(arme=>arme.heroes);
+    expect(new Set(porteurs).size,'un champion porte deux armes Uniques').toBe(porteurs.length);
+  });
+
+  it('l’arme reste rare : personne n’a le droit de la porter',()=>{
+    // Le garde-fou qui compte vraiment. Une arme ouverte a tout le roster ne
+    // serait plus unique, et c'est la rarete qui fait la legende.
+    const porteurs=new Set(Object.values(UNIQUE_WEAPONS).flatMap(arme=>arme.heroes));
+    expect(porteurs.size).toBeLessThan(HEROES.length);
+    Object.values(UNIQUE_WEAPONS).forEach(arme=>
+      expect(arme.heroes.length,arme.name).toBeLessThanOrEqual(Math.ceil(HEROES.length/4)));
   });
 });
 

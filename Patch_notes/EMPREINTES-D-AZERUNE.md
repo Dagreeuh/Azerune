@@ -84,11 +84,11 @@ légèrement un champion investi. C'est le bon sens de l'erreur.
 
 Pas de second emplacement d'équipement façon Cône de lumière : ce serait une
 source de puissance de plus par-dessus un équipement qui pèse déjà +172 %. Les
-Armes Uniques tiennent ce rôle ; leur vrai manque est leur couverture — sept
-armes pour trente-six champions — pas leur absence.
+Armes Uniques tiennent déjà ce rôle, et leur rareté est voulue : une arme que
+tout le monde peut obtenir n'est plus unique.
 
 Les nœuds sont dérivés du kit de chaque champion plutôt qu'écrits un par un.
-C'est ce qui rend le système tenable à trente-six champions, mais un nœud
+C'est ce qui rend le système tenable à l'ensemble du roster, mais un nœud
 d'étage IV taillé sur mesure aurait plus de saveur.
 
 ## Sous le capot

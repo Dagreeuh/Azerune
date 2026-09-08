@@ -85,24 +85,26 @@ relique à moins de 0,5 % et cinquante passages de farm, une arme tiède aurait
 
 ## Ce qui reste ouvert
 
-**Sept armes pour trente-six champions.** Vingt-deux champions n'ont aucune arme
-Unique atteignable, et rien ne le dit au joueur. C'est le vrai manque de ce côté.
-
 **Aucun signal quand une relique tombe.** Une légendaire qui s'ouvre mérite mieux
 qu'une ligne de butin.
 
+*(Une première version de cette note présentait la « couverture » — sept armes
+pour l'ensemble du roster — comme un manque. C'était une erreur : une arme que
+tout le monde peut obtenir n'est plus unique. 26 champions sur 32 figurent déjà
+comme porteurs possibles.)*
+
 ## Sous le capot
 
-33 tests nouveaux. Le plus utile a trouvé un bug pendant son écriture : il
+36 tests nouveaux. Le plus utile a trouvé un bug pendant son écriture : il
 vérifie que chaque victoire exigée par une Chronique est réellement enregistrée
 par le jeu. La Chasseuse de la Dernière Lune a pour identifiant `huntress` ; la
 condition attendait `chasseuse`. La Chronique de l'Arc serait restée bloquée
 pour toujours, sans erreur ni message.
 
-25 mutations appliquées, 25 tuées. Deux avaient survécu, dont celle qui perdait
+29 mutations appliquées, 29 tuées. Deux avaient survécu, dont celle qui perdait
 les victoires au rechargement de la sauvegarde — mon test vérifiait qu'une
 sauvegarde vide rend un objet vide, ce qui ne prouve rien.
 
 Audit complet : `Audit/RAPPORT-CHRONIQUES-LEGENDAIRES.md`.
 
-**1 182 tests, 46 fichiers.**
+**1 185 tests, 46 fichiers.**

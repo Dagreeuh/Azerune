@@ -14,7 +14,7 @@ supposé.
 |---|---|---|
 | **Eidolons** | Résonance R1→R5 | **+3,8 % de puissance** au total, pour cinq doublons de 5★ — la ressource la plus rare du jeu. Quatre paliers sur cinq ne versent que des statistiques plates ; seul R4 change un comportement. |
 | **Traces** | Niveaux de compétence | +30 %, +10 % et +15 % de puissance sur les trois sorts. **Piste linéaire, aucun embranchement.** |
-| **Cônes de lumière** | Armes Uniques | Riches — effet propre, orientation, harmonisation — mais **7 armes pour 36 champions**, derrière de longues chroniques. |
+| **Cônes de lumière** | Armes Uniques | Riches — effet propre, orientation, harmonisation — mais **7 armes** pour un roster de 32, derrière de longues chroniques. |
 
 Et la référence qui cadre tout : **l'équipement complet vaut +172 %**. À côté,
 la Résonance à +3,8 % est du bruit statistique.
@@ -93,7 +93,7 @@ Trois branches × quatre étages = **douze nœuds par champion**.
 | 🕸️ **Emprise** | Fiabilité et durée des effets — marques, malus, régénérations |
 | 🌀 **Flux** | Vitesse, temps de recharge, tempo |
 
-Rien n'est écrit à la main pour trente-six champions : chaque nœud vise un
+Rien n'est écrit à la main pour trente-deux champions : chaque nœud vise un
 index de compétence et se nomme d'après son effet réel. Un nœud de Force sur une
 soigneuse annonce « Soins +8 % » parce que `powerLabel` sait déjà lire son
 effet. C'est l'idiome du projet, celui de `championIdentities` et de `skills`.
@@ -217,9 +217,13 @@ rien n'est masqué, l'application réservant déjà 112 px de marge basse pour s
 **Les Cônes de lumière n'ont pas d'équivalent nouveau.** Un second emplacement
 équipable serait une source de puissance de plus par-dessus un équipement qui
 pèse déjà +172 % : c'est le seul des trois systèmes que je déconseille sans
-compensation ailleurs. Les Armes Uniques en tiennent déjà le rôle, et le vrai
-manque de ce côté est leur **couverture** — sept armes pour trente-six champions
-— pas leur absence.
+compensation ailleurs. Les Armes Uniques en tiennent déjà le rôle.
+
+> **Correction.** Cette section ajoutait que « le vrai manque de ce côté est
+> leur couverture — sept armes pour trente-six champions ». C'était faux sur les
+> chiffres (le roster en compte 32, et 26 sont déjà porteurs possibles) et faux
+> sur le fond : une arme que tout le monde peut obtenir n'est plus unique. Voir
+> `Audit/RAPPORT-CHRONIQUES-LEGENDAIRES.md`, section 6.
 
 **Les nœuds n'ont pas de contrepartie négative.** Le principe « changer la
 forme, pas le volume » est tenu par la rareté des points, pas par des malus. Des
@@ -228,7 +232,7 @@ décisions plus tranchées ; ils demanderaient aussi de vérifier qu'aucun ne
 produit un champion strictement pire, ce qui n'a pas été mesuré.
 
 **Les nœuds sont génériques.** Les douze sont dérivés du kit, pas écrits pour
-chaque champion. C'est ce qui rend le système maintenable à trente-six
+chaque champion. C'est ce qui rend le système maintenable à trente-deux
 champions, mais un nœud d'étage IV taillé sur mesure — qui toucherait la
 mécanique personnelle plutôt que les quatre leviers standard — aurait plus de
 saveur. Il faudrait alors du code de moteur, donc de la surface de bug.
