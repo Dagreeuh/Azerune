@@ -868,3 +868,5 @@
 .tooltip-conditionals>div>span{color:#cbd5e1;font-size:9px;line-height:1.35}
 .tooltip-mastery>b{color:#e9d5ff;font-size:10px}
 .tooltip-affinity>em{display:block;margin-top:4px;color:#64748b;font-size:8px;font-style:normal}
+.champion-resource.malvek-virulence.active{border-color:#84cc16;box-shadow:0 0 12px #84cc1644}
+.champion-resource.sivrane-frost.active{border-color:#38bdf8;box-shadow:0 0 12px #38bdf844}

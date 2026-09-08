@@ -91,3 +91,54 @@ describe('les renforts portent leur nom',()=>{
     expect(page).toContain('const nom=value.label||meta.label;');
   });
 });
+
+describe('les ressources portées par l’ennemi se lisent sur l’ennemi',()=>{
+  // Virulence et Givre ne sont pas des compteurs personnels : ce sont des cumuls
+  // de malus poses sur la cible. Leur barre lisait pourtant `mechanic.value`,
+  // reste a zero pour toujours — la ressource existait, elle etait lue au
+  // mauvais endroit.
+  it('l’écran lit les cumuls portés par les ennemis',()=>{
+    expect(page).toContain("enemyStacks=cle=>livingEnemies.map");
+    expect(page).toContain("enemyStacks('virulence')");
+    expect(page).toContain("enemyStacks('frost')");
+  });
+
+  it('les deux panneaux sont réellement branchés sur leur champion',()=>{
+    // Verifier la seule presence du nom de classe laisserait passer un panneau
+    // desactive : la classe survit dans la branche morte.
+    expect(page).toContain('isMalvek?<div className={`champion-resource malvek-virulence');
+    expect(page).toContain('isSivrane?<div className={`champion-resource sivrane-frost');
+    expect(page).toMatch(/isMalvek=unit\.id===22\|\|unit\.skills\?\.some/);
+    expect(page).toMatch(/isSivrane=unit\.id===33\|\|unit\.skills\?\.some/);
+    expect(page).toContain('Aucune cible infectée');
+    expect(page).toContain('Aucune cible givrée');
+  });
+
+  it('les clés de malus lues sont celles que le moteur pose',()=>{
+    // Une cle mal orthographiee afficherait « Aucune cible » pour toujours,
+    // sans erreur ni message.
+    expect(moteur).toMatch(/debuffs\.virulence=\{/);
+    expect(moteur).toMatch(/debuffs\.frost=\{/);
+  });
+
+  it('le plafond et le seuil affichés sont ceux du moteur',()=>{
+    // Deux nombres differents, qu'il ne faut pas confondre : le Givre plafonne
+    // a 5 cumuls, mais la Brisure ne fige qu'a partir de 3. Afficher « /3 »
+    // aurait produit « 4/3 » des le quatrieme cumul.
+    expect(moteur,'plafond de Givre').toContain('stacks:Math.min(5,(x.debuffs.frost?.stacks||0)+1)');
+    expect(moteur,'seuil de Brisure').toContain("if(cumuls>=3)debuff(chosen,'stun'");
+    expect(page).toContain('/5 · ');
+    expect(page).toContain('BRISURE PRÊTE');
+    expect(page).not.toContain('/3 · ');
+  });
+
+  it('Seraphiel garde son compteur personnel',()=>{
+    // Sa Condamnation monte bien sur lui : Dissipation sacree l'incremente
+    // quand elle retire des ameliorations ennemies. Elle n'avait pas a etre
+    // deplacee — mon premier releve la croyait morte parce que les ennemis de
+    // test ne portaient aucune amelioration a dissiper.
+    const bloc=moteur.slice(moteur.indexOf("if(e==='condemnStrip'){"));
+    expect(bloc.slice(0,600)).toContain('m.value=Math.min(6,(m.value||0)+gained)');
+    expect(page).not.toContain("enemyStacks('condemn')");
+  });
+});
