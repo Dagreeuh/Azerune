@@ -1,3 +1,4 @@
+import{tempoPv}from'../battle/engine';
 import React from'react';
 import{elementMeta}from'../utils/elements'; import{championIdentity}from'../data/championIdentities';
 export function Bar({v,max,color='green'}){return <div className="bar"><i style={{width:`${Math.max(0,Math.min(100,v/max*100))}%`,background:color}}/></div>}
@@ -12,7 +13,11 @@ export function HeroCard({hero,selected,onClick,locked=false,owned=false,progres
     {!owned&&!locked&&<em className="card-unowned-label">Non possédé</em>}
   </button>;
 }
-export function Stats({s,base,progressed=base}){
+// Les PV affiches doivent etre ceux de la barre de combat : le tempo raccourcit
+// la reserve, l'affichage doit dire la meme chose que le combat.
+const auTempo=stats=>stats&&Number.isFinite(stats.hp)?{...stats,hp:tempoPv(stats.hp)}:stats;
+export function Stats({s:sBrut,base:baseBrut,progressed:progressedBrut=baseBrut}){
+  const s=auTempo(sBrut),base=auTempo(baseBrut),progressed=auTempo(progressedBrut);
   const labels={hp:'PV',atk:'Attaque',def:'Défense',spd:'Vitesse',crit:'Critique',critDamage:'Dégâts critiques',accuracy:'Précision',resistance:'Résistance'};
   const order=['hp','atk','def','spd','crit','critDamage','accuracy','resistance'];
   const percentStats=new Set(['crit','critDamage','accuracy','resistance']);

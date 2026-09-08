@@ -3,7 +3,7 @@ import{describe,it,expect,afterEach,beforeEach,vi}from'vitest';
 import fs from'node:fs';
 import{fileURLToPath}from'node:url';
 import{MYTHIC_AFFIXES,MYTHIC_LEVELS,mythicSeason,createMythicMission}from'../src/data/mythic';
-import{createBattle,nextTurn,advanceMythicWave}from'../src/battle/engine';
+import{tempoPv,createBattle,nextTurn,advanceMythicWave}from'../src/battle/engine';
 import{calibratedEncounterPower}from'../src/utils/stats';
 import{makeHero,makeEnemy,statsFrom,withStatus,findUnit,fixedRandom}from'./helpers';
 
@@ -284,7 +284,9 @@ describe('enchainement des vagues',()=>{
     expect(suivant.wave).toBe(2);
     expect(suivant.winner).toBeNull();
     expect(suivant.turn).toBeNull();
-    expect(suivant.enemies[0].hp).toBe(300);
+    // Pleine reserve, et la reserve suit le tempo de combat.
+    expect(suivant.enemies[0].hp).toBe(suivant.enemies[0].maxHp);
+    expect(suivant.enemies[0].maxHp).toBe(tempoPv(300));
   });
 
   it('s arrete a la derniere vague',()=>{

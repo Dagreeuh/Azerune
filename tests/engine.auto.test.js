@@ -237,8 +237,9 @@ describe('chooseAutoAllyTarget',()=>{
 
   it('un soin vise l allie le plus bas en proportion de PV',()=>{
     let{combat}=trio();
-    combat=patcher(combat,'allies',1,{hp:300});  // 30 %
-    combat=patcher(combat,'allies',2,{hp:700});  // 70 %
+    // En proportion de la reserve, que le tempo de combat a raccourcie.
+    combat=patcher(combat,'allies',1,{hp:Math.round(combat.allies[1].maxHp*.30)});
+    combat=patcher(combat,'allies',2,{hp:Math.round(combat.allies[2].maxHp*.70)});
     expect(chooseAutoAllyTarget(combat,combat.allies[0],S('heal','ally')).name).toBe('Blesse');
   });
 
@@ -247,16 +248,16 @@ describe('chooseAutoAllyTarget',()=>{
       {name:'Colosse',hp:5000,def:20,atk:30},
       {name:'Fragile',hp:200,def:20,atk:30}
     ]});
-    // Colosse : 1000/5000 = 20 %. Fragile : 100/200 = 50 %.
-    combat=patcher(combat,'allies',0,{hp:1000});
-    combat=patcher(combat,'allies',1,{hp:100});
+    // Colosse a 20 % de sa reserve, Fragile a 50 % de la sienne.
+    combat=patcher(combat,'allies',0,{hp:Math.round(combat.allies[0].maxHp*.20)});
+    combat=patcher(combat,'allies',1,{hp:Math.round(combat.allies[1].maxHp*.50)});
     expect(chooseAutoAllyTarget(combat,combat.allies[1],S('heal','ally')).name).toBe('Colosse');
   });
 
   it('ignore les allies morts',()=>{
     let{combat}=trio();
     combat=patcher(combat,'allies',1,{hp:0,dead:true});
-    combat=patcher(combat,'allies',2,{hp:500});
+    combat=patcher(combat,'allies',2,{hp:Math.round(combat.allies[2].maxHp*.50)});
     expect(chooseAutoAllyTarget(combat,combat.allies[0],S('heal','ally')).name).toBe('Intact');
   });
 

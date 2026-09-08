@@ -1,6 +1,6 @@
 import{describe,it,expect}from'vitest';
 import{HEROES}from'../src/data/heroes';
-import{createBattle,castSkill}from'../src/battle/engine';
+import{createBattle,castSkill,pvReference}from'../src/battle/engine';
 import{mulberry32}from'./helpers';
 
 // Mathanae ressortait 1er sur 32 avec 49 % de victoires contre 20 % de moyenne,
@@ -110,7 +110,9 @@ describe('Métamorphose démoniaque protège, sans remplacer un soigneur',()=>{
     const avantPv=blesse.find(unit=>unit.id===MATHANAE).hp;
     const apres=lancer({...pret,allies:blesse},2,blesse[0].id);
     const soin=lui(apres).hp-avantPv;
-    const part=soin/lui(apres).maxHp;
+    // Le soin est un pourcentage de la reserve de reference, pas de la barre
+    // affichee : c'est sur cette base qu'il a ete borne.
+    const part=soin/pvReference(lui(apres));
     expect(part,'le soin a disparu').toBeGreaterThan(.05);
     // A cinq Fragments il rendait 38 % de ses PV maximum d'un seul sort.
     expect(part,'le soin reste trop gros').toBeLessThan(.30);

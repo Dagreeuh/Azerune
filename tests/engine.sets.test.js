@@ -44,7 +44,7 @@ describe('set Protection — bouclier initial',()=>{
     fixedRandom(.5); // variance 1,00, pas de critique
     const apres=enemyAction(nextTurn(combat));
     const cible=findUnit(apres,heros.id);
-    expect(cible.hp).toBe(1000);     // rien n a touche les PV
+    expect(cible.hp).toBe(cible.maxHp); // rien n a touche les PV
     expect(cible.shield).toBe(50);   // 150 - 100
   });
 
@@ -83,13 +83,13 @@ describe('set Contre-attaque — riposte',()=>{
 
   it('ne riposte pas quand le jet depasse 20 %',()=>{
     const{ennemi}=echange({sets:['counterSet'],tirage:.5});
-    expect(ennemi.hp).toBe(5000);
+    expect(ennemi.hp).toBe(ennemi.maxHp);
   });
 
   it('le seuil est bien 20 % et pas davantage',()=>{
     // Borne haute : un jet a 25 % ne doit pas declencher la riposte.
     const{ennemi}=echange({sets:['counterSet'],tirage:.25});
-    expect(ennemi.hp).toBe(5000);
+    expect(ennemi.hp).toBe(ennemi.maxHp);
   });
 
   it('le seuil est bien 20 % et pas moins',()=>{
@@ -100,18 +100,18 @@ describe('set Contre-attaque — riposte',()=>{
 
   it('ne riposte jamais sans le set',()=>{
     const{ennemi}=echange({sets:[],tirage:.1});
-    expect(ennemi.hp).toBe(5000);
+    expect(ennemi.hp).toBe(ennemi.maxHp);
   });
 
   it('la riposte vaut 75 % de l Attaque, reduite par la Defense de l attaquant',()=>{
     const{ennemi}=echange({sets:['counterSet'],tirage:.1,atkAllie:200,defEnnemi:20});
     const attendu=Math.max(1,Math.round(200*.75*100/(100+20*3)));
-    expect(5000-ennemi.hp).toBe(attendu);
+    expect(ennemi.maxHp-ennemi.hp).toBe(attendu);
   });
 
   it('inflige au moins 1 point meme contre une Defense enorme',()=>{
     const{ennemi}=echange({sets:['counterSet'],tirage:.1,atkAllie:1,defEnnemi:9999});
-    expect(5000-ennemi.hp).toBe(1);
+    expect(ennemi.maxHp-ennemi.hp).toBe(1);
   });
 
   it('journalise la riposte comme un evenement distinct',()=>{
@@ -133,7 +133,7 @@ describe('set Contre-attaque — riposte',()=>{
     fixedRandom(.1);
     const apres=enemyAction(combat);
     expect(findUnit(apres,heros.id).dead).toBe(true);
-    expect(apres.enemies[0].hp).toBe(5000);
+    expect(apres.enemies[0].hp).toBe(apres.enemies[0].maxHp);
   });
 });
 
@@ -196,7 +196,7 @@ describe('plafond des degats periodiques sur les boss',()=>{
     combat=withStatus(combat,id,{debuffs:{[cle]:malus}});
     combat=giveTurnTo(combat,id);
     fixedRandom(.5);
-    return pv-findUnit(nextTurn(combat),id).hp;
+    const unite=findUnit(nextTurn(combat),id);return unite.maxHp-unite.hp;
   }
 
   it('plafonne la Brulure a 1,15 fois l Attaque de la source',()=>{

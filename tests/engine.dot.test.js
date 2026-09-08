@@ -5,6 +5,10 @@ import{createBattle,nextTurn}from'../src/battle/engine';
 import{makeHero,makeEnemy,statsFrom,giveTurnTo,findUnit,withStatus,fixedRandom}from './helpers';
 
 const PV=1000;
+// Depuis le tempo de combat, la reserve reelle vaut PV / COMBAT_TEMPO, tandis
+// que les degats periodiques restent un pourcentage de la reserve de reference
+// (donc de PV). On mesure donc la perte depuis `maxHp`, et les montants
+// attendus restent exprimes en pourcentage de PV.
 
 /** Combat a un champion (PV connus) contre un ennemi inerte tres lent. */
 function combatSolo(){
@@ -23,7 +27,7 @@ function pvApresUnTour(statuts){
   return findUnit(nextTurn(combat),id);
 }
 
-const perte=statuts=>PV-pvApresUnTour(statuts).hp;
+const perte=statuts=>{const unite=pvApresUnTour(statuts);return unite.maxHp-unite.hp};
 
 beforeEach(()=>fixedRandom(.5));
 afterEach(()=>vi.restoreAllMocks());
@@ -118,14 +122,14 @@ describe('cumul et bornes',()=>{
     const unite=pvApresUnTour({
       debuffs:{poison:{turns:3}},
       buffs:{regen:{turns:3}},
-      patch:{hp:PV/2}
+      patch:{hp:200}
     });
-    expect(unite.hp).toBe(PV/2-Math.round(PV*.06)+Math.round(PV*.06));
+    expect(unite.hp).toBe(200-Math.round(PV*.06)+Math.round(PV*.06));
   });
 
   it('la Regeneration ne fait jamais depasser les PV max',()=>{
     const unite=pvApresUnTour({buffs:{regen:{turns:3}}});
-    expect(unite.hp).toBe(PV);
+    expect(unite.hp).toBe(unite.maxHp);
   });
 
   it('les degats periodiques peuvent tuer, sans PV negatifs',()=>{

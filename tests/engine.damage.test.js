@@ -9,6 +9,10 @@ import{createBattle,nextTurn,enemyAction}from'../src/battle/engine';
 import{makeHero,makeEnemy,statsFrom,withStatus,findUnit,seedRandom,fixedRandom}from './helpers';
 
 const PV_ALLIE=100000; // assez haut pour que rien ne meure pendant les mesures
+// Depuis le tempo de combat, la reserve reelle vaut la statistique divisee par
+// COMBAT_TEMPO : les degats subis se lisent donc depuis `maxHp`, pas depuis la
+// statistique brute. La formule de degats, elle, est inchangee.
+const perdus=unit=>unit.maxHp-unit.hp;
 
 /** Un allie encaisse une attaque d ennemi. Renvoie le combat resolu. */
 function frappe({allie={},ennemi={},statuts=null,allies=null}={}){
@@ -30,7 +34,7 @@ function frappe({allie={},ennemi={},statuts=null,allies=null}={}){
 /** Degats subis par le premier allie. */
 function degats(options){
   const{resolu,heros}=frappe(options);
-  return PV_ALLIE-findUnit(resolu,heros[0].id).hp;
+  return perdus(findUnit(resolu,heros[0].id));
 }
 
 afterEach(()=>vi.restoreAllMocks());
@@ -136,7 +140,7 @@ describe('Attaque reduite',()=>{
       ennemi:{atk:1000},
       statuts:[['e-w1-0-e1',{debuffs:{atkDown:{turns:2}}}]]
     });
-    expect(PV_ALLIE-findUnit(resolu,heros[0].id).hp).toBe(Math.round(1000*.7));
+    expect(perdus(findUnit(resolu,heros[0].id))).toBe(Math.round(1000*.7));
   });
 });
 
@@ -174,7 +178,7 @@ describe('boucliers',()=>{
     combat=nextTurn(combat);
     const resolu=enemyAction(combat);
     const cible=findUnit(resolu,heros[0].id);
-    return{pvPerdus:PV_ALLIE-cible.hp,bouclierRestant:cible.shield};
+    return{pvPerdus:perdus(cible),bouclierRestant:cible.shield};
   }
 });
 
@@ -182,7 +186,7 @@ describe('Serment du gardien',()=>{
   beforeEach(()=>fixedRandom(.5));
 
   /** Deux allies : [0] protege, [1] gardien. */
-  function avecGardien({pvGardien=PV_ALLIE,atk=1000}={}){
+  function avecGardien({pvGardien=null,atk=1000}={}){
     const equipe=[makeHero({hp:PV_ALLIE,def:0,spd:1,element:'Arcane',name:'Protege'}),
                   makeHero({hp:PV_ALLIE,def:0,spd:1,element:'Arcane',name:'Gardien'})];
     let combat=createBattle(equipe.map(h=>h.id),equipe,statsFrom,{
@@ -192,7 +196,7 @@ describe('Serment du gardien',()=>{
       ...combat,
       allies:combat.allies.map((unit,index)=>index===0
         ?{...unit,atb:0,buffs:{guardianLink:{turns:3,source:equipe[1].id}}}
-        :{...unit,atb:0,hp:pvGardien}),
+        :{...unit,atb:0,...(pvGardien==null?{}:{hp:pvGardien})}),
       // Provocation : force l ennemi a viser le protege, sinon son IA cible
       // spontanement l allie le plus fragile (ici le gardien affaibli).
       enemies:combat.enemies.map(unit=>({...unit,atb:99.9,
@@ -210,8 +214,8 @@ describe('Serment du gardien',()=>{
   it('le gardien encaisse 30 % des degats a la place du protege',()=>{
     const{protege,gardien}=avecGardien({atk:1000});
     const redirige=Math.round(1000*.30);
-    expect(PV_ALLIE-gardien.hp).toBe(redirige);
-    expect(PV_ALLIE-protege.hp).toBe(1000-redirige);
+    expect(perdus(gardien)).toBe(redirige);
+    expect(perdus(protege)).toBe(1000-redirige);
   });
 
   it('le gardien ne peut jamais mourir de la redirection',()=>{
