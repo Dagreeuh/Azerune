@@ -257,14 +257,26 @@ describe('raid',()=>{
   });
 
   it('la relique unique est reservee a la Fournaise, niveaux 9 et 10',()=>{
-    expect(raidRelicChance('heartforge',9)).toBe(.0005);
-    expect(raidRelicChance('heartforge',10)).toBe(.0015);
+    expect(raidRelicChance('heartforge',9)).toBeGreaterThan(0);
+    expect(raidRelicChance('heartforge',10)).toBeGreaterThan(0);
     expect(raidRelicChance('heartforge',8)).toBe(0);
     expect(raidRelicChance('autre',10)).toBe(0);
   });
 
   it('le niveau 10 est trois fois plus genereux que le niveau 9',()=>{
     expect(raidRelicChance('heartforge',10)).toBeCloseTo(raidRelicChance('heartforge',9)*3);
+  });
+
+  // Ce test figeait les valeurs exactes (0,0005 et 0,0015). Un chiffre fige est
+  // un detecteur de changement : il tombe des qu'on retouche l'equilibrage, sans
+  // rien dire de ce qui compte. Il verrouille desormais la propriete — une
+  // relique doit rester tres rare sans devenir hors de portee.
+  it('la relique reste tres rare, sans devenir inatteignable',()=>{
+    const chance=raidRelicChance('heartforge',10);
+    expect(chance).toBeLessThan(.01);
+    const moitie=Math.ceil(Math.log(.5)/Math.log(1-chance));
+    expect(moitie,`${moitie} passages pour une chance sur deux`).toBeLessThanOrEqual(250);
+    expect(moitie).toBeGreaterThanOrEqual(50);
   });
 });
 

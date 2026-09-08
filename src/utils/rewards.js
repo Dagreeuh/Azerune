@@ -133,9 +133,20 @@ export const raidBonusLootAllowed=performance=>
   Boolean(performance)&&performance.mechanicFailures===0;
 
 /** Chance de relique unique, reservee a la Fournaise en niveaux 9 et 10. */
+/**
+ * Chance qu'une relique de Chronique tombe dans un Raid.
+ *
+ * Les taux d'origine (0,05 % et 0,15 %) donnaient 462 passages pour une chance
+ * sur deux, et jusqu'a 1 386 pour les reliques de Mythic+. La Chronique qui suit
+ * demandant elle-meme vingt a soixante passages, l'aventure entiere devenait
+ * inatteignable : « tres rare » finissait par vouloir dire « jamais ». Les taux
+ * visent desormais une chance sur deux autour de 120 a 200 passages du contenu
+ * le plus haut — assez long pour rester une legende, assez court pour qu'un
+ * joueur assidu la vive.
+ */
 export function raidRelicChance(raidId,level){
   if(raidId!=='heartforge')return 0;
-  return level===9?.0005:level===10?.0015:0;
+  return level===9?.002:level===10?.006:0;
 }
 
 /* -------------------------------------------------------------- Expedition */
