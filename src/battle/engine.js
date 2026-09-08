@@ -598,9 +598,13 @@ export function castSkill(battle,index,targetId){
   if(e==='arcaneBlast')m.value=Math.min(4,(m.value||0)+1);
   if(e==='arcaneBarrage')m.value=resonanceIV?1:0;
   if(e==='arcaneOrb')m.value=4;
-  if(e==='totemHeal')heal(chosen,chosen.maxHp*(m.active?.48:.40)*(1+mastery.power));
-  if(e==='healingTotem'){m.active=true;m.type='healingTotem';m.value=3+mastery.duration;allies.filter(x=>!x.dead).forEach(x=>{x.buffs.healingTotem={turns:m.value,source:actor.id};heal(x,x.maxHp*.1)});}
-  if(e==='totemTide'){allies.filter(x=>!x.dead).forEach(x=>{heal(x,x.maxHp*.32*(1+mastery.power));if(m.active&&x.buffs?.healingTotem?.source===actor.id)x.buffs.healingTotem.turns+=2;});if(m.active){m.value=Math.max(0,...allies.map(x=>x.buffs?.healingTotem?.source===actor.id?x.buffs.healingTotem.turns:0));logs.push(`Totem prolongé à ${m.value} tour(s).`);}}
+  if(e==='totemHeal'){heal(chosen,chosen.maxHp*(m.active?.48:.40)*(1+mastery.power));chosen.buffs.atkUp={turns:2+mastery.duration};}
+  // Le Totem galvanise en plus de soigner. Un soutien qui ne fait que prolonger
+  // le combat ne pese rien dans une course : Hicho ressortait 27e sur 30 avec
+  // trois sorts sans le moindre degat. Il accelere desormais la course au lieu
+  // de seulement la subir.
+  if(e==='healingTotem'){m.active=true;m.type='healingTotem';m.value=3+mastery.duration;allies.filter(x=>!x.dead).forEach(x=>{x.buffs.healingTotem={turns:m.value,source:actor.id};x.buffs.atkUp={turns:m.value};heal(x,x.maxHp*.1)});}
+  if(e==='totemTide'){allies.filter(x=>!x.dead).forEach(x=>{heal(x,x.maxHp*.32*(1+mastery.power));x.buffs.speedUp={turns:2+mastery.duration};if(m.active&&x.buffs?.healingTotem?.source===actor.id)x.buffs.healingTotem.turns+=2;});if(m.active){m.value=Math.max(0,...allies.map(x=>x.buffs?.healingTotem?.source===actor.id?x.buffs.healingTotem.turns:0));logs.push(`Totem prolongé à ${m.value} tour(s).`);}}
   if(e==='festeringStrike'){const previous=chosen.debuffs.festering?.stacks||0;if(debuff(chosen,'festering',5,1)){chosen.debuffs.festering={...chosen.debuffs.festering,turns:5+mastery.duration,stacks:Math.min(6,previous+2)};logs.push(`Blessures purulentes : ${chosen.debuffs.festering.stacks}/6 sur ${chosen.name}.`);}}
   if(e==='festeringSpread')targets.forEach(t=>{const previous=t.debuffs.festering?.stacks||0;if(debuff(t,'festering',4,.85)){t.debuffs.festering={...t.debuffs.festering,turns:4+mastery.duration,stacks:Math.min(6,previous+1)};logs.push(`Blessures purulentes : ${t.debuffs.festering.stacks}/6 sur ${t.name}.`);}});
   if(e==='apocalypse'){const stacks=chosen.debuffs.festering?.stacks||0;delete chosen.debuffs.festering;const duration=Math.max(1,Math.min(resonanceIV?5:4,stacks+(resonanceIV?1:0)));m.value=duration;m.ghoulTurns=duration;m.active=true;m.ghoulDamage=Math.round(actor.atk*.28);actor.buffs.ghoul={turns:duration+1,source:actor.id,damage:m.ghoulDamage};if(stacks){const extra=Math.round(actor.atk*.3*stacks);chosen.hp=Math.max(0,chosen.hp-extra);chosen.dead=chosen.hp<=0;if(chosen.dead){chosen.atb=0;chosen.shield=0;}damageTotal+=extra;event(chosen,extra,'damage');logs.push(`Apocalypse consomme ${stacks} Blessure(s) purulente(s) et invoque la Goule pour ${duration} attaque(s).`);}else logs.push('Apocalypse invoque la Goule pour 1 attaque, sans Blessure purulente consommée.');}
