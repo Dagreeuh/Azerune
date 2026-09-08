@@ -348,10 +348,30 @@ const livingLeft=units=>(units||[]).filter(unit=>!unit.dead);
 const hpRatio=unit=>unit.maxHp>0?unit.hp/unit.maxHp:1;
 const affinityRank=key=>key==='effective'?0:key==='neutral'?1:2;
 
+/**
+ * Poids de l'achevement dans le ciblage automatique.
+ *
+ * Le ciblage ne regardait que l'affinite puis l'ordre du tableau : aucun terme
+ * de PV. L'AUTO eparpillait donc ses degats au lieu d'achever, alors que tuer
+ * une unite retire definitivement sa part de degats. Mesure pres du seuil : une
+ * simple focalisation sur l'ennemi le plus bas battait l'AUTO du jeu de 19,4
+ * points a x1,05 de puissance et de 8,1 points a x1,10.
+ *
+ * Le poids depasse volontairement un rang d'affinite (100 points) : achever une
+ * cible presque morte vaut mieux qu'un bonus elementaire sur une cible intacte.
+ */
+export const POIDS_ACHEVEMENT=260;
+
 export function chooseAutoEnemyTarget(battle,actor,skill){
   const enemies=livingLeft(battle?.enemies);if(!enemies.length)return null;
   const impose=forcedEnemyTarget(battle,actor);if(impose)return impose;
   const effect=skill?.effect;
+  // Achevement : l'ennemi le plus bas en PV absolus recoit tout le bonus, le
+  // plus haut rien. Les PV absolus, et non le pourcentage : c'est ce qui dit
+  // qui tombera le premier.
+  const restants=enemies.map(unit=>Math.max(0,unit.hp));
+  const plusBas=Math.min(...restants),plage=Math.max(1,Math.max(...restants)-plusBas);
+  const achevement=enemy=>Math.round((1-(Math.max(0,enemy.hp)-plusBas)/plage)*POIDS_ACHEVEMENT);
   const score=(enemy,index)=>{
     let special=0;const raidDanger=Boolean(battle?.raidState&&battle.raidState.charges>=Math.ceil(battle.raidState.maxCharges*.60));if(raidDanger&&enemy.raidRole==='ember')special-=5000;
     // Canalisation en cours : frapper le Pretre ne sert a rien, seul un
@@ -359,6 +379,10 @@ export function chooseAutoEnemyTarget(battle,actor,skill){
     // detourne les autres.
     if(battle?.raidState?.channeling&&enemy.raidRole==='priest')
       special+=CONTROL_EFFECTS.has(effect)?-9000:9000;
+    // Hors canalisation, on garde les controles pour le moment ou le Pretre
+    // canalisera : les depenser d'avance, c'est ne plus avoir de reponse. Les
+    // autres sorts peuvent l'achever, c'est du bon jeu.
+    if(enemy.raidRole==='priest'&&!battle?.raidState?.channeling&&CONTROL_EFFECTS.has(effect))special+=2000;
     if(['shieldBreaker','shieldExpose'].includes(effect))special=(enemy.shield||0)>0?-1200:0;
     if(effect==='shieldExecute'){if(enemy.debuffs?.exposed)special=-1600;else if(enemy.shieldBroken||(enemy.maxShield||0)>0&&(enemy.shield||0)<=0)special=-1300;else special=0;}
     if(effect==='condemnStrip')special=-120*Object.keys(enemy.buffs||{}).length;
@@ -367,7 +391,7 @@ export function chooseAutoEnemyTarget(battle,actor,skill){
     if(effect==='alchemyCatalyst')special=-100*['poison','burn','bleed'].filter(key=>enemy.debuffs?.[key]).length;
     if(effect==='huntMark'){special-=Math.round(hpRatio(enemy)*220)+(enemy.bossUnit?-500:0);}if(['huntStrike','huntFinish'].includes(effect)&&actor.mechanic?.targetId===enemy.id&&enemy.debuffs?.hunt?.source===actor.id)special-=800;
     if(['feralShred','feralFinish'].includes(effect)&&enemy.debuffs?.bleed)special-=900;if(['feralFinish','rogueFinish'].includes(effect))special-=Math.round((1-hpRatio(enemy))*500);
-    return special+affinityRank(affinity(actor.element,enemy.element).key)*100+index;
+    return special-achevement(enemy)+affinityRank(affinity(actor.element,enemy.element).key)*100+index;
   };
   return enemies.map((enemy,index)=>({enemy,value:score(enemy,index)})).sort((a,b)=>a.value-b.value)[0]?.enemy||enemies[0];
 }

@@ -62,9 +62,20 @@ const ORACLE=(b,a)=>{
   return best||SPAM(b,a);
 };
 
-/** Facteur de puissance auquel l'equipe franchit 50 % de victoires. */
-const seuil=(missions,graines,plafond=3.2)=>{
-  const taux=()=>{let v=0,n=0;missions.forEach((m,i)=>graines.forEach(g=>{n+=1;if(jouer(m,AUTO,g+i).gagne)v+=1}));return v/n};
+/** Toujours achever l'ennemi le plus bas : le reflexe de focalisation. */
+const CONCENTRE=(b,a)=>{
+  const cible=b.enemies.filter(u=>!u.dead).sort((x,y)=>x.hp-y.hp)[0];
+  if(!cible)return AUTO(b,a);
+  const offensifs=a.skills.map((sk,i)=>[sk,i]).filter(([sk,i])=>['enemy','allEnemies'].includes(sk.target)
+    &&(a.cooldowns?.[i]||0)<=0&&(i<2||a.currentStars>=4||a.rarity>=4))
+    .sort((x,y)=>(y[0].power||0)-(x[0].power||0));
+  for(const[,i]of offensifs){const r=castSkill(b,i,cible.id);if(!r.error)return r}
+  return AUTO(b,a);
+};
+
+/** Facteur de puissance auquel l'equipe franchit 50 % de victoires. *//** Facteur de puissance auquel l'equipe franchit 50 % de victoires. */
+const seuil=(missions,graines,plafond=3.2,strategie=AUTO)=>{
+  const taux=()=>{let v=0,n=0;missions.forEach((m,i)=>graines.forEach(g=>{n+=1;if(jouer(m,strategie,g+i).gagne)v+=1}));return v/n};
   let bas=.4,haut=plafond;FACTEUR=haut;
   if(taux()<.5)return null;
   for(let k=0;k<7;k+=1){const mi=(bas+haut)/2;FACTEUR=Number(mi.toFixed(3));if(taux()>=.5)haut=mi;else bas=mi}
@@ -91,10 +102,11 @@ it('1. largeur de la bande de transition',()=>{
 
 it('2. valeur des decisions du joueur',()=>{
   ETOILES=5;
+
   const missions=[];
   DIFFICULTIES.forEach(d=>[3,5,7,9].forEach(z=>[3,6].forEach(st=>
     missions.push({nom:`${d.name} Z${z+1}-${st+1}`,m:createMission(d,CONTINENTS[z],CONTINENTS[z].stages[st])}))));
-  const G=[11,29,37,53,71,97],strategies={AUTO,ORACLE,HASARD,'SPAM sort 1':SPAM},detail={};
+  const G=[11,29,37,53,71,97],strategies={AUTO,ORACLE,CONCENTRE,HASARD,'SPAM sort 1':SPAM},detail={};
   console.log('\n=== 2. VALEUR DES DECISIONS ('+missions.length+' missions x '+G.length+' graines) ===');
   const global={};Object.keys(strategies).forEach(n=>{global[n]={v:0,n:0}});
   missions.forEach(({nom,m})=>{detail[nom]={};
@@ -105,7 +117,7 @@ it('2. valeur des decisions du joueur',()=>{
     .forEach(([n,r])=>console.log(`${n.padEnd(12)} ${(100*r.v/r.n).toFixed(1)} % (${r.v}/${r.n})`));
   const tranchees=Object.values(detail).filter(r=>{const v=Object.values(r);return Math.max(...v)-Math.min(...v)>0}).length;
   console.log(`missions ou la strategie change le resultat : ${tranchees}/${missions.length}`);
-  ETOILES=0;
+  ETOILES=0;EQUIPE=[1,19,3];
 },1800000);
 
 it('3. cout reel d’une session',()=>{
@@ -155,3 +167,27 @@ it('5. honnetete de la puissance recommandee',()=>{
   const moy=ratios.reduce((a,b)=>a+b,0)/ratios.length;
   console.log(`ratio moyen ${moy.toFixed(2)} · de ${Math.min(...ratios).toFixed(2)} a ${Math.max(...ratios).toFixed(2)} (un indicateur honnete vaudrait 1.00)`);
 },1800000);
+
+it('6. une strategie de joueur peut-elle battre l’AUTO, pres du seuil ?',()=>{
+  // Mesure a facteur de puissance FIXE, choisi pres du seuil, en paires
+  // appariees : chaque strategie affronte exactement les memes combats. Loin du
+  // seuil tout est deja joue, et une recherche dichotomique est trop grossiere
+  // — sa grille masquait des ecarts reels de plusieurs points.
+  ETOILES=5;EQUIPE=[24,3,19];
+  const G=Array.from({length:40},(u,i)=>3+i*11);
+  const missions=[[0,4,6],[0,6,3],[1,3,6],[1,5,3]].map(([d,z,st])=>
+    createMission(DIFFICULTIES[d],CONTINENTS[z],CONTINENTS[z].stages[st]));
+  console.log('\n=== 6. VALEUR D’UNE DECISION, MESUREE PRES DU SEUIL ===');
+  [1.05,1.10,1.15].forEach(f=>{
+    FACTEUR=f;const res={};
+    [['AUTO',AUTO],['ORACLE',ORACLE],['CONCENTRE',CONCENTRE],['SPAM sort 1',SPAM]].forEach(([nom,strat])=>{
+      let v=0,n=0;missions.forEach((m,i)=>G.forEach(g=>{n+=1;if(jouer(m,strat,g+i).gagne)v+=1}));
+      res[nom]=100*v/n;
+    });
+    console.log(`puissance x${f.toFixed(2)} (${G.length*missions.length} combats) : `
+      +Object.entries(res).map(([n,t])=>`${n} ${t.toFixed(1)} %`).join(' · '));
+    const meilleure=Object.entries(res).sort((a,b)=>b[1]-a[1])[0];
+    console.log(`   → meilleure : ${meilleure[0]}`);
+  });
+  FACTEUR=1;ETOILES=0;EQUIPE=[1,19,3];
+},2400000);
