@@ -721,16 +721,16 @@
   animation-fill-mode:both}
 
 /* halo d'impact commun, teinte par l'archetype */
-.vfx-impact{width:64px;height:64px;border-radius:50%;
-  background:radial-gradient(circle,var(--vfx-core) 0%,transparent 68%);
-  opacity:0;animation-name:vfxImpact}
+.vfx-impact{width:96px;height:96px;border-radius:50%;
+  background:radial-gradient(circle,#fff 0%,var(--vfx-core) 22%,transparent 66%);
+  mix-blend-mode:screen;opacity:0;animation-name:vfxImpact}
 @keyframes vfxImpact{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}
   35%{opacity:calc(.92*var(--vfx-intensity))}100%{opacity:0;transform:translate(-50%,-50%) scale(1.9)}}
 
 /* --- couches --- */
-.vfx-streak{width:96px;height:5px;border-radius:4px;
-  background:linear-gradient(90deg,transparent,var(--vfx-core),transparent);
-  box-shadow:0 0 14px var(--vfx-glow);animation-name:vfxStreak}
+.vfx-streak{width:150px;height:8px;border-radius:5px;
+  background:linear-gradient(90deg,transparent,#fff 45%,var(--vfx-core) 55%,transparent);
+  box-shadow:0 0 22px var(--vfx-glow);animation-name:vfxStreak}
 @keyframes vfxStreak{0%{opacity:0;transform:translate(-140%,-50%) rotate(-24deg) scaleX(.4)}
   30%{opacity:1}100%{opacity:0;transform:translate(40%,-50%) rotate(-24deg) scaleX(1.3)}}
 
@@ -745,8 +745,8 @@
 @keyframes vfxRing{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}
   25%{opacity:calc(.9*var(--vfx-intensity))}100%{opacity:0;transform:translate(-50%,-50%) scale(2.6)}}
 
-.vfx-shock{width:78px;height:78px;border-radius:50%;
-  border:2px solid var(--vfx-core);animation-name:vfxShock}
+.vfx-shock{width:104px;height:104px;border-radius:50%;
+  border:4px solid var(--vfx-core);box-shadow:0 0 20px var(--vfx-glow);animation-name:vfxShock}
 @keyframes vfxShock{0%{opacity:0;transform:translate(-50%,-50%) scale(.6) rotate(0)}
   20%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(28deg)}}
 
@@ -848,3 +848,23 @@
 .battle-vfx-toggle.active{border-color:#a855f7;color:#e9d5ff;background:#2e1065}
 @media(max-width:650px){.battle-vfx-toggle{right:8px;
   bottom:calc(var(--bottom-nav-height) + 120px + env(safe-area-inset-bottom))}}
+
+/* --- Tooltip de sort : le calcul, en clair ------------------------------- */
+.tooltip-scaling,.tooltip-conditionals,.tooltip-mastery{margin-top:9px;padding:9px 10px;border:1px solid #334155;border-radius:10px;background:#0b1220}
+.tooltip-scaling>small,.tooltip-conditionals>small,.tooltip-mastery>small{display:block;margin-bottom:6px;color:#7dd3fc;font-size:8px;font-weight:900;letter-spacing:1px}
+.scaling-formula{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.scaling-formula>b{color:#fbbf24;font-size:17px}
+.scaling-formula>span{color:#94a3b8;font-size:10px}
+.scaling-formula>strong{margin-left:auto;padding:2px 7px;border:1px solid #475569;border-radius:7px;color:#e2e8f0;font-size:11px}
+.scaling-mastery{display:block;margin-top:4px;color:#a5b4fc;font-size:9px;font-style:normal}
+.scaling-expected{display:flex;align-items:baseline;gap:8px;margin-top:7px;padding-top:7px;border-top:1px dashed #334155}
+.scaling-expected>span{color:#94a3b8;font-size:9px}
+.scaling-expected>b{color:#f87171;font-size:15px}
+.scaling-expected>i{color:#fca5a5;font-size:9px;font-style:normal}
+.scaling-note{margin:6px 0 0;color:#64748b;font-size:8px;line-height:1.4}
+.tooltip-conditionals>div{display:flex;align-items:baseline;gap:8px;padding:3px 0}
+.tooltip-conditionals>div+div{border-top:1px dashed #1e293b}
+.tooltip-conditionals>div>b{min-width:62px;color:#4ade80;font-size:11px}
+.tooltip-conditionals>div>span{color:#cbd5e1;font-size:9px;line-height:1.35}
+.tooltip-mastery>b{color:#e9d5ff;font-size:10px}
+.tooltip-affinity>em{display:block;margin-top:4px;color:#64748b;font-size:8px;font-style:normal}

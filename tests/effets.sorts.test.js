@@ -39,9 +39,26 @@ describe('chaque sort a une allure',()=>{
     expect(vfxForEvent({type:'damage',skillEffect:'holyPowerVerdict',element:'Ombre'}).id).toBe('holy');
   });
 
-  it('à défaut, l’élément décide',()=>{
-    expect(vfxForEvent({type:'damage',skillEffect:'sortInconnu',element:'Feu'}).id).toBe('flame');
-    expect(vfxForEvent({type:'damage',skillEffect:'sortInconnu',element:'Ombre'}).id).toBe('shadow');
+  it('à défaut, une attaque ressemble à une attaque — pas à son élément',()=>{
+    // Regle corrigee. L'element decidait de la forme : l'attaque de base d'un
+    // champion Nature affichait des bulles de venin et ne ressemblait jamais a
+    // une frappe. Desormais l'element teinte, la frappe donne la forme, et les
+    // allures elementaires restent reservees aux sorts qui posent vraiment une
+    // Brulure, un Givre ou un Poison.
+    ['Feu','Ombre','Nature','Eau','Arcane','Lumière'].forEach(element=>{
+      const vfx=vfxForEvent({type:'damage',skillEffect:'sortInconnu',element,skillPower:.9});
+      expect(['slash','heavy','burst'],`${element}`).toContain(vfx.id);
+      // La couleur, elle, suit bien l'element.
+      expect(vfx.palette).toBe(paletteFor(element));
+    });
+  });
+
+  it('la forme de la frappe suit la portée et la puissance du sort',()=>{
+    const base={type:'damage',skillEffect:'sortInconnu',element:'Feu'};
+    expect(vfxForEvent({...base,skillPower:.85}).id).toBe('slash');
+    expect(vfxForEvent({...base,skillPower:1.45}).id).toBe('heavy');
+    expect(vfxForEvent({...base,skillTarget:'allEnemies',skillPower:.9}).id).toBe('burst');
+    expect(vfxForEvent({...base,skillTarget:'allAllies',skillPower:.9}).id).toBe('burst');
   });
 
   it('les six éléments du roster ont une palette dédiée',()=>{

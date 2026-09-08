@@ -64,8 +64,20 @@ const PAR_EFFET={
  aimBuilder:'pierce',aimShot:'pierce',huntStrike:'pierce',huntFinish:'pierce'
 };
 
-/** Archetype deduit de l'element, quand rien de plus precis ne s'applique. */
-const PAR_ELEMENT={Feu:'flame',Eau:'frost',Nature:'venom',Lumière:'holy',Ombre:'shadow',Arcane:'burst'};
+/**
+ * Archetype d'une FRAPPE, quand aucun sort nomme ne s'applique.
+ *
+ * L'element ne doit pas remplacer la forme : une attaque de base d'un champion
+ * Nature affichait des bulles de venin, et ne ressemblait donc jamais a une
+ * attaque. L'element teinte, la frappe donne la forme. Les archetypes
+ * elementaires restent reserves aux sorts qui posent vraiment une Brulure, un
+ * Givre ou un Poison — ceux-la sont nommes dans PAR_EFFET.
+ */
+const frappe=event=>{
+ const cible=event.skillTarget;
+ if(cible==='allEnemies'||cible==='allAllies')return'burst';
+ return(Number(event.skillPower)||0)>=1.2?'heavy':'slash';
+};
 
 /** Archetype deduit du type d'evenement, en dernier recours. */
 const PAR_TYPE={heal:'mend',shield:'ward',dot:'venom',recoil:'shadow',ghoul:'shadow'};
@@ -81,8 +93,7 @@ export function vfxForEvent(event={}){
  const type=event.type||'damage';
  const archetypeId=(type!=='damage'&&PAR_TYPE[type])
   ||PAR_EFFET[event.skillEffect]
-  ||PAR_ELEMENT[event.element]
-  ||'slash';
+  ||frappe(event);
  const archetype=VFX_ARCHETYPES[archetypeId]||VFX_ARCHETYPES.slash;
  const palette=paletteFor(event.element);
  // Un critique et une affinite efficace intensifient sans changer la forme :
