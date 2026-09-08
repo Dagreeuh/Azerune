@@ -449,7 +449,10 @@ export function castSkill(battle,index,targetId){
   if(skill.target==='enemy'&&!chosen)return{battle,error:'Aucune cible ennemie disponible.'};
   if(skill.target==='ally'&&!chosen)return{battle,error:'Aucun allié disponible.'};
   const events=[],logs=[],resisted=[];let damageTotal=0,healingTotal=0,shieldTotal=0,retain=0;
-  const event=(target,amount,type,extra={})=>events.push({id:`event-${(battle.eventSeq||0)+events.length+1}-${target.id}`,sourceId:actor.id,targetId:target.id,amount:Math.max(0,Math.round(amount)),type,affinity:'neutral',critical:false,...extra});
+  // `skillEffect` et `element` voyagent avec chaque evenement : c'est ce qui
+  // permet a l'ecran de choisir l'animation du SORT plutot qu'une gerbe
+  // generique, sans que la couche visuelle ait a deviner quoi que ce soit.
+  const event=(target,amount,type,extra={})=>events.push({id:`event-${(battle.eventSeq||0)+events.length+1}-${target.id}`,sourceId:actor.id,targetId:target.id,amount:Math.max(0,Math.round(amount)),type,affinity:'neutral',critical:false,skillEffect:skill.effect,element:actor.element,...extra});
   const heal=(target,raw,type='heal')=>{const necroticMultiplier=1-.06*Math.min(5,target.debuffs?.necrotic?.stacks||0),healingMultiplier=Math.max(.35,(target.debuffs?.healingDown?.60:1)*(target.debuffs?.raidHealingDown?.70:1)*necroticMultiplier),adjusted=raw*healingMultiplier;const amount=Math.max(0,Math.min(target.maxHp-target.hp,Math.round(adjusted)));target.hp+=amount;healingTotal+=amount;if(amount)event(target,amount,type);return amount};
   const shield=(target,raw)=>{const amount=Math.max(0,Math.round(raw));target.shield+=amount;target.maxShield=Math.max(target.maxShield||0,target.shield);target.buffs.shield={turns:2+mastery.duration,source:actor.id};shieldTotal+=amount;if(amount)event(target,amount,'shield');return amount};
   const debuff=(target,key,turns,chance=.75)=>{const relation=affinity(actor.element,target.element);return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,mastery.effectRate,resisted)};

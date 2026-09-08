@@ -712,3 +712,139 @@
 .chronicle-requirements>div strong{font-size:12px;color:#e8d9b8;white-space:nowrap}
 .chronicle-requirements>div.done{border-color:#166534;background:#0d2116}
 .chronicle-requirements>div.done strong{color:#86efac}
+
+/* --- Effets de sort ------------------------------------------------------- */
+.spell-vfx{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:6;
+  --vfx-core:#e2e8f0;--vfx-trail:#334155;--vfx-glow:#94a3b8;--vfx-intensity:1;--vfx-duration:520ms}
+.spell-vfx i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;
+  animation-duration:var(--vfx-duration);animation-timing-function:cubic-bezier(.2,.8,.3,1);
+  animation-fill-mode:both}
+
+/* halo d'impact commun, teinte par l'archetype */
+.vfx-impact{width:64px;height:64px;border-radius:50%;
+  background:radial-gradient(circle,var(--vfx-core) 0%,transparent 68%);
+  opacity:0;animation-name:vfxImpact}
+@keyframes vfxImpact{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}
+  35%{opacity:calc(.92*var(--vfx-intensity))}100%{opacity:0;transform:translate(-50%,-50%) scale(1.9)}}
+
+/* --- couches --- */
+.vfx-streak{width:96px;height:5px;border-radius:4px;
+  background:linear-gradient(90deg,transparent,var(--vfx-core),transparent);
+  box-shadow:0 0 14px var(--vfx-glow);animation-name:vfxStreak}
+@keyframes vfxStreak{0%{opacity:0;transform:translate(-140%,-50%) rotate(-24deg) scaleX(.4)}
+  30%{opacity:1}100%{opacity:0;transform:translate(40%,-50%) rotate(-24deg) scaleX(1.3)}}
+
+.vfx-bolt{width:4px;height:88px;border-radius:3px;
+  background:linear-gradient(180deg,transparent,var(--vfx-core),transparent);
+  box-shadow:0 0 16px var(--vfx-glow);animation-name:vfxBolt}
+@keyframes vfxBolt{0%{opacity:0;transform:translate(-50%,-160%) scaleY(.5)}
+  40%{opacity:1}100%{opacity:0;transform:translate(-50%,10%) scaleY(1.2)}}
+
+.vfx-ring{width:38px;height:38px;border-radius:50%;border:3px solid var(--vfx-core);
+  box-shadow:0 0 20px var(--vfx-glow),inset 0 0 12px var(--vfx-glow);animation-name:vfxRing}
+@keyframes vfxRing{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}
+  25%{opacity:calc(.9*var(--vfx-intensity))}100%{opacity:0;transform:translate(-50%,-50%) scale(2.6)}}
+
+.vfx-shock{width:78px;height:78px;border-radius:50%;
+  border:2px solid var(--vfx-core);animation-name:vfxShock}
+@keyframes vfxShock{0%{opacity:0;transform:translate(-50%,-50%) scale(.6) rotate(0)}
+  20%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(28deg)}}
+
+.vfx-flames{width:54px;height:70px;
+  background:radial-gradient(ellipse at 50% 100%,var(--vfx-core) 0%,var(--vfx-glow) 38%,transparent 72%);
+  filter:blur(1px);animation-name:vfxFlames}
+@keyframes vfxFlames{0%{opacity:0;transform:translate(-50%,-25%) scaleY(.5)}
+  35%{opacity:var(--vfx-intensity)}100%{opacity:0;transform:translate(-50%,-70%) scaleY(1.25)}}
+
+.vfx-shards{width:70px;height:70px;animation-name:vfxShards;
+  background:
+    linear-gradient(38deg,transparent 46%,var(--vfx-core) 47%,transparent 53%),
+    linear-gradient(-38deg,transparent 46%,var(--vfx-core) 47%,transparent 53%),
+    linear-gradient(90deg,transparent 46%,var(--vfx-core) 47%,transparent 53%);
+  filter:drop-shadow(0 0 8px var(--vfx-glow))}
+@keyframes vfxShards{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-20deg)}
+  30%{opacity:var(--vfx-intensity)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.4) rotate(14deg)}}
+
+.vfx-smoke{width:76px;height:76px;border-radius:50%;
+  background:radial-gradient(circle,var(--vfx-trail) 10%,var(--vfx-core) 42%,transparent 70%);
+  filter:blur(3px);animation-name:vfxSmoke}
+@keyframes vfxSmoke{0%{opacity:0;transform:translate(-50%,-40%) scale(.5)}
+  40%{opacity:calc(.85*var(--vfx-intensity))}100%{opacity:0;transform:translate(-50%,-62%) scale(1.5)}}
+
+.vfx-beam{width:26px;height:120px;
+  background:linear-gradient(180deg,transparent,var(--vfx-core) 45%,transparent);
+  filter:blur(2px);animation-name:vfxBeam}
+@keyframes vfxBeam{0%{opacity:0;transform:translate(-50%,-50%) scaleY(.2)}
+  30%{opacity:var(--vfx-intensity)}100%{opacity:0;transform:translate(-50%,-50%) scaleY(1.15)}}
+
+.vfx-bloom{width:62px;height:62px;border-radius:50%;
+  background:radial-gradient(circle,var(--vfx-core) 0%,transparent 62%);animation-name:vfxBloom}
+@keyframes vfxBloom{0%{opacity:0;transform:translate(-50%,-20%) scale(.4)}
+  40%{opacity:var(--vfx-intensity)}100%{opacity:0;transform:translate(-50%,-95%) scale(1.15)}}
+
+.vfx-dome{width:82px;height:82px;border-radius:50%;
+  border:2px solid var(--vfx-core);
+  background:radial-gradient(circle,transparent 58%,var(--vfx-glow) 100%);
+  opacity:0;animation-name:vfxDome}
+@keyframes vfxDome{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}
+  35%{opacity:calc(.8*var(--vfx-intensity))}75%{opacity:calc(.6*var(--vfx-intensity))}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.12)}}
+
+.vfx-rising{width:46px;height:88px;
+  background:linear-gradient(0deg,var(--vfx-core),transparent 78%);
+  filter:blur(2px);animation-name:vfxRising}
+@keyframes vfxRising{0%{opacity:0;transform:translate(-50%,-10%) scaleY(.4)}
+  35%{opacity:var(--vfx-intensity)}100%{opacity:0;transform:translate(-50%,-85%) scaleY(1.1)}}
+
+.vfx-runes{width:72px;height:72px;border-radius:50%;
+  border:3px dashed var(--vfx-core);filter:drop-shadow(0 0 8px var(--vfx-glow));animation-name:vfxRunes}
+@keyframes vfxRunes{0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(0)}
+  30%{opacity:var(--vfx-intensity)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.3) rotate(160deg)}}
+
+.vfx-bubbles{width:58px;height:58px;border-radius:50%;
+  background:radial-gradient(circle at 35% 65%,var(--vfx-core) 0 18%,transparent 19%),
+             radial-gradient(circle at 68% 40%,var(--vfx-core) 0 12%,transparent 13%),
+             radial-gradient(circle at 50% 30%,var(--vfx-core) 0 9%,transparent 10%);
+  animation-name:vfxBubbles}
+@keyframes vfxBubbles{0%{opacity:0;transform:translate(-50%,-20%) scale(.5)}
+  40%{opacity:var(--vfx-intensity)}100%{opacity:0;transform:translate(-50%,-80%) scale(1.2)}}
+
+.vfx-sparks,.vfx-motes,.vfx-dust{width:80px;height:80px;border-radius:50%;
+  background:radial-gradient(circle at 20% 30%,var(--vfx-core) 0 6%,transparent 7%),
+             radial-gradient(circle at 78% 24%,var(--vfx-core) 0 5%,transparent 6%),
+             radial-gradient(circle at 62% 78%,var(--vfx-core) 0 5%,transparent 6%),
+             radial-gradient(circle at 30% 74%,var(--vfx-core) 0 4%,transparent 5%);
+  animation-name:vfxSparks}
+.vfx-dust{filter:blur(2px);opacity:.7}
+@keyframes vfxSparks{0%{opacity:0;transform:translate(-50%,-50%) scale(.3)}
+  30%{opacity:var(--vfx-intensity)}100%{opacity:0;transform:translate(-50%,-62%) scale(1.6)}}
+
+/* le porteur encaisse : un tressaillement bref, jamais un deplacement durable,
+   et une bordure qui prend brievement la couleur du sort recu */
+.battle-unit.vfx-hit{animation:vfxHit 280ms ease-out}
+.battle-unit.vfx-hit::after{content:'';position:absolute;inset:0;border-radius:inherit;
+  pointer-events:none;box-shadow:inset 0 0 26px var(--element-color);opacity:0;
+  animation:vfxRim 520ms ease-out}
+@keyframes vfxRim{0%{opacity:0}30%{opacity:.55}100%{opacity:0}}
+.unit-card.vfx-hit{animation:vfxHit 280ms ease-out}
+@keyframes vfxHit{0%,100%{transform:none}30%{transform:translateX(-4px)}60%{transform:translateX(3px)}}
+
+/* Un joueur qui coupe les effets ne doit plus rien voir bouger, jamais. */
+.no-vfx .spell-vfx{display:none}
+.no-vfx .unit-card.vfx-hit,.no-vfx .battle-unit.vfx-hit{animation:none}
+.no-vfx .battle-unit.vfx-hit::after{display:none}
+@media(prefers-reduced-motion:reduce){
+  .spell-vfx{display:none}
+  .unit-card.vfx-hit,.battle-unit.vfx-hit{animation:none}
+  .battle-unit.vfx-hit::after{display:none}
+}
+/* Aligne sur le bouton AUTO, juste au-dessus : meme ancrage fixe, meme z-index.
+   Un `position:absolute` le renvoyait hors de l'ecran de combat. */
+.battle-vfx-toggle{position:fixed;right:58px;
+  bottom:calc(var(--bottom-nav-height) + 126px + env(safe-area-inset-bottom));
+  z-index:2200;min-height:38px;padding:7px 9px;border:2px solid #475569;border-radius:10px;
+  background:#111827;color:#64748b;font-size:9px;font-weight:1000;letter-spacing:.5px;
+  box-shadow:0 8px 24px #000b}
+.battle-vfx-toggle.active{border-color:#a855f7;color:#e9d5ff;background:#2e1065}
+@media(max-width:650px){.battle-vfx-toggle{right:8px;
+  bottom:calc(var(--bottom-nav-height) + 120px + env(safe-area-inset-bottom))}}

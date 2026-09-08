@@ -2,7 +2,7 @@ import{describe,it,expect}from'vitest';
 import fs from'node:fs';
 import{fileURLToPath}from'node:url';
 import{HEROES}from'../src/data/heroes';
-import{championGuide,championIdentity,mergeGuide,ROSTER_PROFILES}from'../src/data/championIdentities';
+import{championGuide,championIdentity,mergeGuide,ROSTER_PROFILES,CHAMPION_TYPES,CHAMPION_TYPE_OPTIONS}from'../src/data/championIdentities';
 
 // Ecran noir a l'ouverture des six derniers champions : championGuide
 // n'appliquait ses valeurs par defaut que si le profil manquait ENTIEREMENT.
@@ -130,5 +130,59 @@ describe('les profils écrits à la main restent utiles',()=>{
   it('un profil ne référence pas un champion inexistant',()=>{
     Object.keys(ROSTER_PROFILES).forEach(id=>
       expect(HEROES.some(hero=>String(hero.id)===id),`profil orphelin : id ${id}`).toBe(true));
+  });
+});
+
+describe('les types de champion disent la vérité sur le kit',()=>{
+  const TYPES=new Set(CHAMPION_TYPE_OPTIONS.map(entree=>entree.id));
+  const effets=hero=>(hero.skills||[]).map(skill=>skill.effect);
+  /** Un sort qui rend des PV ou pose un bouclier a un allié. */
+  const SOIN=new Set(['healingSeed','seedBloom','livingGarden','rescueShield','rescueSanctuary',
+    'atonementShield','atonementStrike','atonementPenance','totemHeal','healingTotem','totemTide',
+    'renewingMist','mistStrike','revival','gardenThorn','soulMetamorphosis']);
+  const PROTECTION=new Set(['guardianLink','guardianWall','rescueShield','rescueSanctuary',
+    'atonementShield','healingTotem','totemTide','livingGarden','soulMetamorphosis','revival']);
+
+  it('chaque champion a au moins un type, tous connus',()=>{
+    HEROES.forEach(hero=>{
+      const types=CHAMPION_TYPES[hero.id]||[];
+      expect(types.length,hero.name).toBeGreaterThan(0);
+      types.forEach(type=>expect(TYPES.has(type),`${hero.name} · type inconnu « ${type} »`).toBe(true));
+      expect(new Set(types).size,`${hero.name} · type en double`).toBe(types.length);
+    });
+  });
+
+  it('un soigneur soigne vraiment',()=>{
+    HEROES.filter(hero=>(CHAMPION_TYPES[hero.id]||[]).includes('soigneur'))
+      .forEach(hero=>expect(effets(hero).some(effet=>SOIN.has(effet)),
+        `${hero.name} est tagué soigneur mais aucun de ses sorts ne soigne`).toBe(true));
+  });
+
+  it('un protecteur protège vraiment quelqu’un',()=>{
+    HEROES.filter(hero=>(CHAMPION_TYPES[hero.id]||[]).includes('protecteur'))
+      .forEach(hero=>expect(effets(hero).some(effet=>PROTECTION.has(effet)),
+        `${hero.name} est tagué protecteur sans aucun outil de protection`).toBe(true));
+  });
+
+  it('un tank est construit sur une statistique défensive',()=>{
+    // La regle qui a rattrape Ragnhild : elle etait taguee tank alors que son
+    // kit est ATQ/Critique, avec auto-degats, vol de vie et execution — une
+    // bruiser, pas un mur. On ne demande pas un bouclier : Brom et Maerys
+    // tiennent la ligne en frappant depuis leur Defense, ce sont bien des tanks.
+    // On demande que la PREMIERE statistique prioritaire soit defensive.
+    HEROES.filter(hero=>(CHAMPION_TYPES[hero.id]||[]).includes('tank')).forEach(hero=>{
+      const premiere=championGuide(hero).priorityStats[0];
+      expect(['DEF','PV'],`${hero.name} · tank dont la stat première est « ${premiere} »`)
+        .toContain(premiere);
+    });
+  });
+
+  it('Ragnhild est une DPS, pas un tank',()=>{
+    const ragnhild=HEROES.find(hero=>hero.name==='Ragnhild');
+    expect(CHAMPION_TYPES[ragnhild.id]).toEqual(['dps']);
+  });
+
+  it('le champ pitfall a disparu : il n’était lu par aucun écran',()=>{
+    Object.values(ROSTER_PROFILES).forEach(profil=>expect(profil).not.toHaveProperty('pitfall'));
   });
 });
