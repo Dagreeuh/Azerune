@@ -19,7 +19,7 @@ export const ASCENSION_COSTS={
 };
 export const levelCap=stars=>Math.min(MAX_LEVEL,stars*10);
 export const xpForNextLevel=level=>Math.round(90*Math.pow(level,1.28)+40);
-export function defaultChampionProgress(hero){return{level:1,xp:0,stars:hero.rarity,soulFragments:0,resonance:0};}
+export function defaultChampionProgress(hero){return{level:1,xp:0,stars:hero.rarity,soulFragments:0,resonance:0,empreintes:[]};}
 export function normalizeChampionProgress(hero,value){
   const fallback=defaultChampionProgress(hero);
   const rarete=nombre(hero?.rarity,1);
@@ -30,7 +30,11 @@ export function normalizeChampionProgress(hero,value){
     stars,level,
     xp:Math.max(0,nombre(value?.xp,0)),
     soulFragments:Math.min(remainingResonanceFragments({resonance}),Math.max(0,nombre(value?.soulFragments,0))),
-    resonance
+    resonance,
+    // Une sauvegarde anterieure aux Empreintes n'a pas ce champ : il devient un
+    // tableau vide, jamais undefined, pour que tout ce qui le lit puisse le
+    // parcourir sans garde.
+    empreintes:Array.isArray(value?.empreintes)?[...new Set(value.empreintes.filter(id=>typeof id==='string'))]:[]
   };
 }
 export function addChampionXp(hero,current,amount){let next=normalizeChampionProgress(hero,current),level=next.level,xp=next.xp+Math.max(0,amount),cap=levelCap(next.stars);while(level<cap){const required=xpForNextLevel(level);if(xp<required)break;xp-=required;level+=1;}if(level>=cap)xp=0;return{...next,level,xp};}

@@ -1,5 +1,6 @@
 import{ITEMS,itemStats,setStats,activeSets,SETS}from'../data/items';
 import{normalizeChampionProgress,resonanceBonus}from'./progression';
+import{empreinteBonuses}from'../data/empreintes';
 
 export function progressionStats(hero,championProgress){
   const progress=normalizeChampionProgress(hero,championProgress);
@@ -27,6 +28,10 @@ export function totalStats(hero,equipment,championProgress,inventory=[]){
   const bonuses={};
   equipped.forEach(item=>Object.entries(item.mainStat?itemStats(item):(item.stats||{})).forEach(([key,value])=>bonuses[key]=(bonuses[key]||0)+value));
   Object.entries(setStats(equipped)).forEach(([key,value])=>bonuses[key]=(bonuses[key]||0)+value);
+  // Les Empreintes de statistiques rejoignent la meme somme que l'equipement :
+  // elles passent donc par les memes plafonds et les memes pourcentages.
+  Object.entries(empreinteBonuses(hero,championProgress?.empreintes).stats)
+    .forEach(([key,value])=>bonuses[key]=(bonuses[key]||0)+value);
   ['hp','atk','def'].forEach(key=>{stats[key]+=bonuses[key]||0;stats[key]=Math.round(stats[key]*(1+(bonuses[`${key}Pct`]||0)/100))});
   stats.spd=Math.round((stats.spd+(bonuses.spd||0))*(1+(bonuses.spdPct||0)/100));
   ['crit','critDamage','accuracy','resistance'].forEach(key=>stats[key]=(stats[key]||0)+(bonuses[key]||0));

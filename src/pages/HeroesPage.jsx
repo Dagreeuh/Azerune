@@ -12,11 +12,12 @@ import{championIdentity,championGuide,complexityLabel,resonanceIdentityBonus,cha
 export default function HeroesPage({squad=false}){
   const{
     HEROES,owned,team,stats,naturalStats,getProgress,
-    championPower,teamPower,getEvolutionStatus,evolveHero,getResonanceStatus,reinforceResonance,ascensionEssences,
+    championPower,teamPower,getEvolutionStatus,evolveHero,getResonanceStatus,reinforceResonance,getEmpreinteStatus,lightEmpreinte,resetEmpreintes,BRANCHES,ETAGE_RESONANCE,RESONANCE_POINT_TIERS,ascensionEssences,
     masteryTomes,getSkillInfo,upgradeSkill,gold,teamPresets,activeTeamSlot,selectTeamPreset,renameTeamPreset,saveCurrentTeamToPreset,setTeamMember,removeTeamMember,clearCurrentTeam,copyTeamPreset,getAutoSkillPriority,setAutoSkillPriority,resetAutoSkillPriority
   }=useGame();
   const[selected,setSelected]=useState(team[0]||1);
   const[evolutionMessage,setEvolutionMessage]=useState(null);
+  const[empreinteMessage,setEmpreinteMessage]=useState(null);
   const[skillMessage,setSkillMessage]=useState(null);
   const[teamMessage,setTeamMessage]=useState(null),[renamingSlot,setRenamingSlot]=useState(null),[presetName,setPresetName]=useState(''),[selectedSlot,setSelectedSlot]=useState(null),[teamQuery,setTeamQuery]=useState(''),[teamType,setTeamType]=useState('all'),[teamElement,setTeamElement]=useState('all'),[teamSort,setTeamSort]=useState('power'),[copyTarget,setCopyTarget]=useState('');
   const[query,setQuery]=useState(''),[rarity,setRarity]=useState('all'),[ownership,setOwnership]=useState('all'),[championType,setChampionType]=useState('all'),[elementFilter,setElementFilter]=useState('all'),[detailTab,setDetailTab]=useState('identity'),[guideHero,setGuideHero]=useState(null),[resonanceHero,setResonanceHero]=useState(null),[autoHero,setAutoHero]=useState(null);
@@ -36,6 +37,7 @@ export default function HeroesPage({squad=false}){
   const guide=championGuide(hero);
   const personalFragments=Number(progress.soulFragments||0);
   const resonance=getResonanceStatus(hero);
+  const empreintes=getEmpreinteStatus(hero);
   const resonanceIV=resonanceIdentityBonus(hero);
 
   const evolve=()=>setEvolutionMessage(evolveHero(hero.id));
@@ -88,7 +90,8 @@ export default function HeroesPage({squad=false}){
       </div>
 
       <section className="champion-quick-info"><div><small>STATISTIQUES</small><b>❤️ {isOwned?stats(hero).hp:hero.hp}</b><b>⚔️ {isOwned?stats(hero).atk:hero.atk}</b><b>🛡️ {isOwned?stats(hero).def:hero.def}</b><b>⚡ {isOwned?stats(hero).spd:hero.spd}</b></div><div><small>PROGRESSION</small><b>Niveau {isOwned?progress.level:1}/{cap}</b><b>✦ Résonance {progress.resonance}/5</b><b>🧩 {personalFragments} fragment{personalFragments>1?'s':''}</b><b>⭐ {isOwned?progress.stars:hero.rarity}★</b></div><div><small>COMPÉTENCES</small>{hero.skills.map((skill,index)=><button key={skill.name} onClick={()=>setDetailTab('skills')} title={skill.name}>{skill.icon} <span>{skill.name}</span><em>Niv. {getSkillInfo(hero,index).level}</em></button>)}</div></section>
-      <div className="champion-detail-tabs" role="tablist" aria-label="Informations du champion"><button type="button" role="tab" aria-selected={detailTab==='identity'} className={detailTab==='identity'?'active':''} onClick={()=>setDetailTab('identity')}>Identité</button><button type="button" role="tab" aria-selected={detailTab==='stats'} className={detailTab==='stats'?'active':''} onClick={()=>setDetailTab('stats')}>Statistiques</button><button type="button" role="tab" aria-selected={detailTab==='progress'} className={detailTab==='progress'?'active':''} onClick={()=>setDetailTab('progress')}>Progression</button><button type="button" role="tab" aria-selected={detailTab==='skills'} className={detailTab==='skills'?'active':''} onClick={()=>setDetailTab('skills')}>Compétences</button></div>
+      <div className="champion-detail-tabs" role="tablist" aria-label="Informations du champion"><button type="button" role="tab" aria-selected={detailTab==='identity'} className={detailTab==='identity'?'active':''} onClick={()=>setDetailTab('identity')}>Identité</button><button type="button" role="tab" aria-selected={detailTab==='stats'} className={detailTab==='stats'?'active':''} onClick={()=>setDetailTab('stats')}>Statistiques</button><button type="button" role="tab" aria-selected={detailTab==='progress'} className={detailTab==='progress'?'active':''} onClick={()=>setDetailTab('progress')}>Progression</button>
+        <button className={detailTab==='empreintes'?'selected':''} onClick={()=>setDetailTab('empreintes')}>Empreintes</button><button type="button" role="tab" aria-selected={detailTab==='skills'} className={detailTab==='skills'?'active':''} onClick={()=>setDetailTab('skills')}>Compétences</button></div>
       <div className={`champion-tab-panel ${detailTab==='progress'?'visible':''}`}>
       {isOwned&&<div className="xp-panel">
         <div>
@@ -105,9 +108,41 @@ export default function HeroesPage({squad=false}){
 
       {isOwned&&<div className="champion-growth-grid">
         <article className={`ascension-panel ${evolution.canEvolve?'evolution-ready':''}`}><header><div><small>ASCENSION</small><h3>{evolution.maxStars?'Rang maximum':`${progress.stars}★ → ${progress.stars+1}★`}</h3></div><span>⭐</span></header>{evolution.maxStars?<p>Ce champion a atteint le rang maximal 6★.</p>:<><div className="growth-requirements"><span className={evolution.levelReady?'ready':'missing'}>{evolution.levelReady?'✓':'🔒'} Niveau {evolution.maxLevel}</span><span className={gold>=evolution.cost.gold?'ready':'missing'}>🪙 {gold.toLocaleString('fr-FR')} / {evolution.cost.gold.toLocaleString('fr-FR')}</span>{evolution.cost.minor>0&&<span className={ascensionEssences.minor>=evolution.cost.minor?'ready':'missing'}>🔹 {ascensionEssences.minor} / {evolution.cost.minor}</span>}{evolution.cost.major>0&&<span className={ascensionEssences.major>=evolution.cost.major?'ready':'missing'}>🔷 {ascensionEssences.major} / {evolution.cost.major}</span>}{evolution.cost.mythic>0&&<span className={ascensionEssences.mythic>=evolution.cost.mythic?'ready':'missing'}>💠 {ascensionEssences.mythic} / {evolution.cost.mythic}</span>}</div><button disabled={!evolution.canEvolve} onClick={evolve}>{evolution.canEvolve?'⭐ Faire l’Ascension':`Préparer l’Ascension ${progress.stars}★`}</button><small>Les doublons ne sont pas requis. Le champion revient au niveau 1, mais conserve ses compétences, son équipement et sa Résonance.</small></>}</article>
-        <article className={`resonance-panel resonance-${progress.resonance}`}><header><div><small>DOUBLONS</small><h3>Résonance {progress.resonance}/5</h3></div><span>✦</span></header><p>🧩 Fragments d’âme disponibles : <b>{personalFragments}</b></p>{resonance.maxed?<><strong>Résonance maximale</strong><p>Les prochains doublons seront convertis en Fragments de sang.</p><button className="open-constellation-button perfect" onClick={()=>setResonanceHero(hero)}>✦ Admirer la constellation</button></>:<><div className="resonance-next"><small>Prochain niveau</small><b>{resonance.required} Fragment{resonance.required>1?'s':''} requis</b><p>{resonance.next===1?'+2 % PV, ATQ et DEF':resonance.next===2?'+3 Vitesse':resonance.next===3?'+3 % Précision et Résistance':resonance.next===4?resonanceIV:'+2 % PV, ATQ et DEF et prestige maximal'}</p></div><button className="open-constellation-button" onClick={()=>setResonanceHero(hero)}>✦ Ouvrir la constellation</button></>}{evolutionMessage&&<p className={evolutionMessage.ok?'evolution-success':'evolution-error'}>{evolutionMessage.message}</p>}</article>
+        <article className={`resonance-panel resonance-${progress.resonance}`}><header><div><small>DOUBLONS</small><h3>Résonance {progress.resonance}/5</h3></div><span>✦</span></header><p>🧩 Fragments d’âme disponibles : <b>{personalFragments}</b></p>{resonance.maxed?<><strong>Résonance maximale</strong><p>Les prochains doublons seront convertis en Fragments de sang.</p><button className="open-constellation-button perfect" onClick={()=>setResonanceHero(hero)}>✦ Admirer la constellation</button></>:<><div className="resonance-next"><small>Prochain niveau</small><b>{resonance.required} Fragment{resonance.required>1?'s':''} requis</b><p>{resonance.next===1?'+2 % PV, ATQ et DEF':resonance.next===2?'+3 Vitesse':resonance.next===3?'+3 % Précision et Résistance':resonance.next===4?resonanceIV:'+2 % PV, ATQ et DEF et prestige maximal'}</p><p className="resonance-empreinte-note">{RESONANCE_POINT_TIERS.includes(resonance.next)?'✦ Et un point d’Empreinte supplémentaire.':`✦ Et ouvre l’étage ${['I','II','III','IV'][ETAGE_RESONANCE.indexOf(resonance.next)]} de l’arbre d’Empreintes.`}</p></div><button className="open-constellation-button" onClick={()=>setResonanceHero(hero)}>✦ Ouvrir la constellation</button></>}{evolutionMessage&&<p className={evolutionMessage.ok?'evolution-success':'evolution-error'}>{evolutionMessage.message}</p>}</article>
       </div>}
 
+      </div>
+      <div className={`champion-tab-panel ${detailTab==='empreintes'?'visible':''}`}>
+        <section className="empreintes-panel">
+          <header className="empreintes-heading">
+            <div><small>ARBRE D’EMPREINTES</small><h3>{empreintes.depenses}/{empreintes.points} gravées</h3>
+              <p>Le budget n’atteint jamais l’arbre entier : {empreintes.arbre.length} nœuds pour {empreintes.points} point{empreintes.points>1?'s':''}. On ne renforce pas un champion, on le spécialise.</p></div>
+            <div className="empreintes-meta">
+              <span>⭐ {progress.stars}★ · {progress.stars-2} point{progress.stars-2>1?'s':''}</span>
+              <span>✦ Résonance {progress.resonance} · étages I–{['I','II','III','IV'][empreintes.profondeur-1]}</span>
+              {empreintes.depenses>0&&<button className="secondary" onClick={()=>setEmpreinteMessage(resetEmpreintes(hero.id))}>Tout effacer</button>}
+            </div>
+          </header>
+          <div className="empreintes-grid">
+            {BRANCHES.map(branche=><article key={branche.id} className={`empreinte-branche branche-${branche.id}`}>
+              <header><span>{branche.icon}</span><div><b>{branche.name}</b><small>{branche.summary}</small></div></header>
+              {empreintes.noeuds.filter(noeud=>noeud.branche===branche.id).map(noeud=>
+                <button key={noeud.id} type="button"
+                  className={`empreinte-noeud ${noeud.allume?'allume':''} ${noeud.disponible?'disponible':''} ${!noeud.etageOuvert?'verrouille':''}`}
+                  disabled={!noeud.disponible}
+                  onClick={()=>setEmpreinteMessage(lightEmpreinte(hero.id,noeud.id))}>
+                  <span className="empreinte-etage">{['I','II','III','IV'][noeud.etage-1]}</span>
+                  <span className="empreinte-icone">{noeud.etageOuvert?noeud.icon:'🔒'}</span>
+                  <span className="empreinte-corps"><b>{noeud.name}</b><small>{noeud.detail}</small>
+                    {!noeud.etageOuvert&&<em>Résonance {ETAGE_RESONANCE[noeud.etage-1]} requise</em>}
+                    {noeud.etageOuvert&&!noeud.precedent&&!noeud.allume&&<em>Grave l’étage précédent</em>}
+                  </span>
+                  {noeud.allume&&<span className="empreinte-marque">✦</span>}
+                </button>)}
+            </article>)}
+          </div>
+          {empreinteMessage&&<p className={empreinteMessage.ok?'evolution-success':'evolution-error'}>{empreinteMessage.message}</p>}
+        </section>
       </div>
       <div className={`champion-tab-panel ${detailTab==='identity'?'visible':''}`}>
       <section className="champion-identity-panel roster-identity" style={{'--element-color':heroElement.color}}><div className="identity-title"><span>{identity.icon}</span><div><small>MÉCANIQUE DISTINCTIVE</small><h3>{identity.title}</h3><em className={`complexity complexity-${guide.complexity}`}>{complexityLabel(guide.complexity)}</em></div></div><p>{identity.summary}</p><div className="identity-grid roster-grid"><div><small>RÔLE PRINCIPAL</small><b>{guide.primaryRole}</b></div><div><small>RÔLE SECONDAIRE</small><b>{guide.secondaryRole}</b></div><div><small>NICHE</small><b>{guide.niche}</b></div><div><small>SITUATION IDÉALE</small><b>{guide.ideal}</b></div><div><small>LIMITE RÉELLE</small><b>{guide.limitation}</b></div><div><small>STUFF CONSEILLÉ</small><b>{guide.priorityStats.join(' · ')}</b></div></div><button className="gameplay-guide-button" onClick={()=>setGuideHero(hero)}>ⓘ Comprendre le gameplay</button></section>

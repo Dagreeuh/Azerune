@@ -426,8 +426,17 @@ export function performAutoAction(battle,priorities={}){
   return castSkill(battle,index,target?.id||actor.id);
 }
 
+// Les Empreintes n'ont pas de mecanique de combat propre : elles s'ajoutent aux
+// bonus de maitrise deja lus partout dans castSkill. Un seul point de jonction,
+// donc aucune surface de bug nouvelle dans le moteur — et la reduction de
+// recharge reste bornee a un tour par le calcul existant.
+const withEmpreintes=(mastery,bonus)=>bonus
+ ?{power:mastery.power+(bonus.power||0),effectRate:mastery.effectRate+(bonus.effectRate||0),
+   duration:mastery.duration+(bonus.duration||0),cooldown:mastery.cooldown+(bonus.cooldown||0)}
+ :mastery;
+
 export function castSkill(battle,index,targetId){
-  const original=battle.allies.find(unit=>unit.id===battle.turn),skill=original?.skills[index],mastery=skillBonuses(index,original?.skillLevels?.[index]||1,skill);
+  const original=battle.allies.find(unit=>unit.id===battle.turn),skill=original?.skills[index],mastery=withEmpreintes(skillBonuses(index,original?.skillLevels?.[index]||1,skill),original?.empreinteSkills?.[index]);
   if(!original||!skill||original.cooldowns[index]>0)return{battle,error:'Action impossible'};
   if(index===2&&original.rarity===3&&(original.currentStars||3)<4&&!battle?.tutorialBattle?.enabled)return{battle,error:'Cette compétence se débloque à l’évolution 4★.'};
   if(original.skip)return{battle:finish(battle,original.id,`${original.name} est étourdi et passe son tour.`)};

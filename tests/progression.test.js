@@ -51,7 +51,7 @@ describe('plafond de niveau',()=>{
 
 describe('normalizeChampionProgress',()=>{
   it('part des etoiles de rarete pour un champion neuf',()=>{
-    expect(defaultChampionProgress(hero(4))).toEqual({level:1,xp:0,stars:4,soulFragments:0,resonance:0});
+    expect(defaultChampionProgress(hero(4))).toEqual({level:1,xp:0,stars:4,soulFragments:0,resonance:0,empreintes:[]});
   });
 
   it('ne descend jamais sous la rarete du champion',()=>{
@@ -80,11 +80,17 @@ describe('normalizeChampionProgress',()=>{
   // statistiques du champion et la puissance d'equipe.
   it('ne propage jamais NaN, quelle que soit la valeur recue',()=>{
     const mauvaises=[{stars:'abc'},{stars:NaN},{level:'x'},{xp:'y'},{resonance:'z'},
-      {soulFragments:'w'},{stars:{}},{level:[]},{xp:Infinity},undefined,null];
+      {soulFragments:'w'},{stars:{}},{level:[]},{xp:Infinity},undefined,null,
+      {empreintes:'oui'},{empreintes:{}},{empreintes:[1,null,'1:force:1']},{empreintes:NaN}];
     mauvaises.forEach(valeur=>{
       const resultat=normalizeChampionProgress(hero(3),valeur);
-      Object.entries(resultat).forEach(([cle,nombre])=>
+      const{empreintes,...nombres}=resultat;
+      Object.entries(nombres).forEach(([cle,nombre])=>
         expect(Number.isFinite(nombre),`${cle} pour ${JSON.stringify(valeur)}`).toBe(true));
+      // Les Empreintes sont le seul champ non numerique : elles doivent toujours
+      // sortir sous forme de tableau de chaines, jamais undefined ni pollue.
+      expect(Array.isArray(empreintes),`empreintes pour ${JSON.stringify(valeur)}`).toBe(true);
+      empreintes.forEach(id=>expect(typeof id).toBe('string'));
       expect(resultat.stars).toBe(3);
     });
   });
