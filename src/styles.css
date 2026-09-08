@@ -870,3 +870,12 @@
 .tooltip-affinity>em{display:block;margin-top:4px;color:#64748b;font-size:8px;font-style:normal}
 .champion-resource.malvek-virulence.active{border-color:#84cc16;box-shadow:0 0 12px #84cc1644}
 .champion-resource.sivrane-frost.active{border-color:#38bdf8;box-shadow:0 0 12px #38bdf844}
+
+/* Balayage : une mission maitrisee se recolte sans combat. */
+.sweep-button{background:linear-gradient(135deg,#334155,#1e293b);border:1px solid #475569;color:#e2e8f0;}
+.sweep-button:hover{border-color:#94a3b8;}
+.sweep-report .sweep-lines{display:grid;gap:.35rem;margin:.75rem 0;}
+.sweep-report .sweep-lines p{margin:0;font-weight:600;}
+/* Vitesse du combat automatique. */
+.battle-speed-toggle{background:linear-gradient(135deg,#1e293b,#0f172a);border:1px solid #475569;color:#e2e8f0;font-weight:700;}
+.battle-speed-toggle:hover{border-color:#38bdf8;}
