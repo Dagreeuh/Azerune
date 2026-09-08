@@ -64,6 +64,11 @@ export default function BattlePage({setPage}){
  // l'avertissement « Cannot update a component while rendering another ».
  const toggleVfx=()=>{const next=!vfxEnabled;writeCombatPref(!next);setVfxEnabled(next)};const[mission]=useState(()=>battleSession?.mission||activeMission);const enemyActionLock=useRef(false),enemyTurnStartedAt=useRef(0),enemyTurnKey=useRef(null),autoActionLock=useRef(false),autoGeneration=useRef(0),rewardFinalizeLock=useRef(false),battleRef=useRef(battle),battleHeartbeat=useRef({key:'',changedAt:Date.now(),recoveries:0});
  useEffect(()=>{if(!affinityOpen)return;const close=event=>event.key==='Escape'&&setAffinityOpen(false);window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[affinityOpen]);
+ // `battleRef` — deja declaree plus haut et tenue a jour par l'effet de
+ // surveillance — porte le dernier combat COMMITE. Elle remplace la lecture de
+ // `current` a l'interieur des updaters : React peut rejouer un updater pendant
+ // un rendu, et le moteur de combat n'y survit pas — l'action serait recalculee,
+ // avec ses tirages aleatoires, puis jetee.
  const setBattle=value=>setBattleState(value);const setTarget=value=>setTargetState(value);const setMissionReward=value=>setMissionRewardState(value);
  useEffect(()=>{if(!battleSession)return;updateBattleSession({battle,target,missionReward})},[battle,target,missionReward]);
  const start=()=>{rewardFinalizeLock.current=false;enemyActionLock.current=false;autoActionLock.current=false;enemyTurnKey.current=null;autoGeneration.current+=1;setReportOpen(false);setVisualEvents([]);const battleHeroes=HEROES.map(hero=>({...hero,currentStars:getProgress(hero).stars,skillLevels:skillLevels[hero.id]||{},empreinteSkills:empreinteBonuses(hero,getProgress(hero).empreintes).skills,uniqueWeapon:getUniqueWeaponForHero(hero)}));setBattle(createBattle(battleSession?.team||team,battleHeroes,stats,{enemies:mission?mission.enemies:undefined,enemyScale:mission?.scale||1,raid:mission?.raid?{...mission.raidData,level:mission.raidLevel}:null,mythic:mission?.mythic?{level:mission.mythicLevel,season:mission.mythicSeason,turnBudget:mission.turnBudget}:null,waves:mission?.waves,affixIds:mission?.affixIds}));setTarget(null);setError('');setMissionReward(null);setKeyboardSkill(null)};
@@ -124,10 +129,30 @@ export default function BattlePage({setPage}){
  },[battle?.turn,battle?.winner]);
  const toggleAuto=()=>{autoGeneration.current+=1;autoActionLock.current=false;enemyActionLock.current=false;setBattle(current=>{if(!current||current.winner)return current;const enabling=!current.autoMode;let next={...current,autoMode:enabling};if(enabling&&!next.turn){try{next=nextTurn(next)}catch(error){console.error('Activation AUTO interrompue',error);return{...next,autoMode:false,turn:null,log:['AUTO indisponible : initialisation du premier tour impossible.',...(next.log||[])].slice(0,16)}}}return next});setError('');setKeyboardSkill(null)};
  useEffect(()=>{
-   const turn=battle?.turn;if(battle?.autoMode&&!battle?.winner&&!turn){autoActionLock.current=false;setBattle(current=>{if(!current?.autoMode||current.winner||current.turn)return current;try{return nextTurn(current)}catch(error){console.error('Boucle AUTO initiale interrompue',error);return{...current,autoMode:false,turn:null,log:['AUTO désactivé : impossible de déterminer le premier acteur.',...(current.log||[])].slice(0,16)}}});return;}const active=battle?.autoMode&&!battle?.winner&&turn&&!String(turn).startsWith('e');
+   const turn=battle?.turn;if(battle?.autoMode&&!battle?.winner&&!turn){
+     autoActionLock.current=false;
+     const courant=battleRef.current;
+     if(!courant?.autoMode||courant.winner||courant.turn)return;
+     try{setBattle(nextTurn(courant))}
+     catch(error){console.error('Boucle AUTO initiale interrompue',error);
+       setBattle({...courant,autoMode:false,turn:null,log:['AUTO désactivé : impossible de déterminer le premier acteur.',...(courant.log||[])].slice(0,16)})}
+     return;}const active=battle?.autoMode&&!battle?.winner&&turn&&!String(turn).startsWith('e');
    if(!active){autoActionLock.current=false;return;}
    const generation=autoGeneration.current;let disposed=false;
-   const timer=window.setTimeout(()=>{if(disposed||generation!==autoGeneration.current||autoActionLock.current)return;autoActionLock.current=true;setBattle(current=>{if(disposed||generation!==autoGeneration.current||!current?.autoMode||current.winner||current.turn!==turn)return current;try{const result=performAutoAction(current,autoSkillPriorities);if(result.error)return{...current,autoMode:false,log:[`AUTO interrompu : ${result.error}`,...(current.log||[])].slice(0,16)};progress('skills');return result.battle}catch(error){console.error('Action AUTO interrompue',error);return{...current,autoMode:false,turn:null,log:['AUTO interrompu par sécurité.',...(current.log||[])].slice(0,16)}}});window.setTimeout(()=>{autoActionLock.current=false},100)},560);
+   const timer=window.setTimeout(()=>{if(disposed||generation!==autoGeneration.current||autoActionLock.current)return;autoActionLock.current=true;
+     const courant=battleRef.current;
+     // Les memes gardes qu'avant, mais lues sur l'etat commite plutot que dans
+     // un updater : l'action du moteur n'est jouee qu'une fois, et
+     // `progress('skills')` — un setState de GameProvider — ne part plus
+     // pendant le rendu de cette page.
+     if(!disposed&&generation===autoGeneration.current&&courant?.autoMode&&!courant.winner&&courant.turn===turn){
+       try{
+         const result=performAutoAction(courant,autoSkillPriorities);
+         if(result.error)setBattle({...courant,autoMode:false,log:[`AUTO interrompu : ${result.error}`,...(courant.log||[])].slice(0,16)});
+         else{progress('skills');setBattle(result.battle)}
+       }catch(error){console.error('Action AUTO interrompue',error);
+         setBattle({...courant,autoMode:false,turn:null,log:['AUTO interrompu par sécurité.',...(courant.log||[])].slice(0,16)})}
+     }window.setTimeout(()=>{autoActionLock.current=false},100)},560);
    return()=>{disposed=true;window.clearTimeout(timer)};
  },[battle?.turn,battle?.winner,battle?.autoMode,autoSkillPriorities]);
  useEffect(()=>{
