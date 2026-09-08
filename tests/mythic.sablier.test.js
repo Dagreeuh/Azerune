@@ -409,7 +409,13 @@ describe('contrat de cablage — le Sablier atteint bien le joueur',()=>{
   });
 
   it('BattlePage transmet le budget de la mission au moteur',()=>{
-    expect(pageCombat).toContain('turnBudget:mission.turnBudget');
+    // La construction des options de combat est partagee avec la simulation
+    // d'avant-combat, pour que l'estimation joue exactement le meme combat.
+    expect(pageCombat,'BattlePage ne passe plus par les options partagées')
+      .toContain('createBattle(battleSession?.team||team,battleHeroes,stats,optionsDeCombat(mission))');
+    const simulation=fs.readFileSync(fileURLToPath(new URL('../src/utils/simulation.js',import.meta.url)),'utf8');
+    expect(simulation,'le budget du Sablier ne parvient plus au moteur')
+      .toContain('turnBudget:mission.turnBudget');
   });
 
   it('le sablier restant est affiche pendant le combat',()=>{

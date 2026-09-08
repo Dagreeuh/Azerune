@@ -3,6 +3,7 @@ import{useGame}from'../store/GameContext';
 import{Bar}from'../components/Cards';
 import ChampionGuideModal from'../components/ChampionGuideModal';
 import{createBattle,nextTurn,enemyAction,castSkill,advanceMythicWave,performAutoAction,chooseAutoEnemyTarget}from'../battle/engine';
+import{optionsDeCombat}from'../utils/simulation';
 import{affinity,areaAffinity,elementMeta}from'../utils/elements';
 import{championIdentity}from'../data/championIdentities'; import{skillMechanic,skillPowerLabel,skillMaxLevel}from'../utils/skills';
 import{CONTINENTS,DIFFICULTIES,createMission}from'../data/campaign';
@@ -106,7 +107,7 @@ export default function BattlePage({setPage}){
  // avec ses tirages aleatoires, puis jetee.
  const setBattle=value=>setBattleState(value);const setTarget=value=>setTargetState(value);const setMissionReward=value=>setMissionRewardState(value);
  useEffect(()=>{if(!battleSession)return;updateBattleSession({battle,target,missionReward})},[battle,target,missionReward]);
- const start=()=>{rewardFinalizeLock.current=false;enemyActionLock.current=false;autoActionLock.current=false;enemyTurnKey.current=null;autoGeneration.current+=1;setReportOpen(false);setVisualEvents([]);const battleHeroes=HEROES.map(hero=>({...hero,currentStars:getProgress(hero).stars,skillLevels:skillLevels[hero.id]||{},empreinteSkills:empreinteBonuses(hero,getProgress(hero).empreintes).skills,uniqueWeapon:getUniqueWeaponForHero(hero)}));setBattle(createBattle(battleSession?.team||team,battleHeroes,stats,{enemies:mission?mission.enemies:undefined,enemyScale:mission?.scale||1,raid:mission?.raid?{...mission.raidData,level:mission.raidLevel}:null,mythic:mission?.mythic?{level:mission.mythicLevel,season:mission.mythicSeason,turnBudget:mission.turnBudget}:null,waves:mission?.waves,affixIds:mission?.affixIds}));setTarget(null);setError('');setMissionReward(null);setKeyboardSkill(null)};
+ const start=()=>{rewardFinalizeLock.current=false;enemyActionLock.current=false;autoActionLock.current=false;enemyTurnKey.current=null;autoGeneration.current+=1;setReportOpen(false);setVisualEvents([]);const battleHeroes=HEROES.map(hero=>({...hero,currentStars:getProgress(hero).stars,skillLevels:skillLevels[hero.id]||{},empreinteSkills:empreinteBonuses(hero,getProgress(hero).empreintes).skills,uniqueWeapon:getUniqueWeaponForHero(hero)}));setBattle(createBattle(battleSession?.team||team,battleHeroes,stats,optionsDeCombat(mission)));setTarget(null);setError('');setMissionReward(null);setKeyboardSkill(null)};
  useEffect(()=>{if(mission&&!battle)start()},[]);
  useEffect(()=>{battleRef.current=battle;const key=battle?`${battle.turn||'none'}|${battle.winner||'none'}|${battle.eventSeq||0}|${battle.wave||1}|${battle.log?.[0]||''}`:'empty';if(battleHeartbeat.current.key!==key)battleHeartbeat.current={...battleHeartbeat.current,key,changedAt:Date.now()};},[battle]);
  useEffect(()=>{if(!battle||battle.winner||battle.turn)return;setBattle(current=>{if(!current||current.winner||current.turn)return current;try{return nextTurn(current)}catch(error){console.error('Relance du tour interrompue',error);return{...current,turn:null,autoMode:false,log:['Watchdog : calcul du prochain tour interrompu, nouvelle tentative.',...(current.log||[])].slice(0,16)}}})},[battle?.turn,battle?.winner,battle?.eventSeq]);
