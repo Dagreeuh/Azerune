@@ -47,7 +47,9 @@ export function defiDeLaSemaine(date=new Date()){
   const semaine=cleSemaine(date),tirer=suite(graineDepuis(semaine));
   const melange=[...ADVERSAIRES].sort(()=>tirer()-.5);
   const chef=melange[0],escorte=melange.slice(1,3);
-  const echelle=1+tirer()*.5;
+  // Calibre pour rester à portée d'un joueur de milieu de campagne : le défi
+  // se joue entre amis de niveaux différents, pas entre optimisateurs.
+  const echelle=.55+tirer()*.25;
   const unite=(source,role)=>({id:`defi-${source.id}-${role}`,name:source.name,icon:source.icon,
     element:source.element,accuracy:35,resistance:35,bossUnit:role==='chef',
     hp:Math.round(source.hp*echelle*(role==='chef'?1.9:1)),
@@ -60,7 +62,7 @@ export function defiDeLaSemaine(date=new Date()){
     name:`${TITRES[graineDepuis(semaine)%TITRES.length]} · ${semaine}`,
     continentName:'Défi de la semaine',difficultyName:'Entre amis',
     icon:chef.icon,enemies,scale:1,recommended,
-    description:'La même rencontre pour tout le monde pendant sept jours. Le score est le nombre d’actions dépensées : le plus bas gagne.'};
+    description:'La même rencontre pour tout le monde pendant sept jours. Le score est la part des points de vie arrachés : à égalité parfaite, le moins d’actions l’emporte.'};
 }
 
 /* ---- Codes de partage ------------------------------------------------- */
@@ -72,11 +74,27 @@ const controle=texte=>{let somme=0;for(let i=0;i<texte.length;i+=1)somme=(somme*
 const enBase64=texte=>btoa(unescape(encodeURIComponent(texte)));
 const deBase64=texte=>decodeURIComponent(escape(atob(texte)));
 
+/**
+ * Comparaison de deux tentatives. La part de PV arrachés d'abord — c'est ce
+ * qui permet à un joueur de début de campagne de participer quand même — puis
+ * le nombre d'actions à égalité parfaite.
+ *
+ * Renvoie un nombre négatif si `a` est meilleure, positif si `b` l'est.
+ */
+export function comparerTentatives(a,b){
+  if(!a)return b?1:0;
+  if(!b)return -1;
+  const pa=Number(a.part)||0,pb=Number(b.part)||0;
+  if(pa!==pb)return pb-pa;
+  return(Number(a.actions)||0)-(Number(b.actions)||0);
+}
+
 /** Code court à envoyer à ses amis. */
-export function encoderDefi({semaine,nom,actions,puissance}){
+export function encoderDefi({semaine,nom,actions,part,puissance}){
   if(!semaine||!Number.isFinite(Number(actions)))return null;
   const charge=[semaine,String(nom||'Invocateur').slice(0,20).replace(/\|/g,' '),
-    Math.max(0,Math.round(Number(actions))),Math.max(0,Math.round(Number(puissance)||0))].join('|');
+    Math.max(0,Math.round(Number(actions))),Math.max(0,Math.round(Number(puissance)||0)),
+    Math.max(0,Math.min(100,Math.round(Number(part)||0)))].join('|');
   const corps=enBase64(charge).replace(/=+$/,'');
   return `AZ-${corps}-${controle(corps)}`;
 }
@@ -89,8 +107,9 @@ export function lireDefi(code){
   const[,corps,somme]=parties;
   if(controle(corps)!==somme.toUpperCase())return null;
   try{
-    const[semaine,nom,actions,puissance]=deBase64(corps).split('|');
+    const[semaine,nom,actions,puissance,part]=deBase64(corps).split('|');
     if(!semaine||!actions)return null;
-    return{semaine,nom,actions:Number(actions),puissance:Number(puissance)||0,brut:propre};
+    return{semaine,nom,actions:Number(actions),puissance:Number(puissance)||0,
+      part:Math.max(0,Math.min(100,Number(part)||0)),brut:propre};
   }catch{return null}
 }

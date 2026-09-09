@@ -15,7 +15,7 @@ import{canRefreshShop,canUnlockSlot,canBuyOffer,refreshCost as shopRefreshCostFo
 import{itemSellValue as computeSellValue,disposalBlock}from'../utils/inventory'
 import{advanceQuestProgress,canClaimQuest,canClaimChest}from'../utils/quests'
 import{simulerMission,verdictSimule}from'../utils/simulation';
-import{defiDeLaSemaine,cleSemaine,encoderDefi,lireDefi}from'../data/defi';
+import{defiDeLaSemaine,cleSemaine,encoderDefi,lireDefi,comparerTentatives}from'../data/defi';
 import{campaignLootRate,campaignStoneChance,campaignStoneCapped,CAMPAIGN_STONE_DAILY_LIMIT,campaignBaseXp,campaignFarmGold,campaignMissionRewards,campaignProgressionGift,raidQualityBonus,raidBonusLootAllowed,RAID_BONUS_LOOT_CHANCE,raidRelicChance,expeditionGearChance,expeditionRewardAmount}from'../utils/rewards'
 import{totalStats,progressionStats as championProgressionStats,championPower,teamPower,missionDifficulty,campaignXp,calibratedEncounterPower,assessTeamForMission}from'../utils/stats';
 import{addChampionXp,defaultChampionProgress,evolveFromDuplicate,normalizeChampionProgress,normalizeResonanceOverflow,evolutionStatus,evolveChampion,resonanceStatus,strengthenResonance}from'../utils/progression';
@@ -192,19 +192,25 @@ export function GameProvider({children}){
    * le plus bas gagne, et seul le meilleur de la semaine est conservé.
    */
   const finishDefiMission=(mission,battle)=>{
-    const gagne=battle?.winner==='ally';
     const actions=Math.max(1,Number(battle?.actionSeq)||Number(battle?.eventSeq)||1);
-    const ancien=defiRecords[mission.semaine]||null;
-    const record=gagne&&(!ancien||actions<ancien.actions);
-    if(record)setDefiRecords(current=>({...current,[mission.semaine]:{actions,
+    const ennemis=battle?.enemies||[];
+    const total=ennemis.reduce((somme,u)=>somme+(Number(u.maxHp)||0),0);
+    const restant=ennemis.reduce((somme,u)=>somme+Math.max(0,Number(u.hp)||0),0);
+    const part=total?Math.round(100*(total-restant)/total):0;
+    const tentative={part,actions,
       puissance:Math.round(teamPower(team,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory))),
-      date:day()}}));
-    const gold=gagne?900:0;if(gold)setGold(value=>value+gold);
-    return{defi:true,gagne,actions,record,meilleur:record?actions:(ancien?.actions??null),gold,gems:0,stones:0,improved:record};
+      date:day()};
+    const ancien=defiRecords[mission.semaine]||null;
+    const record=comparerTentatives(tentative,ancien)<0;
+    if(record)setDefiRecords(current=>({...current,[mission.semaine]:tentative}));
+    const gold=Math.round(9*part);if(gold)setGold(value=>value+gold);
+    return{defi:true,gagne:part>=100,part,actions,record,
+      meilleur:record?tentative:ancien,gold,gems:0,stones:0,improved:record};
   };
   /** Code à envoyer à ses amis, ou null tant qu'on n'a pas fini le défi. */
   const defiCode=()=>defiRecord?encoderDefi({semaine:defiMission.semaine,
-    nom:summonerProfile?.name,actions:defiRecord.actions,puissance:defiRecord.puissance}):null;
+    nom:summonerProfile?.name,actions:defiRecord.actions,part:defiRecord.part,
+    puissance:defiRecord.puissance}):null;
   /**
    * Lecture du code d'un ami. On refuse une autre semaine plutôt que de
    * comparer deux rencontres différentes.
@@ -213,10 +219,15 @@ export function GameProvider({children}){
     const lu=lireDefi(code);
     if(!lu)return{ok:false,raison:'Code illisible ou abîmé.'};
     if(lu.semaine!==defiMission.semaine)return{ok:false,raison:`Ce code est celui de la semaine ${lu.semaine}, pas de la tienne.`};
-    if(!defiRecord)return{ok:true,ami:lu,moi:null,verdict:'Termine d’abord le défi pour te comparer.'};
-    const ecart=defiRecord.actions-lu.actions;
-    return{ok:true,ami:lu,moi:defiRecord,ecart,
-      verdict:ecart<0?`Tu mènes de ${-ecart} action(s).`:ecart>0?`${lu.nom} mène de ${ecart} action(s).`:'Égalité parfaite.'};
+    if(!defiRecord)return{ok:true,ami:lu,moi:null,verdict:'Tente d’abord le défi pour te comparer.'};
+    const verdictComparaison=comparerTentatives(defiRecord,lu);
+    const memePart=defiRecord.part===lu.part;
+    return{ok:true,ami:lu,moi:defiRecord,
+      verdict:verdictComparaison<0
+        ?(memePart?`Tu mènes de ${lu.actions-defiRecord.actions} action(s).`:`Tu mènes : ${defiRecord.part} % contre ${lu.part} %.`)
+        :verdictComparaison>0
+        ?(memePart?`${lu.nom} mène de ${defiRecord.actions-lu.actions} action(s).`:`${lu.nom} mène : ${lu.part} % contre ${defiRecord.part} %.`)
+        :'Égalité parfaite.'};
   };
   const requestMissionStart=mission=>{
     if(battleInProgress){setPendingMission(mission);return{ok:false,blocked:true,message:'Un combat est déjà en cours.'};}

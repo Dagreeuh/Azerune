@@ -901,3 +901,22 @@
 .estimate-result.serre{border-color:#fbbf24;} .estimate-result.defavorable{border-color:#fb923c;}
 .estimate-result.perdu{border-color:#ef4444;}
 .estimate-failed{color:#94a3b8;font-size:.85rem;margin:0;}
+
+/* Défi de la semaine — la première fonctionnalité sociale du jeu. */
+.defi-card{border:1px solid #4338ca;border-radius:.9rem;padding:1rem;background:linear-gradient(160deg,#1e1b4b,#0f172a);display:grid;gap:.7rem;margin-bottom:1rem;}
+.defi-heading{display:flex;gap:.8rem;align-items:flex-start;}
+.defi-icon{font-size:2rem;line-height:1;}
+.defi-heading small{color:#a5b4fc;letter-spacing:.06em;font-weight:700;}
+.defi-heading h2{margin:.15rem 0;font-size:1.05rem;}
+.defi-heading p{margin:0;color:#94a3b8;font-size:.82rem;}
+.defi-etat{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:.88rem;}
+.defi-etat span{color:#94a3b8;}
+.defi-launch{background:linear-gradient(135deg,#4f46e5,#312e81);border:1px solid #6366f1;color:#e0e7ff;font-weight:700;}
+.defi-partage{display:grid;gap:.35rem;background:#0b1120;border:1px solid #334155;border-radius:.6rem;padding:.55rem .7rem;}
+.defi-partage small,.defi-duel small{color:#94a3b8;letter-spacing:.05em;font-size:.7rem;font-weight:700;}
+.defi-partage code{word-break:break-all;color:#a5b4fc;font-size:.8rem;}
+.defi-duel{display:grid;gap:.35rem;}
+.defi-duel input{background:#0b1120;border:1px solid #334155;border-radius:.5rem;padding:.5rem .65rem;color:#e2e8f0;}
+.defi-resultat{border:1px solid #4338ca;border-radius:.6rem;padding:.55rem .7rem;display:grid;gap:.2rem;}
+.defi-resultat span{color:#94a3b8;font-size:.82rem;}
+.defi-erreur{color:#fca5a5;font-size:.85rem;margin:0;}
