@@ -15,6 +15,7 @@ import{canRefreshShop,canUnlockSlot,canBuyOffer,refreshCost as shopRefreshCostFo
 import{itemSellValue as computeSellValue,disposalBlock}from'../utils/inventory'
 import{advanceQuestProgress,canClaimQuest,canClaimChest}from'../utils/quests'
 import{simulerMission,verdictSimule}from'../utils/simulation';
+import{defiDeLaSemaine,cleSemaine,encoderDefi,lireDefi}from'../data/defi';
 import{campaignLootRate,campaignStoneChance,campaignStoneCapped,CAMPAIGN_STONE_DAILY_LIMIT,campaignBaseXp,campaignFarmGold,campaignMissionRewards,campaignProgressionGift,raidQualityBonus,raidBonusLootAllowed,RAID_BONUS_LOOT_CHANCE,raidRelicChance,expeditionGearChance,expeditionRewardAmount}from'../utils/rewards'
 import{totalStats,progressionStats as championProgressionStats,championPower,teamPower,missionDifficulty,campaignXp,calibratedEncounterPower,assessTeamForMission}from'../utils/stats';
 import{addChampionXp,defaultChampionProgress,evolveFromDuplicate,normalizeChampionProgress,normalizeResonanceOverflow,evolutionStatus,evolveChampion,resonanceStatus,strengthenResonance}from'../utils/progression';
@@ -129,7 +130,7 @@ export function GameProvider({children}){
   const[pendingMission,setPendingMission]=useState(null),[preparationMission,setPreparationMission]=useState(null);
   const[daily,setDaily]=useState(()=>{const value=load('azerune-save-daily',freshDaily());return value.date===day()?value:freshDaily()});
 
-  useEffect(()=>save('azerune-save',{version:29,campaignDifficultyMigrationV28:true,autoSkillPriorities,resonanceOverflowMigrated:true,legendaryChronicles,ascensionEssences,conversionHistory,mythicProgress,activeTeamSlot,teamPresets,achievementClaims,progressionStats,permanentQuests,tutorialRewardClaimed,tutorialAcademy,gems,gold,hearthstones,pityCounter,electedChampion,electedGuarantee,owned,team,equipment,inventory,history,championProgress,campaign,redeemedCodes,summonerProfile,weekly,monthly,trackedQuests,universalSoul5,masteryTomes,skillLevels,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,expeditionProgress,battleSession}),[autoSkillPriorities,legendaryChronicles,ascensionEssences,conversionHistory,mythicProgress,activeTeamSlot,teamPresets,achievementClaims,progressionStats,permanentQuests,tutorialRewardClaimed,tutorialAcademy,gems,gold,hearthstones,pityCounter,electedChampion,electedGuarantee,owned,team,equipment,inventory,history,championProgress,campaign,redeemedCodes,summonerProfile,weekly,monthly,trackedQuests,universalSoul5,masteryTomes,skillLevels,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,expeditionProgress,battleSession]);
+  useEffect(()=>save('azerune-save',{version:29,campaignDifficultyMigrationV28:true,defiRecords,autoSkillPriorities,resonanceOverflowMigrated:true,legendaryChronicles,ascensionEssences,conversionHistory,mythicProgress,activeTeamSlot,teamPresets,achievementClaims,progressionStats,permanentQuests,tutorialRewardClaimed,tutorialAcademy,gems,gold,hearthstones,pityCounter,electedChampion,electedGuarantee,owned,team,equipment,inventory,history,championProgress,campaign,redeemedCodes,summonerProfile,weekly,monthly,trackedQuests,universalSoul5,masteryTomes,skillLevels,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,expeditionProgress,battleSession}),[autoSkillPriorities,legendaryChronicles,ascensionEssences,conversionHistory,mythicProgress,activeTeamSlot,teamPresets,achievementClaims,progressionStats,permanentQuests,tutorialRewardClaimed,tutorialAcademy,gems,gold,hearthstones,pityCounter,electedChampion,electedGuarantee,owned,team,equipment,inventory,history,championProgress,campaign,redeemedCodes,summonerProfile,weekly,monthly,trackedQuests,universalSoul5,masteryTomes,skillLevels,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,expeditionProgress,battleSession]);
   useEffect(()=>save('azerune-save-daily',daily),[daily]);
   useEffect(()=>{
     const checkDailyReset=()=>{
@@ -179,6 +180,43 @@ export function GameProvider({children}){
     if(!resultat)return null;
     const bilan=assessTeamForMission(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory),mission);
     return{...resultat,...verdictSimule(resultat),manques:bilan?.gaps||[]};
+  };
+  /* ---- Défi de la semaine ------------------------------------------- */
+  // Première fonctionnalité sociale du jeu : la même rencontre pour tout le
+  // monde pendant sept jours, un score comparable, un code à s'échanger.
+  const defiMission=useMemo(()=>defiDeLaSemaine(new Date()),[]);
+  const[defiRecords,setDefiRecords]=useState(()=>stored.defiRecords||{});
+  const defiRecord=defiRecords[defiMission.semaine]||null;
+  /**
+   * Enregistre une tentative. Le score est le nombre d'actions dépensées :
+   * le plus bas gagne, et seul le meilleur de la semaine est conservé.
+   */
+  const finishDefiMission=(mission,battle)=>{
+    const gagne=battle?.winner==='ally';
+    const actions=Math.max(1,Number(battle?.actionSeq)||Number(battle?.eventSeq)||1);
+    const ancien=defiRecords[mission.semaine]||null;
+    const record=gagne&&(!ancien||actions<ancien.actions);
+    if(record)setDefiRecords(current=>({...current,[mission.semaine]:{actions,
+      puissance:Math.round(teamPower(team,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory))),
+      date:day()}}));
+    const gold=gagne?900:0;if(gold)setGold(value=>value+gold);
+    return{defi:true,gagne,actions,record,meilleur:record?actions:(ancien?.actions??null),gold,gems:0,stones:0,improved:record};
+  };
+  /** Code à envoyer à ses amis, ou null tant qu'on n'a pas fini le défi. */
+  const defiCode=()=>defiRecord?encoderDefi({semaine:defiMission.semaine,
+    nom:summonerProfile?.name,actions:defiRecord.actions,puissance:defiRecord.puissance}):null;
+  /**
+   * Lecture du code d'un ami. On refuse une autre semaine plutôt que de
+   * comparer deux rencontres différentes.
+   */
+  const comparerDefi=code=>{
+    const lu=lireDefi(code);
+    if(!lu)return{ok:false,raison:'Code illisible ou abîmé.'};
+    if(lu.semaine!==defiMission.semaine)return{ok:false,raison:`Ce code est celui de la semaine ${lu.semaine}, pas de la tienne.`};
+    if(!defiRecord)return{ok:true,ami:lu,moi:null,verdict:'Termine d’abord le défi pour te comparer.'};
+    const ecart=defiRecord.actions-lu.actions;
+    return{ok:true,ami:lu,moi:defiRecord,ecart,
+      verdict:ecart<0?`Tu mènes de ${-ecart} action(s).`:ecart>0?`${lu.nom} mène de ${ecart} action(s).`:'Égalité parfaite.'};
   };
   const requestMissionStart=mission=>{
     if(battleInProgress){setPendingMission(mission);return{ok:false,blocked:true,message:'Un combat est déjà en cours.'};}
@@ -624,7 +662,7 @@ export function GameProvider({children}){
     return{...rewards,continentClear:palier?{...palier,continentName:continent.name}:null,farm:false,loot:lootRoll.item,progressionGift,lootChance:lootRoll.lootChance,campaignStone,championXp:xpResult.xp,xpFactor:xpResult.factor,xpFarm:false};
   };
 
-  const value={HEROES,estimerMission,canSweep,sweepCampaignMission,sweepsLeft,SWEEP_DAILY_LIMIT,UNIQUE_WEAPONS,RELICS,CHRONICLE_STEPS,legendaryChronicles,grantRelic,activateRelic,addLegendaryMaterial,setChronicleStep,advanceChronicle,getChronicleStatus,LEGENDARY_MATERIALS,chronicleGrindLength,chooseUniqueOrientation,forgeUniqueWeapon,harmonizeUniqueWeapon,getUniqueWeaponForHero,ITEMS,QUALITIES,RAIDS,EXPEDITIONS,QUESTS,WEEKLY_QUESTS,MONTHLY_QUESTS,QUEST_GROUPS,FINAL_CHESTS,QUEST_PERIOD_CONFIG,DIFFICULTIES,CONTINENTS,STAR_MILESTONES,gems,gold,hearthstones,pityCounter,tutorialRewardClaimed,completeTutorialReward,tutorialAcademy,completeAcademyTutorial,claimAcademyTutorial,claimAcademyFinal,summonRates,BANNERS,DEFAULT_BANNER,monthlyFeatured:monthlyBanner,electedChampion,electedGuarantee,setElectedChampion,SUMMON_COST,PITY_THRESHOLD,redeemedCodes,universalSoul5,ascensionEssences,conversionHistory,convertAscensionEssence,masteryTomes,skillLevels,autoSkillPriorities,getAutoSkillPriority,setAutoSkillPriority,resetAutoSkillPriority,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,setForgeHistory,expeditionProgress,chooseSundayExpeditionHonor,claimExpeditionHonor,shopRefreshCost,shopNextRotation,summonerProfile,weekly,monthly,trackedQuests,toggleTrackedQuest,unlocks,SUMMONER_MAX_LEVEL,summonerXpRequired,owned,team,teamPresets,activeTeamSlot,selectTeamPreset,renameTeamPreset,saveCurrentTeamToPreset,setTeamMember,removeTeamMember,clearCurrentTeam,copyTeamPreset,equipment,inventory,history,daily,championProgress,campaign,mythicProgress,finishMythicMission,achievementClaims,claimAchievement,progressionStats,permanentQuests,emitProgressEvent,recordBattleResult,grantReward,activeMission,battleSession,battleInProgress,pendingMission,preparationMission,cancelMissionPreparation,confirmMissionPreparation,prepareNextMission,setGems,setGold,setHearthstones,setTeam,setEquipment,setInventory,setHistory,equipItem,itemOwner,unequipSlot,toggleItemLock,sellItem,itemSellValue,upgradeItem,getItemUpgradeCost,recycleItem,itemRecycleValue,buyShopOffer,refreshShop,unlockShopSlot,setDaily,setActiveMission,setBattleSession,requestMissionStart,updateBattleSession,abandonBattle,dismissPendingMission,replaceBattleWithPending,progress:progressQuest,claimQuest,claimQuestChest,grantSummonerXp,setSummonerName,isUnlocked,summon,summonMany,redeemCode,grantXp,getProgress,getEvolutionStatus,evolveHero,getResonanceStatus,reinforceResonance,getEmpreinteStatus,lightEmpreinte,resetEmpreintes,BRANCHES,ETAGE_RESONANCE,RESONANCE_POINT_TIERS,getSkillInfo,upgradeSkill,difficultyUnlocked,continentUnlocked,stageUnlocked,difficultyStars,claimCampaignMilestone,finishExpeditionMission,finishRaidMission,finishWorldBossMission,finishCampaignMission,stats:hero=>totalStats(hero,equipment,getProgress(hero),inventory),naturalStats:hero=>championProgressionStats(hero,getProgress(hero)),championPower:hero=>championPower(totalStats(hero,equipment,getProgress(hero),inventory)),teamPower:(members=team)=>teamPower(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory)),missionPower:mission=>calibratedEncounterPower(mission),assessMission:(mission,members=team)=>assessTeamForMission(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory),mission),missionDifficulty,campaignXp};
+  const value={HEROES,estimerMission,defiMission,defiRecord,finishDefiMission,defiCode,comparerDefi,cleSemaine,canSweep,sweepCampaignMission,sweepsLeft,SWEEP_DAILY_LIMIT,UNIQUE_WEAPONS,RELICS,CHRONICLE_STEPS,legendaryChronicles,grantRelic,activateRelic,addLegendaryMaterial,setChronicleStep,advanceChronicle,getChronicleStatus,LEGENDARY_MATERIALS,chronicleGrindLength,chooseUniqueOrientation,forgeUniqueWeapon,harmonizeUniqueWeapon,getUniqueWeaponForHero,ITEMS,QUALITIES,RAIDS,EXPEDITIONS,QUESTS,WEEKLY_QUESTS,MONTHLY_QUESTS,QUEST_GROUPS,FINAL_CHESTS,QUEST_PERIOD_CONFIG,DIFFICULTIES,CONTINENTS,STAR_MILESTONES,gems,gold,hearthstones,pityCounter,tutorialRewardClaimed,completeTutorialReward,tutorialAcademy,completeAcademyTutorial,claimAcademyTutorial,claimAcademyFinal,summonRates,BANNERS,DEFAULT_BANNER,monthlyFeatured:monthlyBanner,electedChampion,electedGuarantee,setElectedChampion,SUMMON_COST,PITY_THRESHOLD,redeemedCodes,universalSoul5,ascensionEssences,conversionHistory,convertAscensionEssence,masteryTomes,skillLevels,autoSkillPriorities,getAutoSkillPriority,setAutoSkillPriority,resetAutoSkillPriority,bloodFragments,shopState,raidProgress,forgeEssence,forgeHistory,setForgeHistory,expeditionProgress,chooseSundayExpeditionHonor,claimExpeditionHonor,shopRefreshCost,shopNextRotation,summonerProfile,weekly,monthly,trackedQuests,toggleTrackedQuest,unlocks,SUMMONER_MAX_LEVEL,summonerXpRequired,owned,team,teamPresets,activeTeamSlot,selectTeamPreset,renameTeamPreset,saveCurrentTeamToPreset,setTeamMember,removeTeamMember,clearCurrentTeam,copyTeamPreset,equipment,inventory,history,daily,championProgress,campaign,mythicProgress,finishMythicMission,achievementClaims,claimAchievement,progressionStats,permanentQuests,emitProgressEvent,recordBattleResult,grantReward,activeMission,battleSession,battleInProgress,pendingMission,preparationMission,cancelMissionPreparation,confirmMissionPreparation,prepareNextMission,setGems,setGold,setHearthstones,setTeam,setEquipment,setInventory,setHistory,equipItem,itemOwner,unequipSlot,toggleItemLock,sellItem,itemSellValue,upgradeItem,getItemUpgradeCost,recycleItem,itemRecycleValue,buyShopOffer,refreshShop,unlockShopSlot,setDaily,setActiveMission,setBattleSession,requestMissionStart,updateBattleSession,abandonBattle,dismissPendingMission,replaceBattleWithPending,progress:progressQuest,claimQuest,claimQuestChest,grantSummonerXp,setSummonerName,isUnlocked,summon,summonMany,redeemCode,grantXp,getProgress,getEvolutionStatus,evolveHero,getResonanceStatus,reinforceResonance,getEmpreinteStatus,lightEmpreinte,resetEmpreintes,BRANCHES,ETAGE_RESONANCE,RESONANCE_POINT_TIERS,getSkillInfo,upgradeSkill,difficultyUnlocked,continentUnlocked,stageUnlocked,difficultyStars,claimCampaignMilestone,finishExpeditionMission,finishRaidMission,finishWorldBossMission,finishCampaignMission,stats:hero=>totalStats(hero,equipment,getProgress(hero),inventory),naturalStats:hero=>championProgressionStats(hero,getProgress(hero)),championPower:hero=>championPower(totalStats(hero,equipment,getProgress(hero),inventory)),teamPower:(members=team)=>teamPower(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory)),missionPower:mission=>calibratedEncounterPower(mission),assessMission:(mission,members=team)=>assessTeamForMission(members,HEROES,hero=>totalStats(hero,equipment,getProgress(hero),inventory),mission),missionDifficulty,campaignXp};
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }
 export const useGame=()=>useContext(GameContext);

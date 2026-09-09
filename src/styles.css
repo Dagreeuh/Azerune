@@ -714,23 +714,32 @@
 .chronicle-requirements>div.done strong{color:#86efac}
 
 /* --- Effets de sort ------------------------------------------------------- */
-.spell-vfx{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:6;
+/* Les effets se jouaient au centre exact de la carte, la ou le compteur de
+   degats (z-index 80) est pose : le sort disparaissait derriere le nombre. On
+   descend leur centre sur la moitie basse, au-dessus des barres. */
+.spell-vfx{position:absolute;top:26px;bottom:-26px;left:0;right:0;pointer-events:none;overflow:visible;z-index:6;
   --vfx-core:#e2e8f0;--vfx-trail:#334155;--vfx-glow:#94a3b8;--vfx-intensity:1;--vfx-duration:520ms}
 .spell-vfx i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;
   animation-duration:var(--vfx-duration);animation-timing-function:cubic-bezier(.2,.8,.3,1);
   animation-fill-mode:both}
 
-/* halo d'impact commun, teinte par l'archetype */
-.vfx-impact{width:96px;height:96px;border-radius:50%;
-  background:radial-gradient(circle,#fff 0%,var(--vfx-core) 22%,transparent 66%);
+/* Halo d'impact, teinte par l'archetype.
+   Il faisait 96 px de blanc sur une carte de 107 px, a 92 % d'opacite : la
+   carte se lavait en blanc et la couleur elementaire disparaissait. Le blanc
+   se reduit maintenant a un coeur, la couleur porte le halo, et le disque
+   reste plus petit que la carte. */
+.vfx-impact{width:64px;height:64px;border-radius:50%;
+  background:radial-gradient(circle,#fff 0%,var(--vfx-core) 16%,var(--vfx-glow) 44%,transparent 72%);
   mix-blend-mode:screen;opacity:0;animation-name:vfxImpact}
-@keyframes vfxImpact{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}
-  35%{opacity:calc(.92*var(--vfx-intensity))}100%{opacity:0;transform:translate(-50%,-50%) scale(1.9)}}
+@keyframes vfxImpact{0%{opacity:0;transform:translate(-50%,-50%) scale(.25)}
+  30%{opacity:calc(.78*var(--vfx-intensity))}100%{opacity:0;transform:translate(-50%,-50%) scale(1.55)}}
 
 /* --- couches --- */
-.vfx-streak{width:150px;height:8px;border-radius:5px;
-  background:linear-gradient(90deg,transparent,#fff 45%,var(--vfx-core) 55%,transparent);
-  box-shadow:0 0 22px var(--vfx-glow);animation-name:vfxStreak}
+/* La trainee portait du blanc sur la moitie de sa longueur : la couleur du
+   sort ne se voyait plus. Le blanc n'est plus qu'un liseré au centre. */
+.vfx-streak{width:132px;height:10px;border-radius:6px;
+  background:linear-gradient(90deg,transparent,var(--vfx-glow) 22%,#fff 47%,var(--vfx-core) 58%,var(--vfx-trail) 82%,transparent);
+  box-shadow:0 0 26px var(--vfx-glow),0 0 8px #fff;animation-name:vfxStreak}
 @keyframes vfxStreak{0%{opacity:0;transform:translate(-140%,-50%) rotate(-24deg) scaleX(.4)}
   30%{opacity:1}100%{opacity:0;transform:translate(40%,-50%) rotate(-24deg) scaleX(1.3)}}
 
