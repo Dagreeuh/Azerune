@@ -1,5 +1,12 @@
 # Audit d'expérience joueur — Chroniques d'Azerune
 
+> **Mise à jour du 9 septembre 2026 — les corrections ont été appliquées.**
+> Les constats ci-dessous sont ceux de l'audit initial (commit `4a6bfae`).
+> L'état après corrections, y compris ce qui n'a **pas** marché, est en
+> section 11. Deux propositions de ce rapport se sont révélées fausses à la
+> mesure : elles sont signalées là où elles apparaissent.
+
+
 > « qu'est-ce qu'on pourrait faire niveau gameplay pour que ce soit une
 > meilleure expérience pour le joueur »
 
@@ -224,6 +231,10 @@ la même racine.
 
 ### A. Raccourcir les combats — la seule pierre qui fait deux coups
 
+> **Vérifié : à moitié faux.** Le gain de temps est au rendez-vous (16 min →
+> 5,7 min). L'élargissement de la bande, non : elle est passée de 4,0 % à
+> 3,5 %, puis à 0,5 % après la correction du ciblage. Voir section 11.
+
 Un combat médian dure 106 actions. En descendre à 35-45 :
 
 - **rend la variance visible** : sur 40 tirages au lieu de 106, un critique ou
@@ -241,6 +252,11 @@ Givre, Maelström) n'ont plus le temps d'exister. 35-45 actions est un plancher,
 pas une cible à dépasser.
 
 ### B. Rendre les mécaniques de zone jouables au lieu de subies
+
+> **Vérifié : faux.** Implémenté puis retiré. Annoncer une mécanique un tour à
+> l'avance et permettre de la parer coûtait au joueur 8,1 points de taux de
+> victoire à x1,05 de puissance. La mesure a en revanche révélé un vrai défaut
+> à côté — le ciblage automatique. Voir section 11.
 
 Les mécaniques existent déjà et sont bonnes. Il leur manque deux choses :
 
@@ -336,3 +352,91 @@ npm run mesures
 Cinq blocs : largeur de bande, valeur des décisions, coût de session, seuil par
 champion, honnêteté de l'indicateur. Aucune assertion — si un chiffre de ce
 rapport te paraît faux, la commande le contredira.
+
+
+---
+
+## 11. Après corrections — ce qui a marché, ce qui n'a pas marché
+
+Les sept propositions ont été traitées. Six sont livrées, une est abandonnée
+sur mesure, une est laissée de côté. Chiffres relevés avec `npm run mesures`
+sur l'état final.
+
+| Mesure | Avant | Après |
+|---|---|---|
+| Session quotidienne | ~16 min | **5,7 min** |
+| Combat médian | 106 actions | **38 actions** |
+| AUTO près du seuil (x1,05) | 30,6 % | **51,3 % de victoires** |
+| AUTO près du seuil (x1,10) | 41,9 % | **65,0 %** |
+| Écart meilleur→pire champion | 135 % | **77 % de puissance** |
+| Erreur de la puissance recommandée | −21 % à +43 % | **−26 % à −1 %** |
+| Bande de transition | 4,0 % | **0,5 %** ⚠️ |
+
+### Ce qui a marché
+
+**A — Tempo de combat.** Les réserves de PV des deux camps sont divisées par
+2,4. Tout ce qui s'exprime en pourcentage de PV max se calcule sur la réserve
+d'avant la coupe, pour que le rapport soin/dégâts reste intact. La session
+tombe de 16 à 5,7 minutes.
+
+**B (remplacé) — Ciblage automatique.** `chooseAutoEnemyTarget` ne comptait que
+l'affinité puis l'ordre du tableau : **aucun terme de points de vie**. L'AUTO
+éparpillait ses dégâts au lieu d'achever, alors que tuer une unité retire
+définitivement sa part de dégâts. Un terme d'achèvement corrige ça, et l'AUTO
+gagne 20,7 points à x1,05. C'est la façon dont la plupart des gens jouent : le
+gain touche tout le monde.
+
+**C — Estimer mes chances.** L'écran de préparation joue vraiment la mission
+20 fois et répond « Tu gagnes 14 fois sur 20 ». Un combat à pile ou face
+s'annonce « serré », jamais « confortable ».
+
+**D — Balayage et vitesse.** Une mission maîtrisée à 3★ se récolte sans combat
+(12 par jour), et le mode AUTO se règle en x1 / x2 / x3.
+
+**E — Plancher de viabilité.** Hicho remonte de la 27ᵉ à la 21ᵉ place : ses
+totems galvanisent l'équipe au lieu de seulement la soigner. Anomalie inverse
+apparue à la remesure, absente de l'audit initial parce que l'ancien ciblage la
+masquait : Yunmei, un 4★, était le meilleur champion du jeu. L'écart tombe de
+18 % à 10 %. Elle reste première : **c'est le principal reste à faire.**
+
+**F — Défi de la semaine.** La même rencontre pour tout le monde pendant sept
+jours, un score comparable, un code à s'échanger. Sans serveur. Le score est la
+part de PV arrachés — et la tentative compte même sur une défaite — pour que
+des amis de niveaux différents puissent se comparer.
+
+### Ce qui n'a pas marché, et pourquoi
+
+**La tension n'est pas revenue. Elle a même empiré : la bande passe de 4,0 % à
+0,5 %.**
+
+Trois tentatives, trois échecs mesurés :
+
+1. **Raccourcir les combats** (proposition A) n'a pas élargi la bande. Mon
+   hypothèse — « les combats sont longs, donc la variance s'écrase » — était
+   fausse.
+2. **Mesure de contrôle**, à PV et dégâts totaux identiques répartis sur une
+   puis trois unités : bande de 5 % à un seul ennemi, 2 % à trois. La cause
+   n'est pas la longueur mais **la rétroaction des morts** — tuer une unité
+   retire un tiers des dégâts adverses, ce qui amplifie l'avance de celui qui
+   mène.
+3. **Télégraphier les mécaniques** (proposition B) devait donner au joueur une
+   parade. Mesuré près du seuil, en paires appariées : la parade lui coûtait
+   8,1 points à x1,05 et 3,7 à x1,10. Détourner ses dégâts de la cible optimale
+   ne paie jamais tant que tuer est aussi décisif. Retiré : une mécanique qui
+   punit le joueur qui s'en occupe est pire que pas de mécanique.
+
+Et un AUTO qui joue mieux rend l'issue **plus** prévisible : c'est le prix,
+assumé, du gain de 20 points.
+
+**Conclusion honnête : la tension ne se règle pas par ajustement.** Elle tient
+à la forme même du combat — une course où la mort d'une unité s'auto-amplifie.
+La seule chose du jeu qui casse cette spirale est la résurrection de Yunmei, et
+c'est exactement ce qui fait d'elle le meilleur champion. Si l'on veut des
+combats serrés, c'est cette spirale qu'il faut amortir, et c'est une décision
+de conception, pas un réglage. Je ne l'ai pas prise seul.
+
+### Non traité
+
+**G — Étapes à règle spéciale.** Pas fait. C'était la proposition au plus
+faible rapport effet/coût, et la remesure n'a rien apporté qui la rende plus
+urgente.
