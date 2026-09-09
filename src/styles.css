@@ -920,3 +920,10 @@
 .defi-resultat{border:1px solid #4338ca;border-radius:.6rem;padding:.55rem .7rem;display:grid;gap:.2rem;}
 .defi-resultat span{color:#94a3b8;font-size:.82rem;}
 .defi-erreur{color:#fca5a5;font-size:.85rem;margin:0;}
+
+/* Règles spéciales de campagne : une contrainte de composition, annoncée. */
+.stage-regle{margin:.2rem 0 0;color:#fbbf24;font-size:.78rem;font-weight:700;}
+.prep-regle{margin-top:.4rem;border:1px solid #b45309;border-radius:.5rem;padding:.4rem .55rem;background:#1c1207;display:grid;gap:.15rem;}
+.prep-regle b{color:#fbbf24;font-size:.85rem;}
+.prep-regle small{color:#d6d3d1;font-size:.75rem;}
+.battle-regle{background:#1c1207;border:1px solid #b45309;border-radius:.4rem;padding:.2rem .45rem;color:#fbbf24;font-size:.72rem;font-weight:700;}

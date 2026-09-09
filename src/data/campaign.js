@@ -36,6 +36,43 @@ export const CAMPAIGN_MECHANICS={
  'rempart-endurance':{icon:'🔷',name:'Dernier rempart',summary:'Protection, Endurance et combats prolongés.',boss:'Aegor alterne garde absolue et pression soutenue.'},
  'coeur-ignifuge':{icon:'🧯',name:'Épreuve du Cœur-Monde',summary:'Brûlures, réduction des soins et éruption d’entraînement.',boss:'Pyraxis prépare aux mécaniques de la Fournaise du Cœur-Monde.'}
 };
+/**
+ * Règles spéciales de campagne.
+ *
+ * La campagne annonce 210 missions pour ~20 rencontres réellement distinctes :
+ * les mêmes 70 étapes rejouées en Normal, Difficile et Hardcore, où seuls les
+ * multiplicateurs changent. Les règles spéciales ajoutent une contrainte de
+ * composition sur certaines étapes, sans écrire de nouveau contenu.
+ *
+ * Elles ne touchent JAMAIS la Normal : c'est le chemin obligatoire, il doit
+ * rester finissable. Elles vivent sur les difficultés supérieures, qui sont
+ * précisément les rejouages à l'identique.
+ *
+ * Détail : Audit/RAPPORT-EXPERIENCE-JOUEUR.md
+ */
+export const REGLES_SPECIALES={
+ 'sans-soin':{id:'sans-soin',icon:'🚫',name:'Silence des soins',
+   summary:'Aucun soin ne fonctionne. Les boucliers, eux, tiennent toujours.'},
+ 'resistance':{id:'resistance',icon:'🛡️',name:'Volonté de fer',
+   summary:'Les ennemis résistent à tous les malus soumis à la Précision : poisons, brûlures, étourdissements, affaiblissements.'},
+ 'fragile':{id:'fragile',icon:'💔',name:'Marche forcée',
+   summary:'L’équipe entre au combat à 60 % de ses points de vie.'},
+ 'hate':{id:'hate',icon:'⚡',name:'Embuscade',
+   summary:'Les ennemis ouvrent le combat : leurs jauges démarrent pleines.'}
+};
+const ORDRE_REGLES=['sans-soin','resistance','fragile','hate'];
+/**
+ * Règle d'une étape, ou null. Deux étapes réglées en Difficile, trois en
+ * Hardcore ; jamais le boss, pour ne pas transformer un mur en impasse.
+ */
+export function regleDeMission(difficultyId,zoneIndex,stageId,boss){
+ if(boss||difficultyId==='normal')return null;
+ const etapes=difficultyId==='hardcore'?[2,4,6]:[3,5];
+ if(!etapes.includes(Number(stageId)))return null;
+ const rang=etapes.indexOf(Number(stageId));
+ return REGLES_SPECIALES[ORDRE_REGLES[(zoneIndex+rang)%ORDRE_REGLES.length]];
+}
+
 const CAMPAIGN_ROLES=['assaulter','support','controller'];
 const REGIONAL_TUNING=[{hp:1,atk:1,def:1,res:0,acc:0},{hp:1.05,atk:1.04,def:1.03,res:1,acc:1},{hp:1.10,atk:1.08,def:1.05,res:2,acc:2},{hp:1.16,atk:1.12,def:1.08,res:4,acc:3},{hp:1.23,atk:1.17,def:1.11,res:6,acc:5},{hp:1.30,atk:1.22,def:1.14,res:8,acc:6},{hp:1.37,atk:1.27,def:1.17,res:10,acc:8},{hp:1.45,atk:1.32,def:1.20,res:12,acc:10},{hp:1.53,atk:1.37,def:1.23,res:15,acc:12},{hp:1.62,atk:1.43,def:1.27,res:18,acc:14}];const normalRegionalTuning=zoneIndex=>REGIONAL_TUNING[Math.max(0,Math.min(9,Number(zoneIndex)||0))];
 const CAMPAIGN_COMBAT_SCALE={normal:1.12,hard:1.38,hardcore:1.70};
@@ -137,5 +174,6 @@ export function createMission(difficulty,continent,item){
  const enemies=item.enemies.map((unit,index)=>{const bossUnit=item.boss&&index===0,bossFactor=bossUnit?1.14:1;return{...unit,bossUnit,campaignUnit:true,campaignDifficulty:difficulty.id,campaignZone:continent.id,campaignZoneIndex:continentIndex,campaignRole:bossUnit?'boss':CAMPAIGN_ROLES[index%CAMPAIGN_ROLES.length],campaignMechanic:CAMPAIGN_MECHANICS[continent.id],campaignMechanicTier:tuning.mechanicTier,hp:Math.round(unit.hp*tuning.hp*stageRamp*bossFactor*wall),atk:Math.round(unit.atk*tuning.atk*stageRamp*(bossUnit?1.08:1)*wall),def:Math.round(unit.def*tuning.def*stageRamp*(bossUnit?1.08:1)),spd:Math.round(unit.spd*tuning.spd),resistance:Math.min(90,(unit.resistance||15)+tuning.res+(bossUnit?12:0)),accuracy:Math.min(90,(unit.accuracy||10)+tuning.acc+(bossUnit?7:0))}});
  const xpBase=missionXpBase(zone,stageId,item.boss,tuning.xp);
  const recommended=Math.round(enemies.reduce((sum,u)=>sum+u.hp*.30+u.atk*7.5+u.def*5.5+u.spd*1.7+(u.accuracy||0)*1.5+(u.resistance||0)*1.25,0)*(item.boss?1.52:1.38));
- return{key:missionKey(difficulty.id,continent.id,item.id),difficultyId:difficulty.id,difficultyName:difficulty.name,continentId:continent.id,continentName:continent.name,continentIndex,setId:(continent.setIds||[continent.setId])[Math.floor(Math.random()*(continent.setIds||[continent.setId]).length)],setIds:continent.setIds||[continent.setId],stageId:item.id,slotHint:item.slot,name:item.name,icon:item.icon,boss:item.boss,enemies,scale,mechanics:[CAMPAIGN_MECHANICS[continent.id]],mechanicTier:tuning.mechanicTier,progressionWall:item.boss&&[5,10].includes(zone)?zone:null,reward:{gold:baseGold,gems:baseGems,stones:item.boss?1:0,xpBase},recommended};
+ const regle=regleDeMission(difficulty.id,continentIndex,item.id,item.boss);
+ return{regle,key:missionKey(difficulty.id,continent.id,item.id),difficultyId:difficulty.id,difficultyName:difficulty.name,continentId:continent.id,continentName:continent.name,continentIndex,setId:(continent.setIds||[continent.setId])[Math.floor(Math.random()*(continent.setIds||[continent.setId]).length)],setIds:continent.setIds||[continent.setId],stageId:item.id,slotHint:item.slot,name:item.name,icon:item.icon,boss:item.boss,enemies,scale,mechanics:[CAMPAIGN_MECHANICS[continent.id]],mechanicTier:tuning.mechanicTier,progressionWall:item.boss&&[5,10].includes(zone)?zone:null,reward:{gold:baseGold,gems:baseGems,stones:item.boss?1:0,xpBase},recommended};
 }

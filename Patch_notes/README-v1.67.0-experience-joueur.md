@@ -47,11 +47,22 @@
 
 - **Hicho** — ses totems galvanisent l'équipe en plus de la soigner. Il remonte
   de la 27ᵉ à la 21ᵉ place. Il reste un soigneur pur, statistiques inchangées.
-- **Yunmei** — sa Paume de brume passe de 0,85 à 0,70 : elle soignait et
-  frappait comme un attaquant, et sortait meilleure que tous les 5★. Sa
-  résurrection n'est pas touchée.
+- **Yunmei** — sa Paume de brume frappait **et** soignait sans aucune recharge :
+  le seul sort du jeu à soigner sans contrepartie. Elle sortait meilleure que
+  tous les 5★. Sa guérison passe sur Brume revigorante, qui a une recharge,
+  comme tous les soigneurs du jeu. Elle reste première, mais 4 % devant le
+  meilleur 5★ au lieu de 18 %.
 - **Nyxaris** — « Incantation prolongée » infligeait 0 dégât, seul premier sort
   du roster dans ce cas. Elle frappe désormais en chargeant.
+
+## Règles spéciales de campagne
+
+Quatre règles s'ajoutent sur certaines étapes en Difficile et Hardcore —
+Silence des soins, Volonté de fer, Marche forcée, Embuscade. Elles forcent une
+composition différente au lieu d'ajouter de la difficulté : le Silence des
+soins coûte 27 % de puissance à une équipe qui repose sur les soins, et rien du
+tout à une équipe qui s'en passe. La Normal et les boss n'en portent jamais : le
+chemin obligatoire doit rester finissable.
 
 ## Effets visuels
 
@@ -68,6 +79,6 @@ de taux de victoire. Détail et mesures dans `Audit/RAPPORT-EXPERIENCE-JOUEUR.md
 
 ## Vérification
 
-1 390 tests, 59 fichiers, tous au vert. 69 mutations testées sur les
-changements de cette version, 69 tuées. Mesures reproductibles avec
+1 410 tests, 60 fichiers, tous au vert. 84 mutations testées sur les
+changements de cette version, 84 tuées. Mesures reproductibles avec
 `npm run mesures`.

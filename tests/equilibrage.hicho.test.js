@@ -1,4 +1,6 @@
 import{describe,it,expect}from'vitest';
+import fs from'node:fs';
+import{fileURLToPath}from'node:url';
 import{HEROES}from'../src/data/heroes';
 import{createBattle,castSkill}from'../src/battle/engine';
 import{makeEnemy,fixedRandom}from'./helpers';
@@ -64,20 +66,44 @@ describe('Hicho accelere la course au lieu de seulement la subir',()=>{
 });
 
 describe('Yunmei : un 4★ ne doit pas dominer tous les 5★',()=>{
-  it('sa Paume de brume frappe comme un soutien, pas comme un attaquant',()=>{
+  const yunmei=()=>HEROES.find(h=>h.name==='Yunmei');
+
+  it('sa Paume de brume ne soigne plus : elle frappe, point',()=>{
     // Elle sortait 1re sur 30 a x0,93 quand le meilleur 5★ demandait x1,10.
-    // Sa frappe sans recharge soignait ET infligeait des degats d'attaquant.
-    const yunmei=HEROES.find(h=>h.name==='Yunmei');
-    expect(yunmei.skills[0].power,'sa frappe est revenue à un niveau d’attaquant').toBe(.7);
-    const attaquants=HEROES.filter(h=>h.rarity===4&&h.skills[0].cd===0&&h.skills[0].power>0);
-    const median=attaquants.map(h=>h.skills[0].power).sort((a,b)=>a-b)[Math.floor(attaquants.length/2)];
-    expect(yunmei.skills[0].power,'elle frappe plus fort que la médiane des 4★').toBeLessThanOrEqual(median);
+    // Sa frappe sans recharge soignait ET infligeait des degats : le seul sort
+    // du jeu a soigner sans contrepartie. L'ablation a montre que sa valeur
+    // etait binaire — diviser le soin par deux ou ne le tisser qu'un coup sur
+    // deux ne deplacait rien. C'est donc l'absence de recharge qui etait le
+    // probleme, pas le montant.
+    expect(yunmei().skills[0].description,'la Paume annonce encore un soin').not.toMatch(/soigne/i);
+    const moteur=fs.readFileSync(fileURLToPath(new URL('../src/battle/engine.js',import.meta.url)),'utf8');
+    // La ligne du sort seule : une fenetre plus large attraperait le soin du
+    // sort suivant et le test passerait pour la mauvaise raison.
+    const debut=moteur.indexOf("if(e==='mistStrike')");
+    const bloc=moteur.slice(debut,moteur.indexOf('\n',debut));
+    expect(bloc,'la Paume soigne encore dans le moteur').not.toContain('heal(');
   });
 
-  it('sa resurrection reste intacte : c’est son identite',()=>{
-    // Ressusciter est ce qui casse la spirale des morts, et c'est ce qui la
-    // rend forte. On a baisse ses degats, pas ce qui fait d'elle Yunmei.
-    const yunmei=HEROES.find(h=>h.name==='Yunmei');
-    expect(yunmei.skills[2].effect).toBe('revival');
+  it('sa guérison vit sur un sort à recharge, comme tous les soigneurs',()=>{
+    const brume=yunmei().skills[1];
+    expect(brume.effect).toBe('renewingMist');
+    expect(brume.cd,'sa guérison n’a plus de contrepartie').toBeGreaterThan(0);
+  });
+
+  it('elle reste une soutien, pas une attaquante déguisée',()=>{
+    // On lui retire un soin gratuit, on n'en fait pas une DPS.
+    const attaquants=HEROES.filter(h=>h.skills[0].cd===0&&h.skills[0].power>0&&h.rarity===4);
+    const plusFort=Math.max(...attaquants.map(h=>h.skills[0].power));
+    expect(yunmei().skills[0].power).toBeLessThan(plusFort);
+  });
+
+  it('Renouveau reste un soin d’équipe avec purification',()=>{
+    // Correction d'une erreur de ma part : « Renouveau » n'est pas une
+    // resurrection. La seule reanimation du jeu appartient a Caelion
+    // (effet `timeRestore`), pas a Yunmei.
+    expect(yunmei().skills[2].effect).toBe('revival');
+    const caelion=HEROES.find(h=>h.skills.some(s=>s.effect==='timeRestore'));
+    expect(caelion,'plus personne ne porte la réanimation du jeu').toBeTruthy();
+    expect(caelion.name).not.toBe('Yunmei');
   });
 });

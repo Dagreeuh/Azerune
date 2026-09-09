@@ -226,12 +226,23 @@ describe('Sivrane — Givre',()=>{
 });
 
 describe('Yunmei — Brumes',()=>{
-  it('Paume de brume soigne l’allié le plus bas',()=>{
+  it('Paume de brume ne soigne plus : le soin a une recharge maintenant',()=>{
+    // C'etait le seul sort du jeu a frapper ET soigner sans contrepartie, et
+    // Yunmei, un 4★, ressortait premiere sur trente devant tous les 5★.
+    // Sa guerison vit desormais sur Brume revigorante, qui a une recharge.
     fixedRandom(.5);
     const combat=scene(34,{allies:[{}],patchAllie:unite=>
       unite.id===8100?{hp:Math.round(unite.maxHp*.2)}:{}});
     const avant=findUnit(combat,8100).hp;
-    expect(findUnit(lance(combat,0,cible(combat)),8100).hp).toBeGreaterThan(avant);
+    expect(findUnit(lance(combat,0,cible(combat)),8100).hp,'la Paume soigne encore').toBe(avant);
+  });
+
+  it('Brume revigorante soigne bien l’allié visé',()=>{
+    fixedRandom(.5);
+    const combat=scene(34,{allies:[{}],patchAllie:unite=>
+      unite.id===8100?{hp:Math.round(unite.maxHp*.2)}:{}});
+    const avant=findUnit(combat,8100).hp;
+    expect(findUnit(lance(combat,1,8100),8100).hp).toBeGreaterThan(avant);
   });
 
   it('Brume revigorante purifie le malus le plus grave d’abord',()=>{
@@ -408,13 +419,13 @@ describe('cohérence avec les conventions du jeu',()=>{
     expect(soin(20)).toBe(soin(400));
   });
 
-  it('le soin de Paume de brume ne dépend pas non plus de son Attaque',()=>{
+  it('le soin de Brume revigorante ne dépend pas non plus de son Attaque',()=>{
     fixedRandom(.5);
     const soin=attaque=>{
       const combat=scene(34,{allies:[{}],patchAllie:unite=>
         unite.id===34?{atk:attaque}:{hp:Math.round(unite.maxHp*.3)}});
       const avant=findUnit(combat,8100).hp;
-      return findUnit(lance(combat,0,cible(combat)),8100).hp-avant;
+      return findUnit(lance(combat,1,8100),8100).hp-avant;
     };
     expect(soin(20)).toBe(soin(400));
     expect(soin(20)).toBeGreaterThan(0);

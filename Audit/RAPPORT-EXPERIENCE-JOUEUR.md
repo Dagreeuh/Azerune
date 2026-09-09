@@ -394,10 +394,33 @@ s'annonce « serré », jamais « confortable ».
 (12 par jour), et le mode AUTO se règle en x1 / x2 / x3.
 
 **E — Plancher de viabilité.** Hicho remonte de la 27ᵉ à la 21ᵉ place : ses
-totems galvanisent l'équipe au lieu de seulement la soigner. Anomalie inverse
-apparue à la remesure, absente de l'audit initial parce que l'ancien ciblage la
-masquait : Yunmei, un 4★, était le meilleur champion du jeu. L'écart tombe de
-18 % à 10 %. Elle reste première : **c'est le principal reste à faire.**
+totems galvanisent l'équipe au lieu de seulement la soigner.
+
+Anomalie inverse apparue à la remesure, absente de l'audit initial parce que
+l'ancien ciblage la masquait : Yunmei, un 4★, était le meilleur champion du jeu
+à ×0,93 quand le meilleur 5★ demandait ×1,10.
+
+L'ablation dit où était sa force, et ce n'était pas là où je l'avais d'abord
+cru :
+
+| Kit | Seuil |
+|---|---|
+| Complet | ×1,013 |
+| Sans le soin de Paume de brume | ×1,089 |
+| Sans le soin de Brume revigorante | ×1,089 |
+| **Sans le soin de Renouveau (son ultime)** | **×1,013 — aucun effet** |
+| Sans la purification de Renouveau | ×1,013 — aucun effet |
+
+Sa Paume de brume, sans recharge, frappait **et** soignait : le seul sort du
+jeu à soigner sans contrepartie. Et sa valeur était **binaire** — diviser le
+soin par deux (×1,023) ou ne le tisser qu'un coup sur deux (×1,023) ne
+déplaçait rien ; seule sa suppression comptait. Ce n'était donc ni le montant
+ni le rythme, c'était l'absence de recharge. Sa guérison est passée sur Brume
+revigorante, qui en a une, comme tous les soigneurs du jeu.
+
+Elle passe de ×0,93 à **×1,06** : toujours première, mais 4 % devant le
+meilleur 5★ au lieu de 18 %. Un très bon 4★ qui se bat avec les 5★ plutôt
+qu'un 4★ qui les écrase.
 
 **F — Défi de la semaine.** La même rencontre pour tout le monde pendant sept
 jours, un score comparable, un code à s'échanger. Sans serveur. Le score est la
@@ -430,13 +453,65 @@ assumé, du gain de 20 points.
 
 **Conclusion honnête : la tension ne se règle pas par ajustement.** Elle tient
 à la forme même du combat — une course où la mort d'une unité s'auto-amplifie.
-La seule chose du jeu qui casse cette spirale est la résurrection de Yunmei, et
-c'est exactement ce qui fait d'elle le meilleur champion. Si l'on veut des
-combats serrés, c'est cette spirale qu'il faut amortir, et c'est une décision
-de conception, pas un réglage. Je ne l'ai pas prise seul.
+Si l'on veut des combats serrés, c'est cette spirale qu'il faut amortir, et
+c'est une décision de conception, pas un réglage. Je ne l'ai pas prise seul.
+
+> **Correction.** Une version antérieure de cette section affirmait que « la
+> seule chose du jeu qui casse cette spirale est la résurrection de Yunmei, et
+> c'est exactement ce qui fait d'elle le meilleur champion ». C'est faux sur
+> les deux points. Son ultime « Renouveau » (`revival`) est un soin d'équipe
+> avec purification, pas une résurrection : la seule réanimation du jeu est
+> celle de Caelion (`timeRestore`). Et la mesure par ablation, faite depuis,
+> montre que son ultime ne pèse **rien** dans sa domination : le retirer ne
+> déplace pas son seuil d'un millième. Sa force venait de sa Paume de brume,
+> qui frappait et soignait sans aucune recharge. J'avais raisonné sur un nom
+> de sort au lieu de lire son implémentation.
 
 ### Non traité
 
-**G — Étapes à règle spéciale.** Pas fait. C'était la proposition au plus
-faible rapport effet/coût, et la remesure n'a rien apporté qui la rende plus
-urgente.
+**G — Étapes à règle spéciale.** Voir section 12.
+
+
+---
+
+## 12. Étapes à règle spéciale (proposition G)
+
+La campagne annonce 210 missions pour **~20 rencontres réellement distinctes** :
+les mêmes 70 étapes rejouées en Normal, Difficile et Hardcore, où seuls les
+multiplicateurs changent. Quatre règles ajoutent une contrainte de composition,
+sans écrire une seule rencontre de plus.
+
+| Règle | Effet |
+|---|---|
+| 🚫 Silence des soins | Aucun soin ne fonctionne. Les boucliers, eux, tiennent. |
+| 🛡️ Volonté de fer | Les ennemis résistent aux malus soumis à la Précision. |
+| 💔 Marche forcée | L'équipe entre au combat à 60 % de ses points de vie. |
+| ⚡ Embuscade | Les ennemis ouvrent le combat, jauges pleines. |
+
+**Elles ne touchent jamais la Normal**, qui est le chemin obligatoire et doit
+rester finissable, ni aucun boss — un mur de progression ne doit pas devenir une
+impasse. Deux étapes réglées par zone en Difficile, trois en Hardcore : c'est
+précisément là que les rencontres se rejouent à l'identique.
+
+### La mesure qui compte
+
+Une règle utile coûte cher à une équipe qui repose dessus, et peu à une équipe
+qui s'en passe. Sinon ce n'est pas une contrainte de composition, c'est de la
+difficulté en plus.
+
+| Règle | Équipe concernée | Équipe insensible |
+|---|---|---|
+| Silence des soins | **+27,2 %** de puissance | **+0,0 %** |
+| Volonté de fer | +27,4 % | +13,6 % |
+
+Le Silence des soins est exactement ce qu'on visait : il ne pénalise que les
+compositions qui reposent sur les soins. La Volonté de fer discrimine moins bien
+— elle coûte aussi à une équipe neutre — mais reste une vraie contrainte.
+
+### Une promesse tenue au mot près
+
+La Volonté de fer annonçait d'abord « les ennemis résistent à **tous** les
+malus ». C'était faux : les marques de mécanique (Traque, Marque d'exécution)
+sont posées en direct par les kits, sans jet de Précision, et les bloquer
+casserait ces kits. Le texte a été corrigé pour ne promettre que ce que la règle
+bloque réellement. Un test vérifie que le texte ne redevient pas trop large.

@@ -25,7 +25,8 @@ export const optionsDeCombat=mission=>({
   raid:mission?.raid?{...mission.raidData,level:mission.raidLevel}:null,
   mythic:mission?.mythic?{level:mission.mythicLevel,season:mission.mythicSeason,turnBudget:mission.turnBudget}:null,
   waves:mission?.waves,
-  affixIds:mission?.affixIds
+  affixIds:mission?.affixIds,
+  regle:mission?.regle||null
 });
 
 /** Joue un combat entier en mode automatique. */
