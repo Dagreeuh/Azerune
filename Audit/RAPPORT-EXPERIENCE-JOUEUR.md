@@ -515,3 +515,63 @@ malus ». C'était faux : les marques de mécanique (Traque, Marque d'exécution
 sont posées en direct par les kits, sans jet de Précision, et les bloquer
 casserait ces kits. Le texte a été corrigé pour ne promettre que ce que la règle
 bloque réellement. Un test vérifie que le texte ne redevient pas trop large.
+
+
+---
+
+## 13. Tour de tous les champions
+
+32 champions, 96 sorts, chacun lancé dans une scène représentative — alliés
+blessés et affaiblis, ennemis déjà affligés, protégés et l'un d'eux à l'agonie —
+puis comparé à ce que le sort déclare. Rejouable avec `npm run mesures`
+(`Audit/mesures/audit-champions.test.js`).
+
+### Ce qui a été cherché
+
+| Classe | Résultat |
+|---|---|
+| Sort sans aucun effet observable | 0 |
+| Puissance déclarée sans dégâts | 0 |
+| Dégâts sans puissance déclarée | 0 |
+| Sort de soutien qui blesse | 0 |
+| Recharge incohérente avec l'annonce | 0 |
+| Exception au lancer | 0 |
+| Promesse de description non tenue | 2, tous deux vérifiés comme différés |
+| Fiche incohérente avec le kit | 0 |
+| Barre de ressource jamais alimentée | 0 |
+| **Résonance IV promise mais sans effet** | **3** |
+
+### Le seul vrai défaut : trois Résonances IV payées pour rien
+
+Aurelis, Elowen et Hicho annonçaient chacun une amélioration précise à
+Résonance IV — un bouclier plus grand, un Jardin qui soigne davantage, une Marée
+plus généreuse — et **le moteur ne l'appliquait nulle part**. Le joueur payait
+des cristaux et des Âmes universelles pour un texte sans effet.
+
+| Champion | Résonance 0 | Résonance IV avant | après |
+|---|---|---|---|
+| Aurelis — Égide de secours | 3 840 | 3 840 | **4 560** |
+| Elowen — Jardin vivant | 2 880 | 2 880 | **3 600** |
+| Hicho — Marée ancestrale | 11 520 | 11 520 | **13 500** |
+
+### Trois fois où c'était ma mesure qui mentait
+
+La battue a d'abord signalé bien plus, et chaque fois le défaut était dans le
+harnais. C'est la partie la plus utile de cet exercice :
+
+1. **Une copie de surface.** Mon instantané « avant » partageait ses objets de
+   malus avec le moteur : quand un sort prolongeait un Saignement, l'instantané
+   changeait aussi, et l'audit ne voyait rien. **Dagcat a été accusé à tort** de
+   ne pas prolonger le Saignement.
+2. **Un bouclier de test trop épais.** Il absorbait tous les dégâts, et
+   **22 sorts** ont été signalés comme n'infligeant rien.
+3. **Des motifs trop larges.** « Inflige le double de dégâts **aux boucliers** »
+   était lu comme la promesse de *donner* un bouclier ; « Réagit avec Saignement
+   ou Brûlure » comme celle d'en *appliquer*. Korga, Morghast et Histéria
+   accusés à tort.
+
+Les deux signalements qui subsistent sont attendus et vérifiés : la Graine de
+Sylven purifie **quand les PV tombent**, la Pénitence de Lelianna soigne
+**les alliés sous Expiation**. Un lancer isolé ne peut pas les voir.
+`tests/promesses.conditionnelles.test.js` prouve que les deux tiennent, au bon
+moment — et qu'elles n'agissent pas trop tôt.
