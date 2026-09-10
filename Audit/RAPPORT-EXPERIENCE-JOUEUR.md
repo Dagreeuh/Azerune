@@ -575,3 +575,71 @@ Sylven purifie **quand les PV tombent**, la Pénitence de Lelianna soigne
 **les alliés sous Expiation**. Un lancer isolé ne peut pas les voir.
 `tests/promesses.conditionnelles.test.js` prouve que les deux tiennent, au bon
 moment — et qu'elles n'agissent pas trop tôt.
+
+
+---
+
+## 14. Battue des autres systèmes
+
+Même méthode que pour les champions : inventorier ce qui est **annoncé**, puis
+vérifier que le moteur le **consomme**.
+
+### Sets d'équipement — 15 sets, rien à signaler
+
+Les six sets à effet (`lifestealSet`, `protectionSet`, `counterSet`,
+`incendiarySet`, `volcanicFurySet`, `fireproofSet`) sont tous consommés par le
+moteur, et chaque bonus chiffré annoncé correspond aux statistiques déclarées.
+Aucun défaut.
+
+### Armes Uniques — 3 pouvoirs sur 7 ne faisaient rien
+
+Une arme Unique se gagne au bout d'une chronique longue et rare. Trois d'entre
+elles ne tenaient pas leur promesse.
+
+| Arme | Promesse | État |
+|---|---|---|
+| 🌟 Bâton des Astres Brisés | « Cinq compétences alliées éveillent un alignement protecteur. » | **jamais implémenté** |
+| 🌊 Égide des Mille Marées | « Les soins excédentaires alimentent une égide collective. » | **jamais implémenté** |
+| 🗡️ Cendre-Sépulcrale | « La lame répond à son orientation purifiée ou corrompue. » | **seule la corrompue existait** |
+
+Les deux premières n'étaient référencées **nulle part** dans le moteur. Pire,
+la décharge générique commune à toutes les armes exige d'infliger des dégâts :
+un soigneur portant l'une de ces deux armes de soutien — dont les sets sont
+justement Protection et Vitalité — n'en tirait rigoureusement rien.
+
+Elles sont écrites, et sans condition de dégâts. Pour Cendre-Sépulcrale, la
+chronique fait **choisir** entre purification et corruption : choisir la
+purification ne donnait rien. La lame purifiée délivre désormais l'allié le plus
+bas d'un malus et le soigne.
+
+### Empreintes — 22 % du système était décoratif
+
+Le tableau d'Empreintes est **identique pour tous les champions** : les mêmes
+douze nœuds, aux mêmes emplacements, seuls les index de compétences changent.
+Or un bonus de fiabilité sur une compétence qui ne tente aucun jet, ou un bonus
+de durée sur une frappe qui ne pose rien, ne fait rien du tout.
+
+**84 nœuds sur 384 étaient morts** — jusqu'à 6 sur 12 pour Caelion. Vérifié par
+simulation sur 60 graines avant toute conclusion.
+
+Correction : chaque nœud garde l'intention de sa branche — Force parle de
+puissance, Emprise de fiabilité et de durée, Flux de tempo — mais **se porte sur
+une compétence qui sait s'en servir**. Si aucune ne le sait, il bascule sur un
+bonus que la compétence visée peut recevoir. La forme du tableau, ses coûts et
+son interface ne changent pas. **0 nœud mort sur 384.**
+
+Et pour éviter d'introduire le défaut que je traquais, le texte de chaque nœud
+est désormais **dérivé du bonus retenu** au lieu d'être écrit à la main : il
+nomme la compétence réellement touchée et dit le vrai type de bonus, avec le
+verbe qui convient — « frappe plus fort », « protège davantage », « agit plus
+fort ».
+
+### Une quatrième fois où ma mesure mentait
+
+Mon test « les sept armes ont un pouvoir » passait — et ne prouvait rien.
+`createBattle` tire les jauges de départ au hasard : deux exécutions diffèrent
+toujours, donc **n'importe quelle arme, même décorative, passait le test**. Il
+échouait une fois sur trois, ce qui l'a trahi. Une fois le générateur amorcé sur
+toute la séquence, Cendre-Sépulcrale est tombée immédiatement.
+
+Un test instable n'est pas un détail de confort : c'est un test qui ment.

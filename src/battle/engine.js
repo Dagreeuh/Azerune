@@ -500,7 +500,18 @@ export function castSkill(battle,index,targetId){
   // permet a l'ecran de choisir l'animation du SORT plutot qu'une gerbe
   // generique, sans que la couche visuelle ait a deviner quoi que ce soit.
   const event=(target,amount,type,extra={})=>events.push({id:`event-${(battle.eventSeq||0)+events.length+1}-${target.id}`,sourceId:actor.id,targetId:target.id,amount:Math.max(0,Math.round(amount)),type,affinity:'neutral',critical:false,skillEffect:skill.effect,element:actor.element,skillTarget:skill.target,skillPower:skill.power||0,...extra});
-  const heal=(target,raw,type='heal')=>{if(battle.regle?.id==='sans-soin')return 0;const necroticMultiplier=1-.06*Math.min(5,target.debuffs?.necrotic?.stacks||0),healingMultiplier=Math.max(.35,(target.debuffs?.healingDown?.60:1)*(target.debuffs?.raidHealingDown?.70:1)*necroticMultiplier),adjusted=raw*COMBAT_TEMPO*healingMultiplier;const amount=Math.max(0,Math.min(target.maxHp-target.hp,Math.round(adjusted)));target.hp+=amount;healingTotal+=amount;if(amount)event(target,amount,type);return amount};
+  const heal=(target,raw,type='heal')=>{if(battle.regle?.id==='sans-soin')return 0;const necroticMultiplier=1-.06*Math.min(5,target.debuffs?.necrotic?.stacks||0),healingMultiplier=Math.max(.35,(target.debuffs?.healingDown?.60:1)*(target.debuffs?.raidHealingDown?.70:1)*necroticMultiplier),adjusted=raw*COMBAT_TEMPO*healingMultiplier;const voulu=Math.round(adjusted),amount=Math.max(0,Math.min(target.maxHp-target.hp,voulu));target.hp+=amount;healingTotal+=amount;if(amount)event(target,amount,type);
+    // Egide des Mille Marees : le surplus de soin n'est plus perdu, il devient
+    // une egide partagee. Sans cela, l'arme n'avait aucun effet — c'etait la
+    // seule des sept, avec le Baton des Astres Brises, a ne rien faire.
+    const surplus=voulu-amount;
+    if(surplus>0&&actor.uniqueWeapon?.uniqueId==='tides'){
+      const part=Math.max(1,Math.round(surplus/Math.max(1,allies.filter(x=>!x.dead).length)));
+      allies.filter(x=>!x.dead).forEach(x=>{x.shield=(x.shield||0)+part;x.maxShield=Math.max(x.maxShield||0,x.shield);x.buffs.shield={turns:2+mastery.duration,source:actor.id};});
+      shieldTotal+=part*allies.filter(x=>!x.dead).length;
+      logs.push(`🌊 ${actor.uniqueWeapon.name} : ${surplus} PV excédentaires deviennent ${part} de bouclier par allié.`);
+    }
+    return amount};
   const shield=(target,raw)=>{const amount=Math.max(0,Math.round(raw*COMBAT_TEMPO));target.shield+=amount;target.maxShield=Math.max(target.maxShield||0,target.shield);target.buffs.shield={turns:2+mastery.duration,source:actor.id};shieldTotal+=amount;if(amount)event(target,amount,'shield');return amount};
   const debuff=(target,key,turns,chance=.75)=>{if(battle.regle?.id==='resistance'&&target.side==='enemy'){resisted.push(`${target.name} résiste : Volonté de fer.`);return false}const relation=affinity(actor.element,target.element);return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,mastery.effectRate,resisted)};
   const hit=(target,mult=skill.power||0,opts={})=>{if(!target||target.dead||mult<=0)return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'}};if(battle.raidState?.channeling&&target.raidRole==='priest')return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'},channeled:true};const intangible=battle.mythic&&battle.affixState?.ids?.includes('incorporeal')&&target.hp/target.maxHp<.5&&!target.debuffs?.stun&&!target.debuffs?.slow;const relation=affinity(actor.element,target.element),attack=(opts.defScale?actor.def*(actor.buffs.defUp?1.3:1):actor.atk*(actor.buffs.atkUp?1.25:1))*(1+(actor.buffs.damageUp?.power||0)),defense=target.def*(target.buffs.defUp?1.3:1)*(1+.08*(target.buffs?.mythicBolster?.stacks||0))*(target.debuffs.defDown?.7:1)*(typeof opts.pierce==='number'?opts.pierce:opts.pierce?.15:1);let power=mult*(1+mastery.power)*relation.damage*(opts.bonus||1);if(target.debuffs.mark)power*=1.2;if(actor.setEffects?.includes('volcanicFurySet')&&actor.hp/actor.maxHp<.5)power*=1.12;let base=Math.max(5,Math.round(attack*power*100/(100+defense*3)*(intangible?.45:1))),critical=opts.forceCrit||Math.random()<(actor.crit||5)/100,damage=Math.round(base*(critical?1+(actor.critDamage||50)/100:1));const absorbed=Math.min(target.shield||0,opts.shieldBreaker?damage*2:damage);target.shield=Math.max(0,(target.shield||0)-absorbed);if(absorbed>0&&target.shield<=0)target.shieldBroken=true;if(!opts.shieldOnly){damage=Math.max(0,damage-(opts.shieldBreaker?Math.ceil(absorbed/2):absorbed));target.hp=Math.max(0,target.hp-damage);target.dead=target.hp<=0;}damageTotal+=damage;if(damage>0&&actor.setEffects?.includes('lifestealSet')&&actor.hp<actor.maxHp){const life=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*.25)));actor.hp+=life;healingTotal+=life;event(actor,life,'heal',{sourceType:'lifesteal'});}const hunter=allies.find(unit=>unit.mechanic?.targetId===target.id&&unit.mechanic?.active&&!unit.dead);if(hunter&&hunter.id!==actor.id)hunter.atb=Math.min(100,hunter.atb+(Number(hunter.resonanceLevel||0)>=4?15:12));event(target,damage,'damage',{affinity:relation.key,critical});return{damage,critical,relation,absorbed}};
@@ -629,7 +640,31 @@ export function castSkill(battle,index,targetId){
   // renfort dure moins longtemps que sa recharge.
   if(e==='soulSigil'){targets.forEach(t=>{if(debuff(t,'provoke',2,.75))t.debuffs.provoke.source=actor.id});m.value=Math.min(5,(m.value||0)+Math.min(2,targets.length));actor.buffs.defUp={turns:2};}
   if(e==='soulMetamorphosis'){const charges=m.value||0;heal(actor,actor.maxHp*(.05+(resonanceIV?.045:.04)*charges)*(1+mastery.power));allies.filter(x=>!x.dead).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp).slice(0,2).forEach(x=>shield(x,x.maxHp*(.06+(resonanceIV?.028:.025)*charges)*(1+mastery.power)));actor.buffs.defUp={turns:2+Math.min(3,charges)};m.value=0;}
-  if(actor.uniqueWeapon&&damageTotal>0){actor.weaponCharge=(actor.weaponCharge||0)+1;const trigger=actor.uniqueWeapon.uniqueId==='heartworld'?5:4;if(actor.weaponCharge>=trigger&&chosen&&!chosen.dead){const bonus=Math.round(actor.atk*(actor.uniqueWeapon.uniqueId==='eclipse'?.58:.42));chosen.hp=Math.max(0,chosen.hp-bonus);chosen.dead=chosen.hp<=0;damageTotal+=bonus;event(chosen,bonus,'damage',{affinity:'neutral',weapon:true});if(actor.uniqueWeapon.uniqueId==='heartworld')chosen.debuffs.burn={turns:2,source:actor.id,sourceAtk:actor.atk};if(actor.uniqueWeapon.uniqueId==='stormprince')chosen.atb=Math.max(0,chosen.atb-15);if(actor.uniqueWeapon.uniqueId==='plague'&&Object.keys(chosen.debuffs||{}).length)chosen.debuffs.healingDown={turns:2};if(actor.uniqueWeapon.uniqueId==='sepulchral'&&actor.uniqueWeapon.orientation==='corrupted')chosen.debuffs.corruption={turns:3,source:actor.id,sourceAtk:actor.atk};actor.weaponCharge=0;logs.push(`${actor.uniqueWeapon.icon||'✦'} ${actor.uniqueWeapon.name} libère son pouvoir : ${bonus} dégâts.`);}}
+  // Baton des Astres Brises : cinq competences alliees eveillent un alignement
+  // protecteur. Compteur separe de `weaponCharge`, et surtout sans condition de
+  // degats : c'est une arme de soutien, elle doit fonctionner pour un soigneur.
+  const astres=allies.find(x=>!x.dead&&x.uniqueWeapon?.uniqueId==='brokenstars');
+  if(astres){
+    astres.alignementCharge=(astres.alignementCharge||0)+1;
+    if(astres.alignementCharge>=5){
+      astres.alignementCharge=0;
+      const egide=Math.round(pvReference(astres)*.10);
+      allies.filter(x=>!x.dead).forEach(x=>{x.shield=(x.shield||0)+egide;x.maxShield=Math.max(x.maxShield||0,x.shield);x.buffs.shield={turns:2+mastery.duration,source:astres.id};});
+      shieldTotal+=egide*allies.filter(x=>!x.dead).length;
+      logs.push(`✦ ${astres.uniqueWeapon.name} : l’alignement protecteur accorde ${egide} de bouclier à chaque allié.`);
+    }
+  }
+  if(actor.uniqueWeapon&&damageTotal>0){actor.weaponCharge=(actor.weaponCharge||0)+1;const trigger=actor.uniqueWeapon.uniqueId==='heartworld'?5:4;if(actor.weaponCharge>=trigger&&chosen&&!chosen.dead){const bonus=Math.round(actor.atk*(actor.uniqueWeapon.uniqueId==='eclipse'?.58:.42));chosen.hp=Math.max(0,chosen.hp-bonus);chosen.dead=chosen.hp<=0;damageTotal+=bonus;event(chosen,bonus,'damage',{affinity:'neutral',weapon:true});if(actor.uniqueWeapon.uniqueId==='heartworld')chosen.debuffs.burn={turns:2,source:actor.id,sourceAtk:actor.atk};if(actor.uniqueWeapon.uniqueId==='stormprince')chosen.atb=Math.max(0,chosen.atb-15);if(actor.uniqueWeapon.uniqueId==='plague'&&Object.keys(chosen.debuffs||{}).length)chosen.debuffs.healingDown={turns:2};if(actor.uniqueWeapon.uniqueId==='sepulchral'){
+      // La chronique fait choisir entre lame purifiée et lame corrompue. Seule
+      // la corrompue existait : choisir la purification ne donnait rien.
+      if(actor.uniqueWeapon.orientation==='corrupted')chosen.debuffs.corruption={turns:3,source:actor.id,sourceAtk:actor.atk};
+      else{const proteger=allies.filter(x=>!x.dead).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];
+        if(proteger){const retires=cleanseUnit(proteger,1);
+          heal(proteger,proteger.maxHp*.08);
+          logs.push(retires.length
+            ?`✦ La lame purifiée délivre ${proteger.name} de ${retires.join(', ')} et le soigne.`
+            :`✦ La lame purifiée soigne ${proteger.name}.`);}}
+    }actor.weaponCharge=0;logs.push(`${actor.uniqueWeapon.icon||'✦'} ${actor.uniqueWeapon.name} libère son pouvoir : ${bonus} dégâts.`);}}
   const caelion=allies.find(x=>x.id===30&&x.mechanic?.active&&x.mechanic?.targetId===actor.id);if(caelion&&skill.cd>0){caelion.mechanic.anchorSpent=true;logs.push(`⏳ L’Ancrage de Caelion mémorise l’utilisation de ${skill.name}.`);}if(['enemy','allEnemies'].includes(skill.target)&&damageTotal>0&&actor.setEffects?.includes('incendiarySet')){const burnTarget=chosen?.side==='enemy'&&!chosen.dead?chosen:enemies.find(unit=>!unit.dead);if(burnTarget&&Math.random()<.25&&tryDebuff(actor,burnTarget,'burn',2,.75,0,resisted))logs.push(`🔥 Set Incendiaire : ${burnTarget.name} subit Brûlure.`);}
   actor.cooldowns=actor.cooldowns.map((value,i)=>i===index?Math.max(0,skill.cd-mastery.cooldown)+1:value);
   const details=[damageTotal?`${damageTotal} dégâts`:null,healingTotal?`${healingTotal} soins`:null,shieldTotal?`${shieldTotal} bouclier`:null].filter(Boolean).join(' · '),resource=actor.name!=='Korga'&&!actor.skills?.some(skill=>skill.effect==='shieldExecute')&&actor.mechanic?.value?` · ${actor.mechanic.value} charge(s)`:'';
