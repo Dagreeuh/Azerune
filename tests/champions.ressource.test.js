@@ -27,14 +27,16 @@ describe('la barre de ressource ne ment plus',()=>{
   });
 
   it('les champions sans ressource sont bien déclarés ainsi',()=>{
-    ['Yunmei','Aszhal','Ragnhild'].forEach(nom=>{
+    // Aszhal en a gagne une en v1.73 : la Plaie temporelle est une facture qui
+    // grossit, et qu'il faut voir grossir pour choisir quand frapper.
+    ['Yunmei','Ragnhild'].forEach(nom=>{
       const hero=HEROES.find(entry=>entry.name===nom);
       expect(championIdentity(hero).resource,nom).toBe('Aucune');
     });
   });
 
   it('un champion à ressource garde la sienne',()=>{
-    ['Vexil','Nyxaris','Vharok','Korga'].forEach(nom=>{
+    ['Vexil','Nyxaris','Vharok','Korga','Aszhal'].forEach(nom=>{
       const hero=HEROES.find(entry=>entry.name===nom);
       expect(championIdentity(hero).resource,nom).not.toBe('Aucune');
     });

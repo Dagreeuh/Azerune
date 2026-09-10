@@ -153,6 +153,19 @@ export const RESSOURCES_CHAMPIONS={
     return{etat:actifSi((cumuls?.stacks||0)>=3),titre:'☠️ Virulence sur la cible',
       detail:cumuls?`${cumuls.stacks} ${pluriel(cumuls.stacks,'cumul')} · ${cumuls.enemy.name}`:'Aucune cible infectée'};}},
 
+  // Aszhal n'avait aucune pastille : son ancien sort 3 etait un simple bonus
+  // d'equipe, sans rien a suivre. La Plaie temporelle est au contraire une
+  // facture qui grossit — et qu'il faut voir grossir pour choisir quand
+  // frapper. La ressource est portee par les ennemis, comme pour Malvek.
+  35:{classe:'aszhal-wound',effet:'breathOfEons',lire(unit,{livingEnemies}){
+    const plaies=livingEnemies.filter(enemy=>enemy.debuffs?.temporalWound?.source===unit.id);
+    if(!plaies.length)return{etat:'',titre:'⏳ PLAIE TEMPORELLE',detail:'Aucune plaie ouverte'};
+    const stocke=plaies.reduce((total,enemy)=>total+Math.max(0,enemy.debuffs.temporalWound.stored||0),0);
+    const tours=Math.max(...plaies.map(enemy=>enemy.debuffs.temporalWound.turns||0));
+    return{etat:stocke>0?'active':'',
+      titre:stocke>0?'⏳ FACTURE EN COURS':'⏳ PLAIE TEMPORELLE',
+      detail:`${plaies.length} ${pluriel(plaies.length,'plaie')} · ${stocke} en attente · ${tours} ${pluriel(tours,'tour')}`};}},
+
   33:{classe:'sivrane-frost',effet:'frostShatter',lire(unit,{livingEnemies}){
     const cumuls=cumulsEnnemis(livingEnemies,'frost');
     return{etat:actifSi((cumuls?.stacks||0)>=3),titre:'❄️ Givre sur la cible',
@@ -162,7 +175,7 @@ export const RESSOURCES_CHAMPIONS={
 // L'ordre de reconnaissance reproduit celui de l'ancienne chaine de ternaires :
 // un heros derive peut porter deux effets reconnaissables, et c'est le premier
 // qui gagnait. Le changer changerait silencieusement un affichage.
-export const ORDRE_RECONNAISSANCE=[3,7,9,10,11,12,13,17,15,19,21,23,24,26,27,28,14,8,1,30,20,29,22,33];
+export const ORDRE_RECONNAISSANCE=[3,7,9,10,11,12,13,17,15,19,21,23,24,26,27,28,14,8,1,30,20,29,22,33,35];
 
 /** Le descripteur qui decrit cette unite, ou null s'il n'y en a pas. */
 export function descripteurDeRessource(unit){

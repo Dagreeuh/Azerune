@@ -1012,3 +1012,96 @@ combinaisons. Quatre tests de `champions.ressource.test.js` ont été rebranché
 du **texte source** vers le **comportement** — ils lisaient des chaînes de
 `BattlePage.jsx` qui n'existent plus, et vérifient désormais ce que la fonction
 renvoie, ce qui est plus solide. Suite complète : **1 527 tests**, 71 fichiers.
+
+## 19. Souffle des éons : d'un bonus plat à une facture différée
+
+Refonte du sort 3 d'Aszhal, sur modèle du sort du même nom dont il porte déjà
+l'archétype (Évocateur Augmentation).
+
+### Pourquoi l'ancienne version méritait de partir
+
+« Toute l'équipe gagne 15 % de dégâts et de la jauge. » Ça marchait, c'était
+lisible, et ça ne demandait rien : aucune décision, rien à regarder, aucun
+moment où le sort est meilleur qu'un autre. C'était le seul ultime du jeu qui
+ne produisait aucun état à suivre — d'où le `resource: 'Aucune'` d'Aszhal.
+
+### Ce que fait la nouvelle version
+
+| | |
+|---|---|
+| **Ouvre** | une **Plaie temporelle** sur **tous** les ennemis vivants, 3 tours |
+| **Amplifie** | toute l'équipe (12 %, 16 % en Résonance IV) — la **condition**, plus la récompense |
+| **Met de côté** | 15 % des dégâts qu'un allié **amplifié par Aszhal** inflige à une Plaie (20 % en Résonance IV) |
+| **Rend** | la totalité, d'un coup, en Arcane, quand la Plaie se referme |
+| **Réduit** | la part au-delà de deux autres alliés amplifiés (× 2 / n) |
+
+Trois choses en découlent, et c'est tout l'intérêt :
+
+- **Seuls les alliés qu'Aszhal a amplifiés nourrissent la Plaie.** Le buff
+  d'équipe n'est plus le cadeau, c'est le péage.
+- **La Plaie se referme au tour de l'ennemi qui la porte**, comme le Poison et
+  la Brûlure. C'est la convention du moteur, pas une exception.
+- **Une équipe qui ne frappe pas ne reçoit rien.** Le sort peut être gâché.
+
+### La clause du sort d'origine n'est pas du texte mort
+
+« Damage is reduced if Ebon Might affects more than 2 other allies » est, dans
+le sort d'origine, une clause anti-montée en puissance en raid. À trois
+champions elle ne se déclenche **jamais** — la recopier telle quelle aurait été
+exactement le péché que ces six versions ont passé leur temps à réparer.
+
+Elle est donc implémentée **et testée sur le format où elle mord** : en Raid 4v4,
+trois autres alliés amplifiés font tomber la part de 15 % à **10 %**, et le
+journal l'annonce.
+
+### Mesure d'équilibrage — c'est un buff d'environ 5 %, et je le dis
+
+A/B à graines appariées, 40 combats de 24 tours, même équipe, mêmes ennemis :
+
+| | Ancienne | Nouvelle |
+|---|---|---|
+| Apport du sort 3 seul | +6,7 % | **+12,0 %** |
+| Dégâts d'équipe sur 24 tours | 2 022 | **2 122** |
+| Référence : la même équipe avec Ragnhild (DPS) à la place d'Aszhal | 2 131 | 2 131 |
+
+La refonte vaut donc **+5 %** sur la contribution totale d'Aszhal, et le place
+**à parité avec une pure championne de dégâts** (2 122 contre 2 131). Pour un
+soutien qui n'apporte ni soin ni protection et dont toute la valeur est
+l'amplification, c'est une place défendable — mais c'est bien un buff, pas un
+échange neutre. Le levier de réglage est unique et isolé : la part de 15 %.
+
+### Aszhal a enfin quelque chose à regarder
+
+Il était l'un des trois champions sans pastille. La Plaie est une facture qui
+grossit, et il faut la voir grossir pour choisir quand frapper : la pastille
+affiche le nombre de Plaies ouvertes, le total en attente et les tours
+restants. C'est le premier champion ajouté **après** la refonte de la section 18
+— et il n'a demandé **aucune ligne** dans `BattlePage.jsx`. Le chantier a servi
+tout de suite.
+
+### La référence d'affichage a changé pour la première fois — volontairement
+
+Les 1 632 combinaisons de la section 18 ont détecté la nouveauté : **51 cas
+modifiés, tous Aszhal** (17 états × 3 terrains), aucun autre champion touché.
+Vérifié avant de régénérer la référence, et le fichier dit désormais pourquoi il
+a bougé. C'est exactement le service qu'on attend d'un filet de ce genre :
+il n'empêche pas de changer, il oblige à regarder ce qui change.
+
+### Deux tests m'ont dit non pour de mauvaises raisons
+
+- La dérivation des listes d'Empreintes (`gestion`) lit des **lignes** de code.
+  Mon effet réécrit sur plusieurs lignes est devenu invisible à `mastery.power`
+  et `mastery.duration` — le test mesurait la mise en forme, pas le
+  comportement. J'ai d'abord voulu la rendre robuste au bloc ; elle a alors
+  révélé une dizaine de désaccords **préexistants** dans les deux sens, sur
+  d'autres champions. C'est un autre chantier : j'ai remis la dérivation
+  d'origine et remis mon effet sur une ligne, au style du fichier. **Le
+  désaccord reste à traiter** — il est consigné ici, pas enterré.
+- Un mutant destiné à Aszhal a frappé la description de **Lelianna**, qui porte
+  la même phrase (`pendant 3 tours`). Faux positif de mon script — mais il a
+  révélé un vrai trou : cette durée n'était épinglée nulle part. Elle l'est.
+
+### Couverture
+
+`tests/aszhal.plaie.test.js` : 23 tests, **20 mutations sur 20 tuées**.
+Suite complète : **1 550 tests**, 72 fichiers.

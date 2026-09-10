@@ -33,7 +33,8 @@ const AUTRES=[
 const ENNEMIS=[
   {id:'e1',name:'Cible A',icon:'x',side:'enemy',hp:100,maxHp:100,dead:false,element:'Feu',shield:0,
    debuffs:{hunt:{turns:3},poison:{stacks:2},burn:{},bleed:{},agony:{stacks:3},corruption:{},
-     virulence:{stacks:4},frost:{stacks:4},exposed:{}}},
+     virulence:{stacks:4},frost:{stacks:4},exposed:{},
+     temporalWound:{turns:2,share:.15,stored:340}}},
   {id:'e2',name:'Cible B',icon:'y',side:'enemy',hp:60,maxHp:100,dead:false,element:'Eau',shield:0,debuffs:{}}];
 
 /** Rend la carte d'un champion dans un etat donne, et renvoie sa pastille. */

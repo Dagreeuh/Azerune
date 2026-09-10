@@ -67,8 +67,10 @@ describe('chaque champion déclare sa propre ressource',()=>{
     expect(orphelins.map(h=>h.name)).toEqual([]);
   });
 
-  it('les trois champions sans ressource n’affichent rien',()=>{
-    ['Ragnhild','Yunmei','Aszhal'].forEach(nom=>{
+  it('les deux champions sans ressource n’affichent rien',()=>{
+    // Aszhal a quitte cette liste en v1.73 : son Souffle des éons ouvre
+    // desormais des Plaies temporelles, et une facture qui grossit se suit.
+    ['Ragnhild','Yunmei'].forEach(nom=>{
       const hero=HEROES.find(h=>h.name===nom);
       expect(championIdentity(hero).resource,`${nom} a gagné une ressource`).toBe('Aucune');
       expect(ressourceAffichee({...hero,side:'ally',mechanic:{value:3}},{},championIdentity(hero)),
@@ -167,7 +169,7 @@ describe('reconnaissance d’un champion',()=>{
   it('l’ordre de reconnaissance est figé : le changer changerait des affichages',()=>{
     // Un heros derive peut porter deux effets reconnaissables ; c'est le
     // premier de cette liste qui gagnait, et qui doit continuer de gagner.
-    expect(ORDRE_RECONNAISSANCE).toEqual([3,7,9,10,11,12,13,17,15,19,21,23,24,26,27,28,14,8,1,30,20,29,22,33]);
+    expect(ORDRE_RECONNAISSANCE).toEqual([3,7,9,10,11,12,13,17,15,19,21,23,24,26,27,28,14,8,1,30,20,29,22,33,35]);
   });
 });
 
