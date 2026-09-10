@@ -947,3 +947,16 @@
 .cle-noeud.exclue{opacity:.55}
 .cle-noeud:disabled{cursor:default}
 @media(max-width:560px){.cles-de-voute>header{flex-direction:column}}
+
+/* Niveau du champion, en haut a droite de sa carte de combat.
+   Le coin haut-droit porte deja le marqueur AUTO — mais celui-ci ne s'affiche
+   que sur les ennemis, et le niveau que sur les allies : ils ne se croisent
+   jamais. `pointer-events:none` pour que la pastille n'avale pas le clic de
+   selection de la carte. */
+.unit-level{position:absolute;right:5px;top:5px;z-index:20;padding:2px 5px;border-radius:5px;
+  border:1px solid color-mix(in srgb,var(--element-color) 45%,#334155);
+  background:#020617cc;color:#cbd5e1;font-size:7px;font-weight:900;letter-spacing:.2px;
+  pointer-events:none}
+.battle-unit.active .unit-level{border-color:#22d3ee88;color:#a5f3fc}
+@media(min-width:1200px){.unit-level{right:7px;top:7px;padding:3px 6px;font-size:9px}}
+@media(max-width:620px){.unit-level{right:4px;top:4px;padding:2px 4px;font-size:6px}}

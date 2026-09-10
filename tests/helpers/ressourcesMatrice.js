@@ -23,7 +23,7 @@ export const ETATS=[
 /** [nom, ennemis charges de malus, allies porteurs de liens] */
 export const TERRAINS=[['riche',true,true],['vierge',false,false],['sans-ennemi',null,true]];
 
-const ALLIE=(hero,mechanic)=>({...hero,side:'ally',hp:100,maxHp:100,shield:0,maxShield:0,atb:50,
+const ALLIE=(hero,mechanic)=>({...hero,side:'ally',currentLevel:42,hp:100,maxHp:100,shield:0,maxShield:0,atb:50,
   currentSpd:100,buffs:{},debuffs:{},cooldowns:[0,0,0],mechanic,dead:false,atk:100});
 const AUTRES=[
   {id:901,name:'Allié A',icon:'a',side:'ally',hp:50,maxHp:100,dead:false,debuffs:{},
