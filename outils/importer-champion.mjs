@@ -78,7 +78,7 @@ const jeux=config.animations.map(a=>{
   const choisis=r.cadres.filter(b=>(a.xMin==null||b.x>=a.xMin)&&(a.xMax==null||b.x<a.xMax)
     &&(a.minLargeur==null||b.w>=a.minLargeur));
   if(!choisis.length)throw new Error(`aucun cadre pour « ${a.nom} »`);
-  return{nom:a.nom,images:choisis.map(extraire)};
+  return{nom:a.nom,echelle:a.echelle,images:choisis.map(extraire)};
 });
 
 // Composition : une bande par animation, empilées. Chaque cadre garde sa taille
@@ -102,8 +102,11 @@ jeux.forEach((j,n)=>{
   // Le facteur d'échelle vient de la hauteur du PERSONNAGE dans cette rangée,
   // pas de la boîte : c'est lui qui doit rester constant d'une animation à
   // l'autre, sinon le champion grandit et rétrécit en combattant.
+  // Une icône de sort, un totem ou une particule ne sont pas des personnages :
+  // les ramener à la hauteur du champion n'aurait aucun sens. La config peut
+  // donc fixer l'échelle directement.
   const haut=Math.max(...j.images.map(i=>i.h));
-  echelles[j.nom]=Number((config.hauteurCible/haut).toFixed(4));
+  echelles[j.nom]=j.echelle!=null?j.echelle:Number((config.hauteurCible/haut).toFixed(4));
   oy+=hauteurs2[n];
 });
 

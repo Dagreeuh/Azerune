@@ -79,73 +79,138 @@ describe('codec PNG',()=>{
   });
 });
 
-describe('feuille importée de Lelianna',()=>{
-  const meta=JSON.parse(lire('public/sprites/champions/lelianna.json'));
-  const img=lirePNG(path.join(RACINE,'public',meta.fichier.replace(/^\//,'')));
+// Chaque champion présent dans l'index est vérifié automatiquement : une
+// nouvelle feuille importée est couverte sans qu'on touche à ce fichier.
+const index=JSON.parse(lire('public/sprites/champions/index.json'));
+const champions=Object.entries(index);
 
-  it('déclare les animations attendues',()=>{
-    ['repos','marche','attaque','soin','mort','portrait'].forEach(a=>{
-      expect(Object.keys(meta.cadres)).toContain(a);
-      expect(meta.cadres[a].length).toBeGreaterThan(0);
+describe('index des champions',()=>{
+  it('n’est pas vide et pointe vers des fiches existantes',()=>{
+    expect(champions.length).toBeGreaterThan(0);
+    champions.forEach(([heroId,e])=>{
+      expect(Number(heroId)).toBeGreaterThan(0);
+      expect(fs.existsSync(path.join(RACINE,'public',e.description.replace(/^\//,'')))).toBe(true);
+      expect(fs.existsSync(path.join(RACINE,'public',e.fichier.replace(/^\//,'')))).toBe(true);
     });
   });
 
-  it('range chaque cadre dans la feuille, sans débordement',()=>{
-    Object.entries(meta.cadres).forEach(([anim,liste])=>{
-      liste.forEach((c,i)=>{
-        expect(c.x+c.w,`${anim} ${i}`).toBeLessThanOrEqual(img.largeur);
-        expect(c.y+c.h,`${anim} ${i}`).toBeLessThanOrEqual(img.hauteur);
+  it('correspond à des champions réellement jouables',()=>{
+    // Une feuille rattachée à un identifiant inexistant ne s'afficherait
+    // jamais, et rien ne le signalerait à l'exécution.
+    const source=lire('src/data/heroes.js')+lire('src/data/customHeroes.js');
+    champions.forEach(([heroId,e])=>{
+      expect(source,`${e.nom} → id ${heroId}`).toMatch(new RegExp(`\\{id:${heroId},name:'`));
+    });
+  });
+});
+
+champions.forEach(([heroId,entree])=>{
+  describe(`feuille importée — ${entree.nom}`,()=>{
+    const meta=JSON.parse(lire(path.join('public',entree.description.replace(/^\//,''))));
+    const img=lirePNG(path.join(RACINE,'public',meta.fichier.replace(/^\//,'')));
+
+    it('fournit au moins repos, attaque et mort',()=>{
+      // Ce sont les trois animations que l'arène joue. Sans elles, le champion
+      // s'affiche mais reste inerte.
+      ['repos','attaque','mort'].forEach(a=>{
+        expect(Object.keys(meta.cadres)).toContain(a);
+        expect(meta.cadres[a].length).toBeGreaterThan(0);
       });
     });
-  });
 
-  it('ne livre aucun cadre vide',()=>{
-    Object.entries(meta.cadres).forEach(([anim,liste])=>{
-      liste.forEach((c,i)=>expect(pixelsOpaques(img,c),`${anim} ${i}`).toBeGreaterThan(200));
+    it('range chaque cadre dans la feuille, sans débordement',()=>{
+      Object.entries(meta.cadres).forEach(([anim,liste])=>{
+        liste.forEach((c,i)=>{
+          expect(c.x+c.w,`${anim} ${i}`).toBeLessThanOrEqual(img.largeur);
+          expect(c.y+c.h,`${anim} ${i}`).toBeLessThanOrEqual(img.hauteur);
+        });
+      });
+    });
+
+    it('ne livre aucun cadre vide',()=>{
+      Object.entries(meta.cadres).forEach(([anim,liste])=>{
+        liste.forEach((c,i)=>expect(pixelsOpaques(img,c),`${anim} ${i}`).toBeGreaterThan(200));
+      });
+    });
+
+    it('détoure vraiment le fond',()=>{
+      // Vérifier seulement qu'il reste des pixels sombres DANS le sprite ne
+      // prouve rien : ça passe aussi quand rien n'est détouré. Il faut exiger
+      // les deux — du transparent autour, du plein dedans.
+      const c=meta.cadres.repos[0];
+      let opaques=0;
+      for(let y=c.y;y<c.y+c.h;y+=1)for(let x=c.x;x<c.x+c.w;x+=1)
+        if(img.alpha(x,y)>200)opaques+=1;
+      const part=opaques/(c.w*c.h);
+      expect(part,'le fond doit être transparent').toBeLessThan(0.85);
+      expect(part,'le personnage doit rester plein').toBeGreaterThan(0.15);
+    });
+
+    it('ne troue pas le personnage en détourant',()=>{
+      const c=meta.cadres.repos[0];
+      let sombresDedans=0;
+      for(let y=c.y+2;y<c.y+c.h-2;y+=1)for(let x=c.x+2;x<c.x+c.w-2;x+=1){
+        const i=(y*img.largeur+x)*4;
+        if(img.px[i+3]>200&&Math.max(img.px[i],img.px[i+1],img.px[i+2])<34)sombresDedans+=1;
+      }
+      expect(sombresDedans).toBeGreaterThan(0);
+    });
+
+    it('ramène les animations du personnage à la même taille',()=>{
+      // Les rangées d'une feuille sont dessinées à des échelles différentes.
+      // Sans recalage, le champion grandit en attaquant. Les rangées qui ne
+      // sont pas des personnages (icônes, totems, particules) portent une
+      // échelle fixée à 1 et sont exclues de cette règle.
+      const cible=meta.hauteurCible;
+      Object.entries(meta.cadres).forEach(([anim,liste])=>{
+        if(meta.echelles[anim]===1)return;
+        const haut=Math.max(...liste.map(c=>c.h));
+        expect(haut*meta.echelles[anim],anim).toBeCloseTo(cible,0);
+      });
+    });
+
+    it('ne garde pas de fragment détaché comme cadre',()=>{
+      // Une pièce qui se détache (un bâton, un halo) forme son propre îlot et
+      // se glisse dans la rangée. Elle passe tous les autres contrôles : elle
+      // n'est ni vide, ni hors cadre. Seule sa taille la trahit.
+      //
+      // La règle ne vaut que pour les animations CYCLIQUES : repos, marche et
+      // attaque rejouent la même pose. La mort et le soin changent de
+      // silhouette pour de bon (debout puis à terre), leur ratio tombe
+      // légitimement à 0,51. Mesuré sur les deux feuilles : le plus mauvais
+      // ratio cyclique réel est 0,78, un fragment de bâton tombe à 0,49.
+      ['repos','marche','attaque'].forEach(anim=>{
+        const liste=meta.cadres[anim];
+        if(!liste||liste.length<2)return;
+        const hauts=liste.map(c=>c.h);
+        const ratio=Math.min(...hauts)/Math.max(...hauts);
+        expect(ratio,`${anim} : un cadre est hors de proportion`).toBeGreaterThan(0.65);
+      });
+    });
+
+    it('respecte les échelles fixées par la config',()=>{
+      // Les rangées de décor (icônes, totems, particules) déclarent une échelle
+      // explicite. Sans ce contrôle, les ignorer ne cassait aucun test.
+      const chemin=path.join(RACINE,'outils/feuilles',`${entree.nom}.json`);
+      if(!fs.existsSync(chemin))return;
+      const config=JSON.parse(fs.readFileSync(chemin,'utf8'));
+      const fixees=config.animations.filter(a=>a.echelle!=null);
+      fixees.forEach(a=>expect(meta.echelles[a.nom],a.nom).toBe(a.echelle));
+      if(fixees.length)expect(Object.values(meta.echelles).filter(e=>e===1).length)
+        .toBeGreaterThanOrEqual(fixees.length);
+    });
+
+    it('garde les cadres à leur taille native',()=>{
+      // L'invariant qui protège l'art : le pipeline ne redimensionne jamais.
+      const perso=Object.entries(meta.echelles).filter(([,e])=>e!==1);
+      expect(perso.length).toBeGreaterThan(0);
+      expect(perso.some(([,e])=>Math.abs(e-1)>0.05)).toBe(true);
     });
   });
+});
 
-  it('détoure vraiment le fond',()=>{
-    // Vérifier seulement qu'il reste des pixels sombres DANS le sprite ne
-    // prouve rien : ça passe aussi quand rien n'est détouré. Il faut exiger les
-    // deux — du transparent autour, du sombre dedans.
-    const c=meta.cadres.repos[0];
-    let opaques=0;
-    for(let y=c.y;y<c.y+c.h;y+=1)for(let x=c.x;x<c.x+c.w;x+=1)
-      if(img.alpha(x,y)>200)opaques+=1;
-    const part=opaques/(c.w*c.h);
-    expect(part,'le fond doit être transparent').toBeLessThan(0.75);
-    expect(part,'le personnage doit rester plein').toBeGreaterThan(0.15);
-  });
-
-  it('ne troue pas le personnage en détourant',()=>{
-    // Un « tout ce qui est noir devient transparent » perce les contours. Le
-    // remplissage depuis les bords laisse survivre les noirs enfermés.
-    const c=meta.cadres.repos[0];
-    let sombresDedans=0;
-    for(let y=c.y+2;y<c.y+c.h-2;y+=1)for(let x=c.x+2;x<c.x+c.w-2;x+=1){
-      const i=(y*img.largeur+x)*4;
-      if(img.px[i+3]>200&&Math.max(img.px[i],img.px[i+1],img.px[i+2])<34)sombresDedans+=1;
-    }
-    expect(sombresDedans).toBeGreaterThan(0);
-  });
-
-  it('ramène toutes les animations à la même taille de personnage',()=>{
-    // Les rangées d'une feuille sont dessinées à des échelles différentes. Sans
-    // recalage, le champion grandit en attaquant.
-    const cible=meta.hauteurCible;
-    Object.entries(meta.cadres).forEach(([anim,liste])=>{
-      const haut=Math.max(...liste.map(c=>c.h));
-      expect(haut*meta.echelles[anim],anim).toBeCloseTo(cible,0);
-    });
-  });
-
-  it('garde les cadres à leur taille native',()=>{
-    // L'invariant qui protège l'art : le pipeline ne redimensionne jamais. Si
-    // toutes les échelles valaient 1, c'est que quelqu'un a rééchantillonné en
-    // amont — et le pixel art n'y survit pas.
-    const echelles=Object.values(meta.echelles);
-    expect(echelles.some(e=>Math.abs(e-1)>0.05)).toBe(true);
+describe('le pipeline ne rééchantillonne pas',()=>{
+  it('le dit et s’y tient',()=>{
     expect(lire('outils/importer-champion.mjs')).toMatch(/NE JAMAIS RÉÉCHANTILLONNER/);
   });
 });

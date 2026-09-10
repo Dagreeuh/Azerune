@@ -1708,3 +1708,44 @@ Le format attendu pour le reste du roster est documenté dans
 `assets-source/README.md` — et il tient en une phrase : fond noir uni, une
 animation par rangée, des cadres qui ne se touchent pas, et du PNG plutôt que
 du JPEG.
+
+### 1.79.1 — Hicho : la chaîne tient sur une deuxième feuille
+
+Le vrai test d'un pipeline, c'est le deuxième cas. La feuille d'Hicho est plus
+riche que celle de Lelianna : trois icônes de sort encadrées, trois totems, deux
+sorts nommés (Chaîne d'éclair, Soin), une rangée de particules, et des libellés
+**dans des boîtes** au lieu de simple texte.
+
+Elle est passée **sans modifier une ligne de code** : 55 cadres, 7 rangées,
+16 libellés écartés seuls, le portrait en pied reconnu comme hors-gabarit. Dix
+animations extraites, dont les icônes de sort et les totems, utilisables plus
+tard dans l'interface.
+
+Une seule chose a demandé un ajustement, et c'est un défaut de la feuille, pas
+du code : la boîte du libellé « Idle / Repos » **touche** la première pose. Les
+deux ne forment qu'un seul îlot ; ce cadre a été écarté (il en reste quatre) et
+la consigne est passée dans `assets-source/README.md`.
+
+Une seule fonctionnalité ajoutée : `"echelle": 1` pour les rangées qui ne sont
+pas des personnages. Ramener une icône de sort à la hauteur du champion n'a
+aucun sens.
+
+**Les tests parcourent maintenant l'index des champions** : toute feuille
+importée est couverte sans qu'on touche au fichier de test. Deux contrôles
+nouveaux, tous deux nés de mutants survivants :
+
+- **Un fragment détaché n'est plus accepté comme cadre.** Le bâton isolé
+  (29×53) passait tous les contrôles existants — ni vide, ni hors cadre. Seule
+  sa taille le trahit. La règle ne s'applique qu'aux animations *cycliques*
+  (repos, marche, attaque), où toutes les poses se ressemblent : la mort et le
+  soin changent de silhouette pour de bon. Seuil mesuré sur les deux feuilles —
+  le plus mauvais ratio cyclique réel est 0,78, le fragment tombe à 0,49, le
+  seuil est à 0,65. Un seuil à 0,50 aurait tenu à un pixel près : inutilisable.
+- **Les échelles fixées par la config sont vérifiées.** Les ignorer ne cassait
+  aucun test.
+
+Ajouté aussi : une feuille rattachée à un `heroId` inexistant est refusée. Elle
+ne se serait jamais affichée, et rien ne l'aurait signalé à l'exécution.
+
+**5 mutants sur 5 tués** (3 sur 5 à la première passe). Suite complète :
+**1 722 tests**, 79 fichiers.

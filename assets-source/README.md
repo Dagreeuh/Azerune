@@ -24,6 +24,23 @@ le reste du roster passera pareil.
 - **Le nombre de cadres.** 5 en idle, 9 en marche, 8 en attaque : peu importe.
 - **La position des rangées.** Tout est détecté, rien n'est codé en dur.
 
+## Ce que la deuxième feuille a appris
+
+La feuille d'Hicho est passée **sans modifier une ligne de code** : 55 cadres,
+7 rangées, 16 libellés écartés seuls, alors qu'elle contient des choses que
+Lelianna n'avait pas — trois icônes de sort, trois totems, deux sorts nommés,
+une rangée de particules, et des libellés **encadrés** au lieu de simple texte.
+
+Deux enseignements pour les suivantes :
+
+- **Laisse respirer les libellés.** La boîte « Idle / Repos » touchait la
+  première pose : les deux n'ont formé qu'un seul îlot, et ce cadre a dû être
+  écarté. Une dizaine de pixels de noir entre un libellé et le premier cadre
+  suffit à l'éviter.
+- **Les rangées qui ne sont pas des personnages** (icônes, totems, particules)
+  se déclarent avec `"echelle": 1`. Sans ça, le pipeline les ramènerait à la
+  hauteur du champion, ce qui n'a aucun sens pour une icône de sort.
+
 ## Ce qui coince encore
 
 Une pièce qui se **détache complètement** du personnage (le bâton qui tombe au
