@@ -1603,3 +1603,108 @@ main, ni les effets visuels de sorts, ni les vagues, ni les récompenses. C'est
 délibéré : la question était « est-ce que ça vaut le coup », pas « remplaçons
 tout ce soir ». Les sprites sont générés par script et provisoires — leur seul
 mérite est de prouver que la chaîne complète tient, du pixel jusqu'à l'écran.
+
+---
+
+## 1.79.0 — Les vrais dessins entrent dans le jeu
+
+Verdict du joueur sur mes sprites générés : *« ça ne me plaît pas »*. Il avait
+raison, et je peux maintenant dire de combien.
+
+### L'écart, mesuré plutôt que supposé
+
+| | Personnage | Palette |
+|---|---|---|
+| Mes sprites générés | 30×41 pixels d'art | **31 teintes** |
+| Référence « paladin WoW » | ~30×51 | **108 teintes** |
+| Référence Disney Pixel RPG | — | **364 teintes** |
+
+Un facteur trois à douze sur la richesse chromatique. Aucun réglage de mon
+générateur ne comble ça : des rectangles empilés avec trois tons par matière ne
+deviennent pas du pixel art dessiné à la main. Le plafond n'était pas dans les
+réglages, il était dans la méthode.
+
+*(Note d'instrument : ma détection de grille a d'abord renvoyé n'importe quoi —
+elle butait sur le bruit JPEG. La deuxième version, qui cherche le contraste
+entre l'intérieur et la frontière des blocs, tient sur le paladin — ×23,
+mesuré — mais pas sur l'image Disney, une capture vidéo redimensionnée en
+non-entier. Les 364 teintes sont donc mesurées par moyennage de tuiles, pas par
+lecture de grille. Je préfère le dire que laisser croire à une précision que je
+n'ai pas.)*
+
+### Ce qui a changé la donne
+
+Le joueur a fourni une **feuille de personnage complète** pour Lelianna :
+portrait en pied, palette, et surtout des rangées d'animation étiquetées —
+idle, marche, attaque, soin, effets de sorts, portraits, KO. Le travail n'est
+donc plus de dessiner, mais d'**importer**. C'est un travail que je sais faire
+correctement.
+
+### La chaîne construite
+
+| Outil | Rôle |
+|---|---|
+| `outils/png.mjs` | décodage et encodage PNG complets, sans dépendance (les cinq filtres de ligne, les types de couleur usuels) |
+| `outils/decouper-feuille.mjs` | détoure, trouve les îlots, les groupe en rangées, sort un aperçu annoté |
+| `outils/importer-champion.mjs` | extrait les cadres retenus et écrit l'atlas du champion |
+
+**Résultat sur Lelianna, sans aucun réglage manuel** : 45 cadres, 6 rangées,
+12 libellés écartés tout seuls, 1 hors-gabarit (le portrait en pied) reconnu
+comme tel.
+
+Trois décisions techniques portent le résultat :
+
+1. **Le fond est détouré par remplissage depuis les bords**, pas par un test de
+   couleur. Un « tout ce qui est noir devient transparent » perce les contours
+   et les parties sombres du personnage ; un noir *enfermé* dans la silhouette
+   n'est jamais atteint par le remplissage, donc il survit.
+2. **L'art n'est jamais rééchantillonné.** Les rangées d'une feuille sont
+   dessinées à des échelles différentes — chez Lelianna l'idle fait deux fois
+   la taille de l'attaque. Uniformiser en redimensionnant détruirait le pixel
+   art. On garde les cadres à leur taille native et on enregistre un facteur
+   d'échelle **par animation**, appliqué au moment du rendu, en filtrage au
+   plus proche voisin. Sans ce recalage à chaque changement d'animation, le
+   champion grandit en attaquant.
+3. **Le seuil qui sépare un libellé d'un sprite est mesuré**, pas deviné : sur
+   cette feuille les titres montent à 48 px, la plus petite pièce d'animation
+   en fait 63.
+
+### Une heuristique retirée, et pourquoi
+
+J'avais écrit un recollage automatique des fragments — pour rattraper le bâton
+qui se détache au KO. Il chaînait le portrait en pied jusqu'aux rangées
+voisines et **soudait la feuille entière en un seul bloc** : 1 cadre, 1 rangée.
+Je l'ai retiré plutôt que de le rafistoler. Une pièce isolée perdue vaut mieux
+qu'un découpage qui s'effondre en silence ; les rares cas se traitent en trois
+lignes de config.
+
+### Couverture
+
+`tests/import.champion.test.js` : 18 tests. **7 mutants sur 7 tués**, mais la
+première passe n'en tuait que 3, et les trois survivants étaient de vraies
+faiblesses :
+
+- Le prédicteur **Paeth** pouvait être cassé sans qu'un test bronche : mon
+  aller-retour n'utilisait que le filtre 0, celui que mon propre encodeur
+  écrit. Les feuilles viennent d'outils tiers et utilisent les cinq. Le test
+  encode désormais lui-même, filtre par filtre, et exige l'octet près.
+- Le type de couleur **RGB sans alpha** n'était testé nulle part.
+- Le test de détourage se contentait de vérifier qu'il restait des pixels
+  sombres dans le sprite — ce qui passe **aussi quand rien n'est détouré**. Il
+  exige maintenant les deux : du transparent autour, du plein dedans.
+
+Suite complète : **1 708 tests**, 79 fichiers.
+
+### Où ça en est
+
+Lelianna se bat dans l'arène, en vrai pixel art dessiné, à côté de mes sprites
+générés — la comparaison est sans appel et c'est très bien ainsi. Le placement
+a dû être repris deux fois : les feuilles dessinées sont trois fois plus larges
+que les sprites générés, si bien que le premier champion sortait du cadre, puis
+passait derrière son voisin. Les unités sont désormais réparties d'après leur
+largeur **mesurée**, pas tous les 96 pixels.
+
+Le format attendu pour le reste du roster est documenté dans
+`assets-source/README.md` — et il tient en une phrase : fond noir uni, une
+animation par rangée, des cadres qui ne se touchent pas, et du PNG plutôt que
+du JPEG.

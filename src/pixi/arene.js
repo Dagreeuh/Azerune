@@ -11,8 +11,31 @@ const ZOOM=3;                     // un pixel d'art = 3 pixels d'écran
 const SOL=0.72;                   // hauteur du sol, en part de la scène
 
 let atlasPromis=null;
+// L'atlas généré et les feuilles de champion vivent côte à côte. Les secondes
+// viennent de vrais dessins : elles arrivent à leur taille native, chaque
+// rangée à SON échelle, et c'est le rendu qui les remet d'aplomb. Rien n'est
+// rééchantillonné en amont — redimensionner du pixel art le détruit.
 const chargerAtlas=()=>{
-  if(!atlasPromis)atlasPromis=fetch('/sprites/atlas.json').then(r=>r.json());
+  if(atlasPromis)return atlasPromis;
+  atlasPromis=(async()=>{
+    const atlas=await fetch('/sprites/atlas.json').then(r=>r.json());
+    Object.values(atlas.feuilles).forEach(def=>{def.zoomBase=ZOOM;def.echelles={};});
+    try{
+      const index=await fetch('/sprites/champions/index.json').then(r=>r.ok?r.json():{});
+      const fiches=await Promise.all(Object.entries(index).map(async([heroId,e])=>
+        [heroId,e,await fetch(e.description).then(r=>r.json())]));
+      atlas.champions={};
+      fiches.forEach(([heroId,e,fiche])=>{
+        atlas.feuilles[e.nom]={fichier:e.fichier,cadres:fiche.cadres,
+          echelles:fiche.echelles,zoomBase:1};
+        atlas.champions[heroId]=e.nom;
+      });
+    }catch{
+      // Pas de feuilles de champion : on tourne avec les sprites générés.
+      atlas.champions={};
+    }
+    return atlas;
+  })();
   return atlasPromis;
 };
 
@@ -29,8 +52,9 @@ async function texturesDe(atlas,nom){
   Object.entries(def.cadres).forEach(([anim,cadres])=>{
     jeux[anim]=cadres.map(c=>new Texture({source:feuille.source,frame:new Rectangle(c.x,c.y,c.w,c.h)}));
   });
-  cache.set(nom,jeux);
-  return jeux;
+  const fiche={jeux,echelles:def.echelles||{},zoomBase:def.zoomBase||ZOOM};
+  cache.set(nom,fiche);
+  return fiche;
 }
 
 const VITESSE={repos:.09,attaque:.20,touche:.16,mort:.12};
@@ -67,44 +91,75 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
     unites.clear();
     const sol=Math.round(app.screen.height*SOL);
     const cotes={allie:liste.filter(u=>u.cote==='allie'),ennemi:liste.filter(u=>u.cote==='ennemi')};
+    const places=[];
     for(const cote of['allie','ennemi']){
       const groupe=cotes[cote];
       for(let i=0;i<groupe.length;i+=1){
         const u=groupe[i];
-        const jeux=await texturesDe(atlas,u.feuille);
+        const{jeux,echelles,zoomBase}=await texturesDe(atlas,u.feuille);
         const noeud=new Container();
         const ombre=new Graphics();
-        ombre.ellipse(0,0,atlas.taille*ZOOM*.28,atlas.taille*ZOOM*.09).fill({color:0x000000,alpha:.42});
         const sprite=new AnimatedSprite(jeux.repos);
         sprite.anchor.set(.5,1);
-        sprite.scale.set(cote==='allie'?ZOOM:-ZOOM,ZOOM);   // l'ennemi regarde vers nous
         sprite.animationSpeed=VITESSE.repos;
         sprite.play();
+        const hauteur=Math.round((jeux.repos[0]?.height||atlas.taille)*zoomBase*(echelles.repos||1));
         const barre=new Graphics();
         const nom=new Text({text:u.nom,style:{fontFamily:'Georgia, serif',fontSize:12,
           fill:cote==='allie'?0xead7a0:0xe0b8a8,stroke:{color:0x100c09,width:3}}});
         nom.anchor.set(.5,1);
-        nom.y=-atlas.taille*ZOOM-16;
+        nom.y=-hauteur-16;
         noeud.addChild(ombre,sprite,barre,nom);
         // Les alliés au premier plan à gauche, les ennemis en retrait à droite :
         // la profondeur vient de l'écart vertical, pas d'une vraie perspective.
-        const pas=Math.min(96,(app.screen.width/2-40)/Math.max(1,groupe.length));
-        noeud.x=cote==='allie'?60+i*pas:app.screen.width-60-i*pas;
-        noeud.y=sol+8+(cote==='allie'?i*10:i*10);
+        noeud.y=sol+8+i*10;
         scene.addChild(noeud);
-        const etat={id:u.id,cote,noeud,sprite,barre,jeux,base:{x:noeud.x,y:noeud.y},mort:false};
+        ombre.ellipse(0,0,hauteur*.22,hauteur*.07).fill({color:0x000000,alpha:.42});
+        const etat={id:u.id,cote,noeud,sprite,barre,jeux,echelles,zoomBase,hauteur,
+          base:{x:0,y:noeud.y},mort:false};
         unites.set(u.id,etat);
+        appliquerEchelle(etat,'repos');
         pv(u.id,1);
+        places.push(etat);
       }
     }
+    // Placement en second passage : la largeur d'un sprite n'est connue qu'une
+    // fois sa texture posée, et une feuille dessinée est trois fois plus large
+    // qu'un sprite généré. Répartir « tous les 96 px » faisait passer un
+    // champion derrière son voisin.
+    ['allie','ennemi'].forEach(cote=>{
+      const groupe=places.filter(e=>e.cote===cote);
+      if(!groupe.length)return;
+      const larges=groupe.map(e=>Math.abs(e.sprite.width));
+      const dispo=app.screen.width/2-24;
+      const total=larges.reduce((s,l)=>s+l,0);
+      // On resserre si besoin, jamais au point de superposer les visages.
+      const serre=Math.min(1,dispo/Math.max(1,total))*0.94;
+      let curseur=0;
+      groupe.forEach((e,i)=>{
+        const l=larges[i]*serre;
+        const depuisBord=24+curseur+l/2;
+        e.noeud.x=cote==='allie'?depuisBord:app.screen.width-depuisBord;
+        e.base.x=e.noeud.x;
+        curseur+=l;
+      });
+    });
     // Devant/derrière selon la profondeur, sinon les unités du fond passent devant.
     scene.children.sort((a,b)=>a.y-b.y);
+  }
+
+  // Chaque rangée d'une feuille de champion a sa propre échelle. Sans ce
+  // recalage à chaque changement d'animation, le champion grandit en attaquant.
+  function appliquerEchelle(e,anim){
+    const k=e.zoomBase*(e.echelles[anim]??1);
+    e.sprite.scale.set(e.cote==='allie'?k:-k,k);   // l'ennemi regarde vers nous
   }
 
   function animer(id,anim,{boucle=false}={}){
     const e=unites.get(id);
     if(!e||!e.jeux[anim])return;
     e.sprite.textures=e.jeux[anim];
+    appliquerEchelle(e,anim);
     e.sprite.animationSpeed=VITESSE[anim]||.12;
     e.sprite.loop=boucle;
     e.sprite.onComplete=boucle?null:()=>{if(!e.mort)animer(id,'repos',{boucle:true})};
@@ -131,10 +186,10 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
   function pv(id,ratio){
     const e=unites.get(id);
     if(!e)return;
-    const l=atlas.taille*ZOOM*.62,part=Math.max(0,Math.min(1,ratio));
+    const l=Math.max(34,e.hauteur*.5),part=Math.max(0,Math.min(1,ratio));
     e.barre.clear();
-    e.barre.rect(-l/2-1,-atlas.taille*ZOOM-13,l+2,7).fill({color:0x100c09});
-    e.barre.rect(-l/2,-atlas.taille*ZOOM-12,l*part,5)
+    e.barre.rect(-l/2-1,-e.hauteur-13,l+2,7).fill({color:0x100c09});
+    e.barre.rect(-l/2,-e.hauteur-12,l*part,5)
       .fill({color:e.cote==='allie'?0x5a9e3f:0x8c2b1e});
   }
 
@@ -147,7 +202,7 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
       fill:couleur,stroke:{color:0x100c09,width:4}}});
     t.anchor.set(.5,1);
     t.x=e.noeud.x+(Math.random()*20-10);
-    t.y=e.noeud.y-atlas.taille*ZOOM*.6;
+    t.y=e.noeud.y-e.hauteur*.6;
     volants.addChild(t);
     const y0=t.y;
     tween(p=>{t.y=y0-46*(1-(1-p)**2);t.alpha=p<.7?1:1-(p-.7)/.3;},900)
@@ -171,6 +226,7 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
 
   return{
     app,placer,animer,frapper,toucher,mourir,pv,chiffre,
+    feuillePour:heroId=>atlas.champions?.[String(heroId)]||null,
     ips:()=>Math.round(app.ticker.FPS),
     detruire(){encours.forEach(b=>app.ticker.remove(b));encours.clear();
       app.destroy(true,{children:true});},

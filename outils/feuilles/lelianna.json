@@ -1,0 +1,37 @@
+{
+  "champion": "Lelianna",
+  "heroId": 12,
+  "source": "assets-source/lelianna.png",
+  "hauteurCible": 160,
+  "animations": [
+    {
+      "nom": "repos",
+      "rangee": 0,
+      "xMin": 400
+    },
+    {
+      "nom": "marche",
+      "rangee": 1
+    },
+    {
+      "nom": "attaque",
+      "rangee": 2,
+      "xMax": 1200
+    },
+    {
+      "nom": "soin",
+      "rangee": 3
+    },
+    {
+      "nom": "mort",
+      "rangee": 5,
+      "xMin": 600,
+      "minLargeur": 90
+    },
+    {
+      "nom": "portrait",
+      "rangee": 5,
+      "xMax": 600
+    }
+  ]
+}

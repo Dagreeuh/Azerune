@@ -31,14 +31,18 @@ export default function ArenePrototypePage(){
 
   const demarrer=useCallback(async()=>{
     if(!arene.current)return;
-    const equipe=(team||[]).slice(0,3);
+    // Sur cet écran d'essai, un champion qui possède une vraie feuille dessinée
+    // passe devant : c'est précisément ce qu'on vient regarder.
+    const dessines=(HEROES||[]).filter(h=>arene.current.feuillePour(h.id)).map(h=>h.id);
+    const equipe=[...new Set([...dessines,...(team||[])])].slice(0,3);
     if(!equipe.length){setEtat('sans-equipe');return}
     const heros=HEROES.map(hero=>({...hero,currentStars:getProgress(hero).stars,
       currentLevel:getProgress(hero).level}));
     const bataille=createBattle(equipe,heros,stats,{});
     combat.current=bataille;
     await arene.current.placer([
-      ...bataille.allies.map(u=>({id:u.id,cote:'allie',nom:u.name,feuille:feuilleDe(u,'heros')})),
+      ...bataille.allies.map(u=>({id:u.id,cote:'allie',nom:u.name,
+        feuille:arene.current.feuillePour(u.id)||feuilleDe(u,'heros')})),
       ...bataille.enemies.map(u=>({id:u.id,cote:'ennemi',nom:u.name,feuille:feuilleDe(u,'monstre')})),
     ]);
     setJournal(['Le combat commence.']);
@@ -99,7 +103,7 @@ export default function ArenePrototypePage(){
       Écran d'essai. Le moteur de combat est le vrai ; les sprites sont générés
       et provisoires. On regarde ici la fluidité et la lisibilité, rien d'autre.
     </p>
-    <ArenePixi largeur={640} hauteur={360} onPret={pret}
+    <ArenePixi largeur={960} hauteur={420} onPret={pret}
       onPerdu={()=>setEtat('sans-webgl')}/>
     <p className="arene-mesure">Images par seconde : <strong>{ips||'—'}</strong></p>
     {etat==='sans-webgl'&&<p className="arene-erreur">WebGL indisponible sur cet appareil : l'arène ne peut pas s'afficher.</p>}
