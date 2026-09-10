@@ -713,3 +713,71 @@ Mon test « une mort par riposte déclenche Détonant » mesurait les PV perdus 
 l'allié — or l'ennemi venait justement de le frapper. L'assertion était vraie
 quoi qu'il arrive. Il a fallu un témoin sans l'affixe pour que la mesure porte
 sur la détonation elle-même.
+
+## 16. Battue de l'économie : boutique, hauts faits, quêtes
+
+Dernier tour, sur les trois systèmes qui manipulent les monnaies du joueur.
+C'est le seul endroit où un bug se paie en ressources perdues, donc la battue a
+porté sur une question unique : **tout ce qui est promis est-il vraiment versé ?**
+
+### Ce qui est propre
+
+| Système | Vérifié | Résultat |
+|---|---|---|
+| Quêtes | 23 événements de suivi | tous émis par le jeu |
+| Récompenses | 7 clés (`gold`, `gems`, `stones`, `essence`, `masteryTomes`, `universalSoul5`, `summonerXp`) | toutes versées par `grantReward` |
+| Boutique | 5 types d'offres, 3 devises | tous traités |
+| Boutique | `canBuyOffer` : devise, stock, solde, inventaire plein | les quatre refus fonctionnent |
+
+`SHOP_CURRENCIES` fait bien la traduction `blood` → `bloodFragments` : c'était le
+candidat le plus probable pour une monnaie débitée dans le vide, il n'en est
+rien.
+
+### Deux compteurs de Chronique qui ne comptaient pas
+
+`lifetime.chronicles.relicsFound` et `lifetime.chronicles.activated` existaient
+dans `emptyProgressionStats()`, étaient sauvegardés, étaient lus par la page de
+statistiques — et n'étaient **jamais incrémentés**. Un joueur qui trouvait dix
+reliques en voyait zéro. Corrigé : `grantRelic` et `activateRelic` écrivent
+maintenant dans les deux, via un unique `noterChronique`.
+
+(`lifetime.forge.sales` reste mort lui aussi, mais rien ne le lit : ce n'est pas
+un mensonge affiché au joueur, seulement du poids inutile dans la sauvegarde.)
+
+### Sixième fois où ma mesure mentait — et c'est la plus instructive
+
+Ma sonde de navigateur a rapporté qu'un achat de 4 500 or ne changeait **rien**
+à la sauvegarde. Bouton actif, solde suffisant, aucune erreur en console. Tout
+disait « bug ».
+
+Ce n'en était pas un. Le bouton `Acheter` de la carte n'achète pas : il appelle
+`setSelected(item)` et ouvre une fenêtre de confirmation. Le vrai achat est sur
+un **second** bouton `Acheter`, à l'intérieur de cette fenêtre. Ma sonde cliquait
+le premier et lisait le résultat du second.
+
+Deux autres pièges se cachaient sur le même chemin, et chacun aurait pu faire
+conclure à un bug différent :
+
+- le tutoriel passe par `window.confirm`, que Playwright **refuse** par défaut :
+  la sonde restait bloquée sur le premier écran en croyant naviguer ;
+- la Boutique est verrouillée sous le niveau d'Invocateur 2, donc « aucune offre
+  achetable » ne voulait pas dire « la boutique est vide ».
+
+Sonde corrigée, l'achat est net, et les deux chemins sont vérifiés :
+
+| | Avant | Après |
+|---|---|---|
+| Achat de cristaux (15 000 or) | 999 999 or · 99 999 💎 | 984 999 or · 100 049 💎 · stock `VENDU` |
+| Achat d'équipement (4 500 or) | inventaire 0 | inventaire 1 · « 👖 Jambières Protection 2★ · Boutique d'Azerune » |
+
+Écran et sauvegarde disent la même chose dans les deux cas.
+
+**La leçon, six fois de suite :** aucun de ces six mensonges n'était un bug du
+jeu. Tous les six étaient des bugs de l'outil qui cherchait les bugs — et cinq
+d'entre eux accusaient à tort quelque chose de sain. Une sonde qui rapporte un
+défaut n'a rien prouvé tant qu'elle n'a pas d'abord prouvé qu'elle sait mesurer
+un cas qui marche.
+
+### Couverture
+
+`tests/economie.contrats.test.js`, 12 tests, **12 mutations sur 12 tuées**.

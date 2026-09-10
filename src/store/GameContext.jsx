@@ -478,8 +478,14 @@ export function GameProvider({children}){
   };
 
 
-  const grantRelic=(relicId,source='Activité légendaire')=>{const relic=RELICS.find(r=>r.id===relicId);if(!relic)return{ok:false};if(legendaryChronicles.relics[relicId]?.owned||legendaryChronicles.completed[relic.weaponId])return{ok:false,duplicate:true};setLegendaryChronicles(v=>({...v,relics:{...v.relics,[relicId]:{owned:1,activated:false,obtainedAt:Date.now(),source}}}));return{ok:true,relic};};
-  const activateRelic=relicId=>{const relic=RELICS.find(r=>r.id===relicId),entry=legendaryChronicles.relics[relicId];if(!relic||!entry?.owned)return{ok:false,message:'Relique introuvable.'};if(entry.activated)return{ok:false,message:'Cette relique a déjà été activée.'};setLegendaryChronicles(v=>({...v,relics:{...v.relics,[relicId]:{...v.relics[relicId],activated:true}},active:{...v.active,[relic.weaponId]:v.active[relic.weaponId]||{step:0,progress:{},startedAt:Date.now()}}}));return{ok:true,message:`Chronique activée : ${UNIQUE_WEAPONS[relic.weaponId].name}.`};};
+  // `lifetime.chronicles.relicsFound` et `.activated` existaient dans l'arbre de
+  // statistiques mais n'étaient jamais incrémentés : le compteur restait à zéro
+  // quoi que fasse le joueur. Aucun haut fait ne les lit encore — c'est
+  // justement pour qu'un futur haut fait ne naisse pas mort.
+  const noterChronique=majorer=>setProgressionStats(current=>({...current,
+    lifetime:{...current.lifetime,chronicles:majorer(current.lifetime.chronicles||{})}}));
+  const grantRelic=(relicId,source='Activité légendaire')=>{const relic=RELICS.find(r=>r.id===relicId);if(!relic)return{ok:false};noterChronique(c=>({...c,relicsFound:(Number(c.relicsFound)||0)+1}));if(legendaryChronicles.relics[relicId]?.owned||legendaryChronicles.completed[relic.weaponId])return{ok:false,duplicate:true};setLegendaryChronicles(v=>({...v,relics:{...v.relics,[relicId]:{owned:1,activated:false,obtainedAt:Date.now(),source}}}));return{ok:true,relic};};
+  const activateRelic=relicId=>{const relic=RELICS.find(r=>r.id===relicId),entry=legendaryChronicles.relics[relicId];if(!relic||!entry?.owned)return{ok:false,message:'Relique introuvable.'};noterChronique(c=>({...c,activated:(Number(c.activated)||0)+1}));if(entry.activated)return{ok:false,message:'Cette relique a déjà été activée.'};setLegendaryChronicles(v=>({...v,relics:{...v.relics,[relicId]:{...v.relics[relicId],activated:true}},active:{...v.active,[relic.weaponId]:v.active[relic.weaponId]||{step:0,progress:{},startedAt:Date.now()}}}));return{ok:true,message:`Chronique activée : ${UNIQUE_WEAPONS[relic.weaponId].name}.`};};
   const addLegendaryMaterial=(id,amount=1)=>setLegendaryChronicles(v=>({...v,materials:{...v.materials,[id]:(v.materials[id]||0)+amount}}));
   /** Ce que possede le joueur, tel que les exigences de Chronique le lisent. */
   const chronicleContext=()=>({materials:legendaryChronicles.materials,relics:legendaryChronicles.relics,
