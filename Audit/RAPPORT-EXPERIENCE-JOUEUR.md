@@ -913,3 +913,102 @@ n'existait plus. Il a fallu un lookbehind pour que l'assertion porte.
 `tests/confort.balayage.test.js`. **12 mutants sur 12 tués** — dont un survivant
 d'abord : définir `enemyDelay` sans vérifier qu'elle soit branchée laissait
 passer un retour au délai fixe. Suite complète : **1 504 tests**, 70 fichiers.
+
+## 18. Refonte : chaque champion déclare sa propre ressource
+
+Le chantier annoncé en section 17. C'est un refactoring, donc la seule question
+qui compte est : **est-ce que l'écran affiche exactement la même chose ?**
+
+### Ce qui a été mesuré, et comment
+
+Un refactoring qui « a l'air bon » ne prouve rien. J'ai donc rendu le composant
+`Unit` en HTML, avant et après, sur une matrice de cas :
+
+| | |
+|---|---|
+| Champions | 32 (tout le roster) |
+| États de mécanique | 17 (vide, 0, 1, 2, 3, 4, 5, 6, 60, actif avec cible, actif sans cible, actif dépensé, inactif dépensé, marée haute, marée basse, goule, plafond déclaré) |
+| Terrains | 3 (ennemis chargés de malus, terrain vierge, aucun ennemi) |
+| **Combinaisons** | **1 632** |
+| Rendus distincts | 206 |
+| **Différences** | **0** |
+
+Comparaison caractère pour caractère, sur le HTML **complet** de la carte, pas
+seulement sur la pastille. La référence est committée
+(`tests/fixtures/ressources-champions.json`) et la matrice qui la produit vit
+dans `tests/helpers/ressourcesMatrice.js`, **partagée** entre le test et le
+script de capture — sans ce partage, la comparaison ne prouverait rien.
+
+### Le gain
+
+| Le composant `Unit` | Avant | Après |
+|---|---|---|
+| Taille | 31 989 caractères | 22 627 |
+| Identifiants de champion codés en dur | 23 | **0** |
+| Variables `isNomDuChampion` | 24 | **0** |
+
+Le préambule seul est passé de 4 033 à 764 caractères, et il ne recalcule plus
+27 variables par unité et par rendu, qu'elles servent ou non.
+
+**Ce qui change vraiment**, c'est le coût d'un champion. Aujourd'hui :
+
+- une entrée dans `customHeroes.js` (ses statistiques et ses sorts),
+- une entrée dans `championIdentities.js` (son identité),
+- une entrée dans `ressourcesChampions.js` **s'il a une ressource propre**,
+- et **aucune modification de `BattlePage.jsx`**.
+
+Un champion est redevenu une donnée. C'était tout l'objet du chantier.
+
+### Ce que ça règle sur le fond
+
+Le problème n'était pas la longueur, c'était la **séparation** : la ressource
+affichée vivait dans l'interface, la mécanique qui la produit vit dans le
+moteur, et rien n'obligeait les deux à dire la même chose. Toute la battue des
+sections 13 à 16 a consisté à réparer des divergences de cette famille.
+
+Elles ne peuvent plus naître par oubli : un test vérifie que **tout champion du
+roster** a soit une entrée propre, soit un repli générique valable, soit une
+identité qui déclare explicitement `resource: 'Aucune'`. Un 33ᵉ champion ajouté
+sans pastille fait échouer la suite.
+
+### Trois mutants avaient survécu, et ils avaient raison
+
+La matrice de 1 632 cas passait, et pourtant trois mutations ne changeaient
+rien. Elles pointaient de vrais trous :
+
+1. **Le tri des cumuls** (`b.stacks-a.stacks` → `a.stacks-b.stacks`). La matrice
+   ne chargeait jamais qu'un seul ennemi : l'ordre ne pouvait pas se voir.
+   Sivrane et Malvek doivent viser la cible **la plus** chargée.
+2. **Le filtre `source===unit.id` de Lelianna.** La matrice marquait tous les
+   buffs alliés au nom du champion testé. Sans le filtre, Lelianna comptait les
+   Expiations posées par quelqu'un d'autre.
+3. **`expose||brise` de Korga.** La matrice posait toujours `exposed`, donc la
+   seconde condition n'était jamais celle qui décidait. Un bouclier brisé sans
+   malus Exposé est pourtant une cible d'exécution valable.
+
+Quatre tests ciblés les tuent. **20 mutants sur 20** au final.
+
+Une matrice large n'est pas une matrice complète : 1 632 cas ne valaient rien
+sur ces trois points précis parce qu'ils faisaient tous varier la même chose.
+
+### Ce qui n'a pas été touché
+
+Le moteur : pas une ligne. Les 33 familles d'effets, l'ordre des tours, les
+dégâts, les affixes — rien de tout cela n'entre dans ce chantier, et c'est
+voulu. `ORDRE_RECONNAISSANCE` fige par ailleurs l'ordre historique de
+reconnaissance, parce qu'un héros dérivé peut porter deux effets reconnaissables
+et que le changer changerait silencieusement son affichage. Un test l'épingle.
+
+### Vérification en jeu
+
+Combat réel, aucune erreur console : le Serment de Thorgar passe bien de
+« Aucun allié lié » à « SERMENT ACTIF · Korga · 2 tours » avec sa classe
+`active`, et la mise en avant `final-resource` de Sylven est intacte.
+
+### Couverture
+
+`tests/ressources.champions.test.js` : 23 tests, dont la comparaison des 1 632
+combinaisons. Quatre tests de `champions.ressource.test.js` ont été rebranchés
+du **texte source** vers le **comportement** — ils lisaient des chaînes de
+`BattlePage.jsx` qui n'existent plus, et vérifient désormais ce que la fonction
+renvoie, ce qui est plus solide. Suite complète : **1 527 tests**, 71 fichiers.
