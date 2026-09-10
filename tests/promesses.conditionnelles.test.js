@@ -66,12 +66,37 @@ describe('Graine purifiante de Sylven',()=>{
 describe('Pénitence de Lelianna',()=>{
   const id=()=>idDe('Lelianna');
 
-  it('sans Expiation sur personne, elle ne soigne pas',()=>{
+  it('elle applique elle-même l’Expiation à toute l’équipe',()=>{
+    // Elle exigeait l'Expiation posee a l'avance, donc soignait au mieux UN
+    // allie — alors que son texte et son identite promettaient « chaque allie
+    // sous Expiation ». C'est la Penitence qui la pose desormais.
+    let b=poser(id());
+    expect(b.allies.filter(u=>u.buffs?.atonement),'l’Expiation est déjà là').toHaveLength(0);
+    const apres=lancer(b,2,b.enemies[0].id);
+    expect(apres.allies.filter(u=>u.buffs?.atonement?.source===id()),
+      'la Pénitence n’applique pas l’Expiation').toHaveLength(3);
+  });
+
+  it('c’est le Châtiment, lui, qui ne soigne personne sans Expiation',()=>{
+    // La condition n'a pas disparu du kit : elle porte sur le sort de base.
     let b=poser(id());
     b={...b,allies:b.allies.map(u=>({...u,hp:Math.round(u.maxHp*.3)}))};
     const avant=b.allies.reduce((s,u)=>s+u.hp,0);
-    const apres=lancer(b,2,b.enemies[0].id);
-    expect(apres.allies.reduce((s,u)=>s+u.hp,0),'elle soigne sans Expiation').toBe(avant);
+    const apres=lancer(b,0,b.enemies[0].id);
+    expect(apres.allies.reduce((s,u)=>s+u.hp,0),'le Châtiment soigne sans Expiation').toBe(avant);
+  });
+
+  it('après la Pénitence, le Châtiment soigne toute l’équipe',()=>{
+    // C'est la boucle reelle : l'ultime ouvre la fenetre, le sort de base
+    // l'entretient tant que l'Expiation tient.
+    let b=poser(id());
+    b=lancer(b,2,b.enemies[0].id);
+    b=pret(b,id());
+    b={...b,allies:b.allies.map(u=>({...u,hp:Math.round(u.maxHp*.3)}))};
+    const avant=b.allies.map(u=>({id:u.id,hp:u.hp}));
+    const apres=lancer(b,0,b.enemies[0].id);
+    apres.allies.forEach(u=>expect(u.hp,`${u.name} n’est pas soigné`)
+      .toBeGreaterThan(avant.find(x=>x.id===u.id).hp));
   });
 
   it('elle soigne l’allié sous Expiation',()=>{

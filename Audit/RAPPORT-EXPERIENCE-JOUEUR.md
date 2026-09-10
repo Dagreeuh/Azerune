@@ -1250,3 +1250,101 @@ jour sur la nouvelle structure, en gardant leur intention. Suite complète :
 - Le désaccord entre `EFFETS_A_JET`/`EFFETS_TEMPORELS`/`EFFETS_A_PUISSANCE` et
   ce que le moteur fait vraiment, relevé en section 19 et toujours là. Il est
   d'ailleurs lié : ces listes décident de `peutRecevoir`, donc des ancrages.
+
+## 21. Pénitence : le soin était calculé, affiché, et invisible
+
+« La Pénitence de Lelianna, j'ai pas l'impression que ça heal. » C'était exact,
+et le soin n'était pourtant ni cassé ni oublié : il était **inapplicable à
+l'échelle du jeu**.
+
+### La mesure
+
+Boucle réelle, équipe à 30 % de PV, barre de 3 750 :
+
+| | Avant | Après |
+|---|---|---|
+| Soin de la Pénitence | **34 PV** (0,9 % d'une barre, sur **1** allié) | 2 025 PV (54 %, sur **3** alliés) |
+| Dégâts de la Pénitence | 98 | 182 |
+| Repère : une brume de Yunmei | 43 % d'une barre | — |
+
+34 PV. Le journal l'affichait, le calcul était juste, et le joueur ne voyait
+rien. Ce n'était pas un bug d'application — c'était une règle qui ne pouvait pas
+produire un nombre visible.
+
+### Pourquoi c'était structurellement impossible
+
+Elle rendait **35 % des dégâts infligés**. Or dans ce moteur un coup vaut
+environ **3 % d'une barre de vie**. 35 % de 3 %, c'est 1 %.
+
+Pour que cette conversion rende ne serait-ce que 25 % d'une barre, il aurait
+fallu infliger **4 300 dégâts en un sort** — plus que les points de vie de la
+cible. Aucun réglage du pourcentage n'y changeait quoi que ce soit : le rapport
+dégâts/PV du jeu interdit cette mécanique.
+
+### Deux autres défauts sortis de la même mesure
+
+**« Frappe trois fois » était purement décoratif.** La boucle de frappe divise
+la puissance par le nombre de coups :
+
+```js
+for(let i=0;i<hits;i++) hit(target,(skill.power||0)/hits,{...});
+```
+
+Trois frappes infligeaient donc exactement autant qu'une. Pénitence est le
+**seul sort du jeu** à utiliser ce compteur — personne d'autre n'en dépendait.
+
+**Son ultime frappait moins fort que son attaque de base.** Puissance **.52**
+pour un ultime monocible à cinq tours de recharge, contre **.84** pour son
+Châtiment sans recharge.
+
+Et son identité promettait « les allié**s** sous Expiation » alors que seul le
+Mot de pouvoir la posait, sur **une** cible : « chaque allié » n'a jamais pu
+désigner plus d'un allié.
+
+### Le correctif
+
+L'Expiation ne convertit plus des dégâts. **Chaque coup porté par Lelianna rend
+6 % des PV maximum aux alliés qui la portent** (8 % en Résonance IV) — donc un
+tic par coup, ce qui donne enfin un sens aux trois frappes.
+
+- **Pénitence** applique l'Expiation à **toute l'équipe**, puis frappe trois
+  fois : 3 × 6 % = **18 % par allié**. Sa puissance passe de .52 à **.95**.
+- **Châtiment** entretient la fenêtre : 6 % par allié, sans recharge, tant que
+  l'Expiation tient.
+
+La boucle a maintenant un rythme : l'ultime ouvre la fenêtre, le sort de base
+l'entretient deux tours.
+
+### L'équilibrage reste celui d'un soigneur qui frappe
+
+| Sur trois actions | Soins | Dégâts |
+|---|---|---|
+| Lelianna (Pénitence + 2 Châtiments) | 90 % d'une barre | oui |
+| Yunmei (Renouveau seul, cd 5) | **158 %** d'une barre | non |
+
+Yunmei reste très loin devant en soin pur, ce qui est sa raison d'être.
+Lelianna soigne moins, étalé sur sa rotation, et frappe en même temps — ce que
+son identité annonce depuis le début.
+
+### Un mensonge de plus, corrigé au passage
+
+Le Châtiment annonçait « Inflige des dégâts et **déclenche** Expiation ». Faux :
+il ne l'a jamais posée, il soigne ceux qui la portent. Trouvé parce qu'un mutant
+qui remettait l'ancien texte survivait — mon assertion se contentait de vérifier
+que le mot « Expiation » apparaissait quelque part.
+
+### Un test épingle l'écart entre le texte et le moteur
+
+Le soin passe par `heal()`, qui multiplie par `COMBAT_TEMPO` (2,4). La part
+écrite dans le moteur (.025) n'est donc **pas** celle que le joueur voit (6 %).
+C'est précisément le genre d'écart qui fait mentir un texte sans que personne
+s'en aperçoive : un test mesure la part réellement rendue et la compare aux 6 %
+annoncés — et vérifie au passage que le tempo n'a pas bougé.
+
+### Couverture
+
+`tests/lelianna.expiation.test.js` : 17 tests, **10 mutations sur 10 tuées**.
+Deux tests de `promesses.conditionnelles.test.js` ont été réécrits : la
+condition n'a pas disparu du kit, elle porte désormais sur le Châtiment.
+`atonementPenance` rejoint `EFFETS_TEMPORELS` puisqu'il pose enfin l'Expiation.
+Suite complète : **1 608 tests**, 74 fichiers.
