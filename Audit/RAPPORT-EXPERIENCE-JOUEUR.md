@@ -781,3 +781,135 @@ un cas qui marche.
 ### Couverture
 
 `tests/economie.contrats.test.js`, 12 tests, **12 mutations sur 12 tuées**.
+
+## 17. Les effets visuels, le gel de l'AUTO, et l'avenir du moteur
+
+Trois retours du joueur, dont un que j'avais déjà prétendu corriger deux fois.
+
+### Les effets visuels : le moteur était juste, le CSS les tuait
+
+J'avais corrigé le moteur, puis le composant, puis les couleurs. Tout cela était
+vrai et ne servait à rien : **le CSS masquait la couche en dur**, et le bouton
+continuait d'annoncer que les effets étaient actifs.
+
+```css
+@media(prefers-reduced-motion:reduce){ .spell-vfx{display:none} }
+```
+
+Sort lancé, couche inspectée dans un vrai combat :
+
+| `prefers-reduced-motion` | `.spell-vfx` | Bouton affiché |
+|---|---|---|
+| `no-preference` | `display:block` · 107×136 · animé, opacité 0,78 | ✨ EFFETS · `aria-pressed=true` |
+| `reduce` | **`display:none` · 0×0** | ✨ EFFETS · `aria-pressed=true` |
+
+Sur téléphone ce réglage est courant : l'économie d'énergie l'active seule sur
+Android, et c'est un réglage d'accessibilité répandu sur iOS. Un joueur dans ce
+cas ne pouvait **rien** voir, quoi que je corrige ailleurs — et le bouton lui
+mentait.
+
+Le réglage système décide désormais de l'**état initial** du bouton, plus jamais
+du rendu. Seul `.no-vfx`, posé par le bouton, coupe la couche. Vérifié : sous
+`reduce`, le bouton démarre sur « EFFETS COUPÉS » (honnête), et une tape dessus
+fait réapparaître les effets — `display:block`, 107×136, animations à 1,0.
+
+**Deuxième cause, indépendante, même symptôme.** Le réglage des Paramètres
+s'appelait « Réduire les animations *d'invocation* » mais partageait sa clé
+(`azerune-summon-preferences-v1`) avec le combat : le cocher éteignait les
+effets de sort sans jamais le dire. Le libellé le dit maintenant.
+
+### Le mode AUTO gelait un combat sur deux en vitesse x2
+
+Non signalé comme tel — le joueur a dit « les combats ne sont plus très
+fluides ». La mesure a trouvé bien pire qu'un manque de fluidité.
+
+Les images : **60 fps pleins, même à 4× de bridage CPU**. Ce n'était donc pas un
+problème de rendu. En revanche, sur douze secondes de combat en x2 :
+
+| | Avant | Après |
+|---|---|---|
+| Combats gelés (x2) | **6 sur 8** | 0 sur 8 |
+| Combats gelés (x1, x3) | 0 sur 3 | 0 sur 3 |
+
+État pendant le gel, identique à chaque fois : `AUTO ACTIF`, un allié à 100 % de
+jauge portant `[TOUR]`, et plus rien. Jamais.
+
+La cause est un enchaînement de trois défauts qui se couvrent l'un l'autre :
+
+1. La boucle AUTO est un `setTimeout` unique dont la garde faisait un `return`
+   sec. Si elle refusait le tour, **aucune action n'était jouée**.
+2. Donc `battle.turn` ne changeait pas. Or l'effet ne dépend que de cette clé :
+   il ne se rejouait jamais, et son minuteur restait orphelin.
+3. Le watchdog censé rattraper cela relance sur le **même** acteur — donc
+   `battle.turn` ne change toujours pas, et il tournait en rond toutes les
+   2,6 secondes sans jamais réveiller la boucle.
+
+La garde repousse désormais de 90 ms au lieu de renoncer, et le watchdog dispose
+d'un compteur de relance qui force l'effet à se rejouer même à acteur constant.
+
+Deux défauts de rythme trouvés au passage, tous deux visibles en jeu :
+
+- **Le tour ennemi était figé à 480 ms** quelle que soit la vitesse. En x3
+  l'escouade jouait toutes les 187 ms et l'adversaire toujours en une
+  demi-seconde : le combat avançait par à-coups. Les deux suivent le même
+  réglage, avec un plancher de 150 ms.
+- **Deux tapes rapides sur le bouton de vitesse ne comptaient que pour une** :
+  `cycleSpeed` lisait `speed` dans sa fermeture, donc les deux clics d'un même
+  lot React repartaient de la même valeur. x1 n'allait jamais qu'à x2.
+
+### « Estimer mes chances » est retiré
+
+À la demande du joueur, et il a raison : annoncer « tu gagnes 17 fois sur 20 »
+avant d'appuyer sur Lancer supprime la seule question qui donne un intérêt au
+combat. C'était une fonctionnalité que j'avais proposée ; elle résolvait un
+problème d'information au prix du suspense, et le prix était trop élevé.
+
+Le simulateur reste dans le dépôt et reste testé : c'est un bon outil de mesure
+d'équilibrage. Il n'est simplement plus exposé au joueur.
+
+### Le moteur tiendra-t-il ? Oui. L'interface de combat, non.
+
+Question posée directement, donc réponse directe et chiffrée.
+
+**Le moteur va très bien.** 681 lignes, fonctions pures, état immuable, 33
+familles d'effets, 1 504 tests. Chaque correctif de cette battue a consisté à
+ajouter une branche sans rien casser ailleurs — c'est exactement le signe qu'une
+architecture tient. Le rythme (60 fps à 4× de bridage) n'est pas near la limite.
+
+**Le problème est ailleurs, et il est déjà là.** Le composant `Unit` de
+`BattlePage.jsx` fait **~32 000 caractères sur deux lignes**, et contient :
+
+- **24 identifiants de champion codés en dur** (`unit.id===22`, `unit.id===33`…)
+- **27 variables `isNomDuChampion`**
+- une chaîne de ternaires qui les enchaîne toutes
+
+le tout **recalculé à chaque rendu, pour chaque unité**. Ajouter le 33ᵉ champion
+veut dire éditer cette chaîne. Au 40ᵉ elle sera intenable, et c'est là que les
+bugs « annoncé mais jamais appliqué » que j'ai passé quatre versions à corriger
+vont continuer de naître : la ressource affichée d'un champion vit dans
+l'interface, séparée de la mécanique qui la produit dans le moteur. Rien ne les
+oblige à dire la même chose — et cette battue a montré qu'elles divergent.
+
+La sortie ne demande pas de réécrire le moteur. Elle demande que **chaque
+champion déclare lui-même sa ressource** (icône, libellé, comment la lire dans
+`unit.mechanic`), à côté de ses sorts, et que `Unit` se contente de l'afficher.
+Un champion deviendrait alors une seule entrée de données, et le moteur comme
+l'écran liraient la même source. Ce n'est pas urgent ; c'est le prochain vrai
+chantier, avant d'ajouter beaucoup de contenu.
+
+### Septième et huitième fois où ma mesure mentait
+
+Elle a d'abord rapporté un gel total de l'AUTO en x2 — un vrai bug, mais ma
+sonde le voyait pour la mauvaise raison : mon détecteur confondait « combat
+terminé » et « combat figé ». Corrigé, il a confirmé le gel pour de bon.
+
+Puis mon test de non-régression du CSS s'est déclenché sur la **bonne** règle :
+`[^}]*` avalait le garde `.no-vfx` et voyait la règle fautive là où elle
+n'existait plus. Il a fallu un lookbehind pour que l'assertion porte.
+
+### Couverture
+
+`tests/effets.visuels.test.js` (8 tests) et quatre tests ajoutés à
+`tests/confort.balayage.test.js`. **12 mutants sur 12 tués** — dont un survivant
+d'abord : définir `enemyDelay` sans vérifier qu'elle soit branchée laissait
+passer un retour au délai fixe. Suite complète : **1 504 tests**, 70 fichiers.

@@ -28,6 +28,20 @@ function EventFloat({events=[]}){return <div className="combat-float-stack">{eve
 // part les coupe partout, et le stockage peut echouer sans casser le combat.
 const COMBAT_PREF_KEY='azerune-summon-preferences-v1';
 export const combatPrefs=()=>{try{return JSON.parse(localStorage.getItem(COMBAT_PREF_KEY)||'null')||{}}catch{return{}}};
+/**
+ * Le systeme dit-il « reduire les animations » ?
+ *
+ * Sur telephone c'est frequent — l'economie d'energie l'active toute seule sur
+ * Android, et c'est un reglage d'accessibilite courant sur iOS. On le respecte
+ * comme valeur PAR DEFAUT du bouton, jamais comme un verrou : un joueur qui
+ * rallume les effets doit les voir. Le CSS ne cache plus rien de lui-meme.
+ */
+export const systemeReduitLesAnimations=()=>{
+  try{return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)}catch{return false}};
+/** Effets actifs au chargement : choix explicite du joueur, sinon le systeme. */
+export const vfxParDefaut=()=>{
+  const reglage=combatPrefs().reducedAnimations;
+  return typeof reglage==='boolean'?!reglage:!systemeReduitLesAnimations();};
 export const writeCombatPref=reduced=>{try{localStorage.setItem(COMBAT_PREF_KEY,JSON.stringify({...combatPrefs(),reducedAnimations:reduced}));return true}catch{return false}};
 /**
  * Vitesse du mode AUTO. Une boucle quotidienne de seize combats se regarde plus
@@ -37,6 +51,13 @@ export const writeCombatPref=reduced=>{try{localStorage.setItem(COMBAT_PREF_KEY,
 export const COMBAT_SPEEDS=[1,2,3];
 export const AUTO_BASE_DELAY=560;
 export const autoDelay=speed=>Math.round(AUTO_BASE_DELAY/(COMBAT_SPEEDS.includes(speed)?speed:1));
+/**
+ * Delai du tour ennemi. Il etait fige a 480 ms : en x3 l'escouade jouait trois
+ * fois plus vite que l'adversaire et le combat avancait par saccades. Un
+ * plancher de 150 ms garde le tour ennemi lisible.
+ */
+export const ENEMY_BASE_DELAY=480;
+export const enemyDelay=speed=>Math.max(150,Math.round(ENEMY_BASE_DELAY/(COMBAT_SPEEDS.includes(speed)?speed:1)));
 export const readCombatSpeed=()=>{const value=Number(combatPrefs().speed);return COMBAT_SPEEDS.includes(value)?value:1};
 export const writeCombatSpeed=speed=>{try{localStorage.setItem(COMBAT_PREF_KEY,JSON.stringify({...combatPrefs(),speed:COMBAT_SPEEDS.includes(speed)?speed:1}));return true}catch{return false}};
 
@@ -89,7 +110,7 @@ function LootItemDetails({item,label='Butin'}){
 
 export default function BattlePage({setPage}){
  const{HEROES,team,stats,progress,getProgress,skillLevels,grantXp,activeMission,battleSession,updateBattleSession,finishCampaignMission,finishRaidMission,finishExpeditionMission,finishMythicMission,finishWorldBossMission,finishDefiMission,recordBattleResult,abandonBattle,teamPower,campaignXp,grantSummonerXp,summonerProfile,summonerXpRequired,getUniqueWeaponForHero,autoSkillPriorities,prepareNextMission,expeditionProgress,raidProgress,mythicProgress}=useGame();
- const[battle,setBattleState]=useState(()=>battleSession?.battle||null),[target,setTargetState]=useState(()=>battleSession?.target||null),[error,setError]=useState(''),[missionReward,setMissionRewardState]=useState(()=>battleSession?.missionReward||null),[keyboardSkill,setKeyboardSkill]=useState(null),[affinityOpen,setAffinityOpen]=useState(false),[guideHero,setGuideHero]=useState(null),[reportOpen,setReportOpen]=useState(false),[visualEvents,setVisualEvents]=useState([]),[vfxEnabled,setVfxEnabled]=useState(()=>!combatPrefs().reducedAnimations);
+ const[battle,setBattleState]=useState(()=>battleSession?.battle||null),[target,setTargetState]=useState(()=>battleSession?.target||null),[error,setError]=useState(''),[missionReward,setMissionRewardState]=useState(()=>battleSession?.missionReward||null),[keyboardSkill,setKeyboardSkill]=useState(null),[affinityOpen,setAffinityOpen]=useState(false),[guideHero,setGuideHero]=useState(null),[reportOpen,setReportOpen]=useState(false),[visualEvents,setVisualEvents]=useState([]),[vfxEnabled,setVfxEnabled]=useState(vfxParDefaut);
  // Couper les effets ecrit la MEME preference que les Paramètres et le rituel
  // d'invocation : un seul reglage, deux endroits pour le basculer.
  //
@@ -98,7 +119,12 @@ export default function BattlePage({setPage}){
  // l'avertissement « Cannot update a component while rendering another ».
  const toggleVfx=()=>{const next=!vfxEnabled;writeCombatPref(!next);setVfxEnabled(next)};
  const[speed,setSpeed]=useState(()=>readCombatSpeed());
- const cycleSpeed=()=>{const suivante=COMBAT_SPEEDS[(COMBAT_SPEEDS.indexOf(speed)+1)%COMBAT_SPEEDS.length];writeCombatSpeed(suivante);setSpeed(suivante)};const[mission]=useState(()=>battleSession?.mission||activeMission);const enemyActionLock=useRef(false),enemyTurnStartedAt=useRef(0),enemyTurnKey=useRef(null),autoActionLock=useRef(false),autoGeneration=useRef(0),rewardFinalizeLock=useRef(false),battleRef=useRef(battle),battleHeartbeat=useRef({key:'',changedAt:Date.now(),recoveries:0});
+ // Le watchdog pouvait relancer le combat sur le MEME acteur : `battle.turn`
+ // ne changeait pas, donc l'effet AUTO — qui n'en depend que par cette cle —
+ // ne se rejouait jamais et son minuteur restait orphelin. Ce compteur donne
+ // au watchdog un moyen de forcer la relance.
+ const[relanceAuto,setRelanceAuto]=useState(0);
+ const cycleSpeed=()=>setSpeed(courante=>{const suivante=COMBAT_SPEEDS[(COMBAT_SPEEDS.indexOf(courante)+1)%COMBAT_SPEEDS.length];writeCombatSpeed(suivante);return suivante});const[mission]=useState(()=>battleSession?.mission||activeMission);const enemyActionLock=useRef(false),enemyTurnStartedAt=useRef(0),enemyTurnKey=useRef(null),autoActionLock=useRef(false),autoGeneration=useRef(0),rewardFinalizeLock=useRef(false),battleRef=useRef(battle),battleHeartbeat=useRef({key:'',changedAt:Date.now(),recoveries:0});
  useEffect(()=>{if(!affinityOpen)return;const close=event=>event.key==='Escape'&&setAffinityOpen(false);window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[affinityOpen]);
  // `battleRef` — deja declaree plus haut et tenue a jour par l'effet de
  // surveillance — porte le dernier combat COMMITE. Elle remplace la lecture de
@@ -120,6 +146,7 @@ export default function BattlePage({setPage}){
      const stale=!turn?elapsed>1400:invalid?elapsed>700:enemyTurn?elapsed>2600:automaticAlly?elapsed>2600:false;
      if(!stale)return;
      enemyActionLock.current=false;autoActionLock.current=false;enemyTurnKey.current=null;autoGeneration.current+=1;
+     setRelanceAuto(valeur=>valeur+1);
      setBattle(current=>{
        if(!current||current.winner)return current;
        const currentTurn=current.turn,currentEnemy=String(currentTurn||'').startsWith('e'),currentActor=currentTurn?[...(current.allies||[]),...(current.enemies||[])].find(unit=>unit.id===currentTurn&&!unit.dead):null;
@@ -157,12 +184,15 @@ export default function BattlePage({setPage}){
     });
     window.setTimeout(()=>{enemyActionLock.current=false},80);
   };
-  const normalTimer=window.setTimeout(()=>runEnemyAction('normal'),480);
+  // Le tour ennemi restait fige a 480 ms quelle que soit la vitesse : en x3 un
+  // allie agissait toutes les 187 ms et l'ennemi mettait toujours une demi-
+  // seconde. Le combat avancait par a-coups. Les deux suivent le meme reglage.
+  const normalTimer=window.setTimeout(()=>runEnemyAction('normal'),enemyDelay(speed));
   const watchdogTimer=window.setTimeout(()=>{enemyActionLock.current=false;runEnemyAction('watchdog')},1600);
   const resume=()=>{if(document.visibilityState==='visible'&&Date.now()-enemyTurnStartedAt.current>700){enemyActionLock.current=false;runEnemyAction('watchdog')}};
   document.addEventListener('visibilitychange',resume);window.addEventListener('focus',resume);
   return()=>{disposed=true;window.clearTimeout(normalTimer);window.clearTimeout(watchdogTimer);document.removeEventListener('visibilitychange',resume);window.removeEventListener('focus',resume)};
- },[battle?.turn,battle?.winner]);
+ },[battle?.turn,battle?.winner,speed]);
  const toggleAuto=()=>{autoGeneration.current+=1;autoActionLock.current=false;enemyActionLock.current=false;setBattle(current=>{if(!current||current.winner)return current;const enabling=!current.autoMode;let next={...current,autoMode:enabling};if(enabling&&!next.turn){try{next=nextTurn(next)}catch(error){console.error('Activation AUTO interrompue',error);return{...next,autoMode:false,turn:null,log:['AUTO indisponible : initialisation du premier tour impossible.',...(next.log||[])].slice(0,16)}}}return next});setError('');setKeyboardSkill(null)};
  useEffect(()=>{
    const turn=battle?.turn;if(battle?.autoMode&&!battle?.winner&&!turn){
@@ -174,8 +204,16 @@ export default function BattlePage({setPage}){
        setBattle({...courant,autoMode:false,turn:null,log:['AUTO désactivé : impossible de déterminer le premier acteur.',...(courant.log||[])].slice(0,16)})}
      return;}const active=battle?.autoMode&&!battle?.winner&&turn&&!String(turn).startsWith('e');
    if(!active){autoActionLock.current=false;return;}
-   const generation=autoGeneration.current;let disposed=false;
-   const timer=window.setTimeout(()=>{if(disposed||generation!==autoGeneration.current||autoActionLock.current)return;autoActionLock.current=true;
+   const generation=autoGeneration.current;let disposed=false;let timer=0;
+   // Cette garde faisait un `return` sec. Or si elle refusait le tour, aucune
+   // action n'etait jouee, donc `battle.turn` restait identique, donc l'effet
+   // ne se rejouait pas : la boucle mourait sur place, AUTO affiche « ACTIF »
+   // et un allie fige a 100 % de jauge. Mesure : six gels sur huit combats en
+   // vitesse x2. On repousse desormais de 90 ms au lieu de renoncer.
+   const jouer=()=>{
+     if(disposed)return;
+     if(generation!==autoGeneration.current||autoActionLock.current){timer=window.setTimeout(jouer,90);return}
+     autoActionLock.current=true;
      const courant=battleRef.current;
      // Les memes gardes qu'avant, mais lues sur l'etat commite plutot que dans
      // un updater : l'action du moteur n'est jouee qu'une fois, et
@@ -188,9 +226,10 @@ export default function BattlePage({setPage}){
          else{progress('skills');setBattle(result.battle)}
        }catch(error){console.error('Action AUTO interrompue',error);
          setBattle({...courant,autoMode:false,turn:null,log:['AUTO interrompu par sécurité.',...(courant.log||[])].slice(0,16)})}
-     }window.setTimeout(()=>{autoActionLock.current=false},100)},autoDelay(speed));
+     }window.setTimeout(()=>{autoActionLock.current=false},100)};
+   timer=window.setTimeout(jouer,autoDelay(speed));
    return()=>{disposed=true;window.clearTimeout(timer)};
- },[battle?.turn,battle?.winner,battle?.autoMode,autoSkillPriorities,speed]);
+ },[battle?.turn,battle?.winner,battle?.autoMode,autoSkillPriorities,speed,relanceAuto]);
  useEffect(()=>{
    const incoming=battle?.lastEvents||[];if(!incoming.length)return;
    setVisualEvents(current=>{const known=new Set(current.map(event=>event.id));return[...current,...incoming.filter(event=>!known.has(event.id))].slice(-12)});

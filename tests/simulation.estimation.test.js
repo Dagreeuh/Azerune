@@ -133,20 +133,21 @@ describe('on simule bien le combat qu’on va jouer',()=>{
     expect(o.mythic).toBe(null);
   });
 
-  it('l’estimation du contexte utilise l’equipement et la progression reels',()=>{
-    const source=lire('../src/store/GameContext.jsx');
-    expect(source).toContain('const estimerMission=(mission,members=team,tirages)=>{');
-    // On lit le corps de estimerMission, pas le fichier entier : les memes
-    // appels existent ailleurs et masqueraient une regression ici.
-    const debut=source.indexOf('const estimerMission=');
-    const contexte=source.slice(debut,source.indexOf('const requestMissionStart=',debut));
-    expect(contexte.length,'le corps de estimerMission est introuvable').toBeGreaterThan(200);
-    // On vise la ligne qui alimente la simulation, pas n'importe quel appel :
-    // le meme calcul apparait juste a cote pour le bilan d'equipe.
-    expect(contexte,'la simulation ignore l’équipement')
-      .toContain('getStats:hero=>totalStats(hero,equipment,getProgress(hero),inventory)');
-    expect(contexte,'la simulation ignore les Empreintes').toContain('empreinteBonuses(hero,getProgress(hero).empreintes).skills');
-    expect(contexte,'la simulation ignore les armes uniques').toContain('uniqueWeapon:getUniqueWeaponForHero(hero)');
-    expect(contexte,'la simulation ignore les priorités de sorts').toContain('priorites:autoSkillPriorities');
+  it('« Estimer mes chances » n’est plus exposé au joueur',()=>{
+    // Retire a la demande du joueur : annoncer « tu gagnes 17 fois sur 20 »
+    // avant d'appuyer sur Lancer supprimait la seule question qui donne un
+    // interet au combat. Le simulateur reste teste ci-dessus comme outil de
+    // mesure d'equilibrage, mais le jeu ne doit plus s'en servir.
+    const contexte=lire('../src/store/GameContext.jsx');
+    expect(contexte,'estimerMission est revenu dans le contexte').not.toContain('estimerMission');
+    expect(contexte,'le simulateur est de nouveau importé par le jeu').not.toContain("from'../utils/simulation'");
+    const layout=lire('../src/components/Layout.jsx');
+    // On vise les marqueurs d'interface, pas la phrase : le commentaire qui
+    // explique le retrait contient forcement le nom de la fonctionnalite.
+    expect(layout,'le bouton d’estimation est revenu').not.toContain('estimate-button');
+    expect(layout,'le bloc d’estimation est revenu').not.toContain('prep-estimation');
+    expect(layout,'l’état d’estimation est revenu').not.toContain('setEstimation');
+    const styles=lire('../src/styles.css');
+    expect(styles,'des règles CSS orphelines subsistent').not.toContain('estimate-');
   });
 });

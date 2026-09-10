@@ -111,7 +111,7 @@ export default function SettingsPage(){
       </div>
     </article>
 
-    <article className="summon-protection-settings"><span>🔥</span><div><h3>Protection des invocations</h3><p>Contrôle la confirmation x10 et le rythme des révélations.</p><label><input type="checkbox" checked={summonPrefs.confirmMultiSummon} onChange={e=>updateSummonPref('confirmMultiSummon',e.target.checked)}/> Demander une confirmation avant chaque invocation x10</label><label><input type="checkbox" checked={summonPrefs.reducedAnimations} onChange={e=>updateSummonPref('reducedAnimations',e.target.checked)}/> Réduire les animations d’invocation</label></div></article><article className="danger-zone">
+    <article className="summon-protection-settings"><span>🔥</span><div><h3>Protection des invocations</h3><p>Contrôle la confirmation x10, le rythme des révélations et les effets visuels des sorts. Les effets de combat restent réglables à tout moment depuis le bouton ✨ de l’écran de combat.</p><label><input type="checkbox" checked={summonPrefs.confirmMultiSummon} onChange={e=>updateSummonPref('confirmMultiSummon',e.target.checked)}/> Demander une confirmation avant chaque invocation x10</label><label><input type="checkbox" checked={summonPrefs.reducedAnimations} onChange={e=>updateSummonPref('reducedAnimations',e.target.checked)}/> Réduire les animations d’invocation — et les effets de sort en combat</label></div></article><article className="danger-zone">
       <div className="danger-zone-header"><div className="settings-icon">⚠️</div><div><h3>Zone dangereuse</h3><p>La réinitialisation est définitive et ne peut pas être annulée.</p></div></div>
 
       {step===0&&<button className="reset-progress-button" onClick={()=>setStep(1)}>Réinitialiser la progression</button>}

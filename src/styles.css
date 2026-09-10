@@ -842,10 +842,14 @@
 .no-vfx .spell-vfx{display:none}
 .no-vfx .unit-card.vfx-hit,.no-vfx .battle-unit.vfx-hit{animation:none}
 .no-vfx .battle-unit.vfx-hit::after{display:none}
+/* `prefers-reduced-motion` decide de l'etat INITIAL du bouton, pas du rendu.
+   En cachant la couche ici, un joueur dont le telephone est en « reduire les
+   animations » — ou simplement en economie d'energie — ne voyait jamais aucun
+   effet, alors que le bouton affichait « EFFETS » et se disait actif. Le seul
+   maitre du rendu est desormais `.no-vfx`, pose par ce bouton : le reglage
+   systeme est respecte par defaut, et reste contournable d'une tape. */
 @media(prefers-reduced-motion:reduce){
-  .spell-vfx{display:none}
-  .unit-card.vfx-hit,.battle-unit.vfx-hit{animation:none}
-  .battle-unit.vfx-hit::after{display:none}
+  .no-vfx .spell-vfx{display:none}
 }
 /* Aligne sur le bouton AUTO, juste au-dessus : meme ancrage fixe, meme z-index.
    Un `position:absolute` le renvoyait hors de l'ecran de combat. */
@@ -890,17 +894,6 @@
 .battle-speed-toggle:hover{border-color:#38bdf8;}
 
 /* Estimation par simulation, a la preparation du combat. */
-.prep-estimation{margin-top:.6rem;display:grid;gap:.5rem;}
-.estimate-button{background:linear-gradient(135deg,#312e81,#1e1b4b);border:1px solid #6366f1;color:#e0e7ff;font-weight:700;}
-.estimate-button:disabled{opacity:.6;}
-.estimate-result{border:1px solid #334155;border-radius:.6rem;padding:.55rem .7rem;background:#0f172a;}
-.estimate-result b{display:block;font-size:.95rem;}
-.estimate-result small{color:#94a3b8;}
-.estimate-result ul{margin:.4rem 0 0;padding-left:1.1rem;color:#fbbf24;font-size:.8rem;}
-.estimate-result.sur{border-color:#22c55e;} .estimate-result.favorable{border-color:#38bdf8;}
-.estimate-result.serre{border-color:#fbbf24;} .estimate-result.defavorable{border-color:#fb923c;}
-.estimate-result.perdu{border-color:#ef4444;}
-.estimate-failed{color:#94a3b8;font-size:.85rem;margin:0;}
 
 /* Défi de la semaine — la première fonctionnalité sociale du jeu. */
 .defi-card{border:1px solid #4338ca;border-radius:.9rem;padding:1rem;background:linear-gradient(160deg,#1e1b4b,#0f172a);display:grid;gap:.7rem;margin-bottom:1rem;}

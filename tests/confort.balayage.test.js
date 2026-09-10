@@ -1,7 +1,7 @@
 import{describe,it,expect}from'vitest';
 import fs from'node:fs';
 import{fileURLToPath}from'node:url';
-import{COMBAT_SPEEDS,AUTO_BASE_DELAY,autoDelay}from'../src/pages/BattlePage';
+import{COMBAT_SPEEDS,AUTO_BASE_DELAY,autoDelay,enemyDelay,vfxParDefaut}from'../src/pages/BattlePage';
 import{SWEEP_DAILY_LIMIT}from'../src/store/GameContext';
 
 // GameContext est un composant React : on ne peut pas le rendre ici. Le projet
@@ -66,8 +66,52 @@ describe('Vitesse du combat automatique',()=>{
 
   it('la boucle AUTO utilise bien le delai reglable',()=>{
     const page=fs.readFileSync(fileURLToPath(new URL('../src/pages/BattlePage.jsx',import.meta.url)),'utf8');
-    expect(page,'la boucle AUTO est restée sur un délai fixe').toContain('},autoDelay(speed));');
+    expect(page,'la boucle AUTO est restée sur un délai fixe').toContain('timer=window.setTimeout(jouer,autoDelay(speed));');
     expect(page,'un changement de vitesse ne relance pas la boucle')
-      .toContain('autoSkillPriorities,speed]);');
+      .toContain('autoSkillPriorities,speed,relanceAuto]);');
+  });
+
+  it('le tour ennemi suit la vitesse choisie, avec un plancher lisible',()=>{
+    // Il restait fige a 480 ms : en x3 l'escouade jouait trois fois plus vite
+    // que l'adversaire et le combat avancait par a-coups.
+    expect(enemyDelay(1)).toBe(480);
+    expect(enemyDelay(2)).toBe(240);
+    expect(enemyDelay(3)).toBe(160);
+    expect(enemyDelay(99),'une vitesse inconnue retombe sur x1').toBe(480);
+    COMBAT_SPEEDS.forEach(v=>expect(enemyDelay(v),`x${v} passe sous le plancher`).toBeGreaterThanOrEqual(150));
+    // Definir la fonction ne suffit pas : un mutant qui remettait 480 en dur
+    // sur le site d'appel survivait a tous les tests ci-dessus.
+    const page=fs.readFileSync(fileURLToPath(new URL('../src/pages/BattlePage.jsx',import.meta.url)),'utf8');
+    expect(page,'le tour ennemi est resté sur un délai fixe')
+      .toContain("runEnemyAction('normal'),enemyDelay(speed))");
+    expect(page,'un changement de vitesse ne relance pas le tour ennemi')
+      .toContain('},[battle?.turn,battle?.winner,speed]);');
+  });
+
+  it('deux tapes rapides sur la vitesse comptent bien pour deux',()=>{
+    // `cycleSpeed` lisait `speed` dans sa fermeture : deux clics dans le meme
+    // lot React repartaient tous les deux de la meme valeur, et x1 n'allait
+    // jamais qu'a x2.
+    const page=fs.readFileSync(fileURLToPath(new URL('../src/pages/BattlePage.jsx',import.meta.url)),'utf8');
+    expect(page,'cycleSpeed lit encore une valeur figée').toContain('const cycleSpeed=()=>setSpeed(courante=>{');
+    expect(page).toContain('COMBAT_SPEEDS.indexOf(courante)');
+  });
+
+  it('la boucle AUTO se réarme au lieu d’abandonner le tour',()=>{
+    // Mesure avant correctif : six combats geles sur huit en vitesse x2, AUTO
+    // affiche « ACTIF » et un allie fige a 100 % de jauge. La garde faisait un
+    // `return` sec ; aucune action n'etant jouee, `battle.turn` ne changeait
+    // pas, donc l'effet ne se rejouait jamais et son minuteur restait orphelin.
+    const page=fs.readFileSync(fileURLToPath(new URL('../src/pages/BattlePage.jsx',import.meta.url)),'utf8');
+    const debut=page.indexOf('const jouer=()=>{');
+    expect(debut,'la boucle AUTO n’a plus de fonction réarmable').toBeGreaterThan(0);
+    const corps=page.slice(debut,page.indexOf('timer=window.setTimeout(jouer,autoDelay(speed));',debut));
+    expect(corps,'la garde abandonne encore le tour')
+      .toContain('{timer=window.setTimeout(jouer,90);return}');
+    expect(corps,'la garde ne doit jamais renoncer sans repousser')
+      .not.toMatch(/autoActionLock\.current\)return;(?!\s*\{)/);
+    // Le watchdog doit pouvoir forcer la relance : il relance parfois sur le
+    // MEME acteur, et `battle.turn` ne suffit donc pas a reveiller l'effet.
+    expect(page,'le watchdog ne peut pas relancer la boucle').toContain('setRelanceAuto(valeur=>valeur+1);');
   });
 });
