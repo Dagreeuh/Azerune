@@ -20,12 +20,28 @@ const unite=(hero,extra={})=>({...hero,side:'ally',hp:100,maxHp:100,shield:0,max
 const rendre=(u,props={})=>renderToStaticMarkup(React.createElement(Unit,
   {unit:u,active:false,selected:false,automatic:false,onClick:()=>{},events:[],
    enemies:[],allies:[u],vfxEnabled:true,...props}));
-const pastille=html=>html.match(/<span class="unit-level">([^<]*)<\/span>/)?.[1]||null;
+const pastille=html=>html.match(/<span class="unit-level"[^>]*>([^<]*)<\/span>/)?.[1]||null;
+const infobulle=html=>html.match(/<span class="unit-level" title="([^"]*)"/)?.[1]||null;
 
 describe('la carte affiche le niveau du champion',()=>{
   it('il apparaît pour tout le roster',()=>{
-    HEROES.forEach(hero=>
-      expect(pastille(rendre(unite(hero,{currentLevel:37}))),hero.name).toBe('Niv. 37'));
+    // Le nombre seul : sur une carte de 109 px, « Niv. 37 » ecrasait le nom du
+    // champion jusqu'a le reduire a une lettre. Le libelle complet vit
+    // desormais dans l'infobulle, comme sur un cadre d'unite.
+    HEROES.forEach(hero=>{
+      const html=rendre(unite(hero,{currentLevel:37}));
+      expect(pastille(html),hero.name).toBe('37');
+      expect(infobulle(html),hero.name).toBe('Niveau 37');
+    });
+  });
+
+  it('le nom du champion reste entier à côté de la pastille',()=>{
+    // C'est la raison d'etre du format compact : le nom ne doit jamais etre
+    // tronque par la reserve laissee a la pastille.
+    HEROES.forEach(hero=>{
+      const html=rendre(unite(hero,{currentLevel:60}));
+      expect(html,`${hero.name} est tronqué`).toContain(`<strong>${hero.name}</strong>`);
+    });
   });
 
   it('il est en haut à droite de la carte',()=>{
@@ -67,7 +83,7 @@ describe('elle ne se marche pas sur les pieds avec le reste de la carte',()=>{
     const allies=page.slice(page.indexOf('battle.allies.map(unit=><Unit'));
     expect(allies.slice(0,400),'l’écran marque un allié comme cible AUTO').not.toContain('automatic=');
     const avecAuto=rendre(unite(HEROES[0],{currentLevel:12}),{automatic:true});
-    expect(pastille(avecAuto),'un allié porte les deux marqueurs').toBe('Niv. 12');
+    expect(pastille(avecAuto),'un allié porte les deux marqueurs').toBe('12');
   });
 
   it('l’étiquette TOUR reste au-dessus, pas à droite',()=>{
@@ -79,7 +95,7 @@ describe('elle ne se marche pas sur les pieds avec le reste de la carte',()=>{
   it('le reste de la carte est inchangé',()=>{
     // Un ajout d'interface ne doit rien deplacer d'autre.
     const sans=rendre(unite(HEROES[0])),avec=rendre(unite(HEROES[0],{currentLevel:42}));
-    expect(avec.replace(/<span class="unit-level">[^<]*<\/span>/,'')).toBe(sans);
+    expect(avec.replace(/<span class="unit-level"[^>]*>[^<]*<\/span>/,'')).toBe(sans);
   });
 });
 
@@ -91,7 +107,7 @@ describe('le niveau affiché est le vrai',()=>{
   });
 
   it('il s’affiche jusqu’au plafond du jeu',()=>{
-    expect(pastille(rendre(unite(HEROES[0],{currentLevel:MAX_LEVEL})))).toBe(`Niv. ${MAX_LEVEL}`);
+    expect(pastille(rendre(unite(HEROES[0],{currentLevel:MAX_LEVEL})))).toBe(String(MAX_LEVEL));
     expect(levelCap(6),'le plafond a changé').toBe(MAX_LEVEL);
   });
 });

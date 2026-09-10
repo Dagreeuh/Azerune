@@ -1348,3 +1348,109 @@ Deux tests de `promesses.conditionnelles.test.js` ont été réécrits : la
 condition n'a pas disparu du kit, elle porte désormais sur le Châtiment.
 `atonementPenance` rejoint `EFFETS_TEMPORELS` puisqu'il pose enfin l'Expiation.
 Suite complète : **1 608 tests**, 74 fichiers.
+
+## 22. Refonte d'interface : pierre et or, et un combat en plein écran
+
+Deux demandes en une : retrouver une ambiance World of Warcraft, et revoir
+l'ergonomie des combats.
+
+### Diagnostic
+
+**L'ambiance : il n'y en avait pas.** L'interface était un tableau de bord web
+propre mais générique — cartes ardoise, coins arrondis, aplats froids. Aucun
+vocabulaire d'heroic fantasy.
+
+Techniquement, la cause était mesurable :
+
+| | Avant | Après |
+|---|---|---|
+| Variables CSS | **7** (dont 5 pour les effets de sort) | 30 jetons de thème |
+| Occurrences de couleurs en dur | **2 459** | 728 |
+| Teintes distinctes | 370 | — |
+
+Changer une teinte voulait dire la changer à la main, partout.
+
+**L'ergonomie du combat : quatre défauts chiffrés.**
+
+| | Avant | Après |
+|---|---|---|
+| Cibles tactiles sous 44 px | **4 sur 13** | **0** |
+| Boutons flottants dispersés | **4**, dans 4 coins différents | 0 — une seule barre |
+| Texte le plus petit | **6 px** | 8 px |
+| Hauteur d'écran prise par le profil et la navigation, **pendant le combat** | **~250 px sur 932 (27 %)** | 0 |
+| Hauteur de l'arène | 468 px | **566 px** |
+
+### La palette n'a pas été inventée
+
+Elle a été **extraite du Journal de quêtes** — seul écran du jeu qui portait déjà
+l'ambiance : parchemin, sceaux de quête, bordures d'or, titres à empattements.
+Elle y était enfermée, en valeurs écrites en dur, pendant que tout le reste
+restait en ardoise. Trente jetons (`--pierre-*`, `--bord`, `--or-*`,
+`--texte-*`, `--police-titre`, `--biseau`, `--relief`) la rendent disponible
+partout, et un test vérifie que chacun sert réellement.
+
+Un second test épingle les huit teintes ardoise d'origine : si l'une revient
+dans la feuille, la suite échoue.
+
+### Le combat en plein écran
+
+Le bandeau de profil, les monnaies et la navigation disparaissent tant qu'un
+combat tourne, et reviennent pour l'écran de résultat. On quitte par un bouton
+explicite avec confirmation — sans quoi il n'y aurait plus de sortie.
+
+**Une découverte en chemin :** j'ai d'abord câblé le mode depuis la mise en
+page, sur `battleInProgress` du contexte. Il ne s'est jamais déclenché. Cause :
+`setBattle` de l'écran de combat **n'écrit que dans l'état local et ne
+synchronise jamais `battleSession`** — donc `battleInProgress` vaut faux pendant
+tout le combat. C'est aussi ce qui alimente la carte « COMBAT EN COURS » de la
+mise en page, qui est donc muette elle aussi.
+
+Je n'ai pas corrigé cette synchronisation : elle touche à la reprise de combat
+sauvegardée, et ce n'était pas le sujet. **C'est la page qui déclare son mode**,
+via une classe sur le corps du document, posée et retirée par le même effet.
+Le défaut de synchronisation reste ouvert et consigné ici.
+
+### Trois corrections nées de la mesure, pas de l'œil
+
+- **Les 250 px libérés restaient un trou.** L'arène ne gagnait que 15 px : la
+  grille ne s'étirait pas. Il a fallu le dire explicitement.
+- **Mon plancher de lisibilité a cassé les noms.** En passant le texte à 8 px
+  minimum, la pastille de niveau s'est élargie et la réserve laissée à droite
+  a réduit « Thorgar » à « T… » sur une carte de 109 px. Corrigé en deux temps :
+  la pastille ne porte plus que le nombre (le libellé passe dans l'infobulle),
+  et le nom est empilé sous le portrait — ce qui est aussi plus proche d'un
+  cadre d'unité.
+- **Les deux camps se ressemblaient.** Ils portent désormais des teintes
+  distinctes, rouge sombre contre vert sombre.
+
+### Deux fois où mon test lisait la mauvaise règle
+
+Mon assistant de test prenait la **première** occurrence d'un sélecteur — donc
+l'ancienne règle, pas ma surcharge de fin de feuille. Corrigé en visant la
+dernière… ce qui a cassé deux autres assertions, parce que la dernière règle
+d'un sélecteur n'est pas forcément celle qui **traite la propriété** visée.
+La version finale cherche la dernière règle qui parle de la propriété.
+
+Ce détour a révélé un vrai point : sous 620 px, `.hud-bouton` perd son
+`min-width`. C'est volontaire — les commandes s'étirent alors pour remplir la
+barre — mais le test l'exige désormais explicitement, faute de quoi elles
+rétréciraient sous la cible tactile.
+
+### Vérification en jeu
+
+À 430 px et 1440 px : plein écran actif, **0 cible sous 44 px**, noms entiers,
+aucun débordement horizontal, aucune erreur console. La sortie par le bouton
+affiche bien la confirmation, et quitter restaure le bandeau et la navigation.
+
+### Couverture
+
+`tests/interface.ambiance.test.js` : 16 tests, **13 mutations sur 13 tuées**.
+Suite complète : **1 635 tests**, 76 fichiers.
+
+### Ce qui reste ouvert
+
+- La synchronisation `battleSession` (ci-dessus), qui rend `battleInProgress`
+  et la carte « COMBAT EN COURS » inopérants.
+- 728 couleurs restent écrites en dur : ce sont des teintes locales assumées
+  (raretés, éléments, dégradés ponctuels), mais la charpente passe par les
+  jetons — un test vérifie que les `var(--…)` sont plus nombreux qu'elles.

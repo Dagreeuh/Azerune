@@ -14,7 +14,7 @@ export default function Layout({page,setPage,children}){
   const nav=[['home','🏰','Accueil',1],['academy','📘','Académie',1],['campaign','🗺️','Campagne',1],['raids','🔥','Raids',10],['squad','👥','Équipe',1],['codex','📖','Codex',1],['gear','🎒','Stuff',2],['inventory','🧰','Inventaire',1],['shop','🛒','Boutique',2],['quests','📜','Quêtes',1],['achievements','🏆','Hauts faits',1],['mythic','🗝️','Mythic+',8],['summon','🌀','Invocation',1],['history','🕘','Historique',10],['expeditions','⚔️','Expéditions',3],['settings','⚙️','Paramètres',1]];
   const submitName=event=>{event.preventDefault();const clean=name.trim();if(clean.length<3)return setNameError('Le nom doit contenir au moins 3 caractères.');setSummonerName(clean)};
   const maxed=summonerProfile.level>=60,required=maxed?1:summonerXpRequired(summonerProfile.level),percent=maxed?100:Math.min(100,summonerProfile.xp/required*100);
-  return <div className="app">
+return <div className="app">
     {!summonerProfile.name&&<div className="summoner-setup"><form onSubmit={submitName}><div className="summoner-orb">🔮</div><h1>Choisis ton nom d’Invocateur</h1><p>Ce nom représentera ton profil dans les Chroniques d’Azerune.</p><input maxLength="20" value={name} onChange={event=>setName(event.target.value)} placeholder="Nom d’Invocateur" autoFocus/><button>Commencer l’aventure</button>{nameError&&<small>{nameError}</small>}</form></div>}
     <header className="game-header">
       <div className="brand-profile">
