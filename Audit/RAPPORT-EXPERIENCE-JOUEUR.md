@@ -1454,3 +1454,27 @@ Suite complète : **1 635 tests**, 76 fichiers.
 - 728 couleurs restent écrites en dur : ce sont des teintes locales assumées
   (raretés, éléments, dégradés ponctuels), mais la charpente passe par les
   jetons — un test vérifie que les `var(--…)` sont plus nombreux qu'elles.
+
+### Correctif 1.77.1 — le libellé « AFFINITÉS » sortait de son bouton
+
+Signalé aussitôt par le joueur. Mesure :
+
+| Largeur d'écran | Bouton | Libellé « AFFINITÉS » |
+|---|---|---|
+| 430 px | 74 px | **72 px** — déborde |
+| 360 px | 60 px | **72 px** — déborde franchement |
+
+Cause : sous 620 px, `.hud-bouton{flex:1 1 0}` donnait à **tous** les boutons la
+même largeur, alors que les libellés vont de 15 px (« x1 ») à 72 px. Le plus
+long ne pouvait pas tenir.
+
+La correction n'est pas de raccourcir le mot : en laissant chaque bouton prendre
+sa largeur (`flex:0 1 auto`), le total ne fait que **310 px pour 410
+disponibles** à 430 px, et tient encore à 360 px. Plus aucun débordement aux
+trois largeurs mesurées. Le libellé reste borné par sécurité, et chaque commande
+porte désormais un nom accessible complet, puisque le texte visible est court.
+
+**Deux mutants avaient d'abord survécu** — ils mutaient en réalité
+`.team-prep-presets`, qui porte les mêmes propriétés plus haut dans la feuille.
+Rejoués sur la bonne règle : 4 sur 4. C'est la troisième fois de cet audit qu'une
+ancre de mutation ambiguë fait douter d'un test qui, lui, fonctionnait.

@@ -1068,7 +1068,8 @@ button:hover:not(:disabled){border-color:var(--metal-vif)}
   border:1px solid var(--bord);border-radius:9px;background:linear-gradient(#221c13,#100e0a);
   color:var(--texte-doux);box-shadow:var(--biseau)}
 .hud-bouton span{font-size:16px;line-height:1}
-.hud-bouton small{font-size:7px;font-weight:900;letter-spacing:.3px}
+.hud-bouton small{max-width:100%;overflow:hidden;font-size:7px;font-weight:900;letter-spacing:.3px;
+  text-overflow:ellipsis;white-space:nowrap}
 .hud-bouton.actif{border-color:var(--or);background:linear-gradient(#4a390d,#241b06);color:var(--or-clair);
   box-shadow:var(--biseau),var(--lueur-or)}
 .hud-quitter{border-color:#5a2318;color:#e0a08f}
@@ -1077,7 +1078,12 @@ button:hover:not(:disabled){border-color:var(--metal-vif)}
   .battle-hud{flex-wrap:wrap}
   .hud-mission{flex:1 1 100%}
   .hud-commandes{flex:1 1 100%;justify-content:space-between}
-  .hud-bouton{flex:1 1 0;min-width:0}
+  /* Surtout PAS `flex:1 1 0` : il donnait la meme largeur a tous les boutons
+     alors que les libelles vont de 15 px (« x1 ») a 72 px (« AFFINITÉS ») —
+     et le plus long sortait de son cadre. Chacun prend desormais sa largeur ;
+     mesure : 310 px de contenu pour 410 disponibles a 430 px, et 342 a 360 px.
+     Le `min-width` du cadre de base garde la cible tactile. */
+  .hud-bouton{flex:0 1 auto}
 }
 
 /* --- Cadres d'unité : de la pierre, et un camp lisible --------------------- */

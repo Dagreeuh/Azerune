@@ -333,18 +333,18 @@ export default function BattlePage({setPage}){
       {battle.regle&&<em title={battle.regle.summary}>{battle.regle.icon} {battle.regle.name}</em>}</div>
     <div className="hud-commandes">
       <button type="button" className={`hud-bouton ${battle.autoMode?'actif':''}`} onClick={toggleAuto}
-        aria-pressed={Boolean(battle.autoMode)} title="Combat automatique">
+        aria-pressed={Boolean(battle.autoMode)} title="Combat automatique" aria-label="Combat automatique">
         <span>{battle.autoMode?'⏸':'▶'}</span><small>AUTO</small></button>
-      <button type="button" className="hud-bouton" onClick={cycleSpeed} title="Vitesse du combat automatique">
+      <button type="button" className="hud-bouton" onClick={cycleSpeed} title="Vitesse du combat automatique" aria-label="Vitesse du combat automatique">
         <span>⏩</span><small>x{speed}</small></button>
       <button type="button" className={`hud-bouton ${vfxEnabled?'actif':''}`} onClick={toggleVfx}
-        aria-pressed={vfxEnabled} title="Effets visuels des sorts">
+        aria-pressed={vfxEnabled} title="Effets visuels des sorts" aria-label="Effets visuels des sorts">
         <span>✨</span><small>{vfxEnabled?'EFFETS':'COUPÉS'}</small></button>
       <button type="button" className="hud-bouton" onClick={()=>setAffinityOpen(true)}
-        aria-expanded={affinityOpen} title="Forces et faiblesses">
+        aria-expanded={affinityOpen} title="Forces et faiblesses" aria-label="Forces et faiblesses">
         <span>⚖️</span><small>AFFINITÉS</small></button>
       <button type="button" className="hud-bouton hud-quitter" onClick={()=>setAbandonConfirm(true)}
-        title="Quitter le combat"><span>✕</span><small>QUITTER</small></button>
+        title="Quitter le combat" aria-label="Quitter le combat"><span>✕</span><small>QUITTER</small></button>
     </div>
   </div>
   {battle.mythic&&<div className="mythic-wave-bar"><b>🗝️ Mythic+ {mission.mythicLevel}</b><span>Vague {battle.wave}/{battle.totalWaves}</span><span className={`mythic-sand ${mythicCollapsed(battle.mythicState)?'collapsed':mythicSandLeft(battle.mythicState)<=15?'low':''}`}>{mythicCollapsed(battle.mythicState)?`💥 Effondrement +${mythicOvertime(battle.mythicState)}`:`⌛ ${mythicSandLeft(battle.mythicState)} tours`}</span><em>{mission.affixes.length?mission.affixes.map(a=>`${a.icon} ${a.name}`).join(' · '):'Aucun affixe'}</em></div>}

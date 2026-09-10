@@ -146,6 +146,34 @@ describe('les commandes de combat sont rassemblées et atteignables',()=>{
       expect(etroit,'les commandes rétrécissent sans s’étirer').toContain('flex:1 1 0');
   });
 
+  it('aucun libellé ne sort de son bouton',()=>{
+    // Mesure du défaut : sur mobile, `flex:1 1 0` donnait la MÊME largeur à
+    // tous les boutons (74 px à 430 px, 60 px à 360 px) alors que les libellés
+    // vont de 15 px (« x1 ») à 72 px (« AFFINITÉS ») — le plus long sortait de
+    // son cadre. Chacun prend désormais sa largeur : mesuré, 310 px de contenu
+    // pour 410 disponibles à 430 px, et aucun débordement à 360, 430 ni 1440.
+    const etroit=regles(styles(),'.hud-bouton{').slice(1).join(' ');
+    expect(etroit,'les boutons reprennent une largeur imposée').not.toContain('flex:1 1 0');
+    expect(etroit,'les boutons ne s’adaptent plus à leur libellé').toContain('flex:0 1 auto');
+    // Ceinture et bretelles : même trop long, un libellé reste borné.
+    const petit=regle(styles(),'.hud-bouton small{');
+    expect(petit).toContain('max-width:100%');
+    expect(petit).toContain('overflow:hidden');
+    expect(petit).toContain('white-space:nowrap');
+  });
+
+  it('chaque commande porte un nom accessible complet',()=>{
+    // Les libellés sont courts et peuvent être tronqués : le nom entier doit
+    // vivre ailleurs que dans le texte visible.
+    const barre=page().slice(page().indexOf('<div className="battle-hud">'),page().indexOf('</div>\n  </div>'));
+    // On compte la classe, pas la forme de l'attribut : certaines commandes
+    // l'ecrivent en chaine simple, d'autres en gabarit avec un etat.
+    const commandes=[...barre.matchAll(/hud-bouton/g)].length;
+    const noms=[...barre.matchAll(/aria-label="/g)].length;
+    expect(commandes,'la barre a perdu ses commandes').toBeGreaterThanOrEqual(5);
+    expect(noms,`${commandes} commandes pour ${noms} noms accessibles`).toBe(commandes);
+  });
+
   it('un plancher de lisibilité remplace le texte à 6 px',()=>{
     expect(styles()).toContain('.battle-screen-compact small,.battle-screen-compact em,.battle-screen-compact span{font-size:max(8px,1em)}');
   });
