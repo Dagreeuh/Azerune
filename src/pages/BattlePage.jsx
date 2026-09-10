@@ -9,6 +9,7 @@ import{championIdentity}from'../data/championIdentities'; import{skillMechanic,s
 import{CONTINENTS,DIFFICULTIES,createMission}from'../data/campaign';
 import SpellVfx from'../components/SpellVfx';
 import{ressourceAffichee,classeRessource}from'../data/ressourcesChampions';
+import{bonusDeCle}from'../data/clesDeVoute';
 import{empreinteBonuses}from'../data/empreintes';
 import{skillDamageProfile,bonusLabel}from'../utils/skillMath';
 import{createRaidMission}from'../data/raids';
@@ -137,7 +138,7 @@ export default function BattlePage({setPage}){
  // avec ses tirages aleatoires, puis jetee.
  const setBattle=value=>setBattleState(value);const setTarget=value=>setTargetState(value);const setMissionReward=value=>setMissionRewardState(value);
  useEffect(()=>{if(!battleSession)return;updateBattleSession({battle,target,missionReward})},[battle,target,missionReward]);
- const start=()=>{rewardFinalizeLock.current=false;enemyActionLock.current=false;autoActionLock.current=false;enemyTurnKey.current=null;autoGeneration.current+=1;setReportOpen(false);setVisualEvents([]);const battleHeroes=HEROES.map(hero=>({...hero,currentStars:getProgress(hero).stars,skillLevels:skillLevels[hero.id]||{},empreinteSkills:empreinteBonuses(hero,getProgress(hero).empreintes).skills,uniqueWeapon:getUniqueWeaponForHero(hero)}));setBattle(createBattle(battleSession?.team||team,battleHeroes,stats,optionsDeCombat(mission)));setTarget(null);setError('');setMissionReward(null);setKeyboardSkill(null)};
+ const start=()=>{rewardFinalizeLock.current=false;enemyActionLock.current=false;autoActionLock.current=false;enemyTurnKey.current=null;autoGeneration.current+=1;setReportOpen(false);setVisualEvents([]);const battleHeroes=HEROES.map(hero=>({...hero,currentStars:getProgress(hero).stars,skillLevels:skillLevels[hero.id]||{},empreinteSkills:empreinteBonuses(hero,getProgress(hero).empreintes).skills,cleDeVoute:bonusDeCle(hero.id,getProgress(hero).empreintes),uniqueWeapon:getUniqueWeaponForHero(hero)}));setBattle(createBattle(battleSession?.team||team,battleHeroes,stats,optionsDeCombat(mission)));setTarget(null);setError('');setMissionReward(null);setKeyboardSkill(null)};
  useEffect(()=>{if(mission&&!battle)start()},[]);
  useEffect(()=>{battleRef.current=battle;const key=battle?`${battle.turn||'none'}|${battle.winner||'none'}|${battle.eventSeq||0}|${battle.wave||1}|${battle.log?.[0]||''}`:'empty';if(battleHeartbeat.current.key!==key)battleHeartbeat.current={...battleHeartbeat.current,key,changedAt:Date.now()};},[battle]);
  useEffect(()=>{if(!battle||battle.winner||battle.turn)return;setBattle(current=>{if(!current||current.winner||current.turn)return current;try{return nextTurn(current)}catch(error){console.error('Relance du tour interrompue',error);return{...current,turn:null,autoMode:false,log:['Watchdog : calcul du prochain tour interrompu, nouvelle tentative.',...(current.log||[])].slice(0,16)}}})},[battle?.turn,battle?.winner,battle?.eventSeq]);

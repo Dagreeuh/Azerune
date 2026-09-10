@@ -920,3 +920,30 @@
 .prep-regle b{color:#fbbf24;font-size:.85rem;}
 .prep-regle small{color:#d6d3d1;font-size:.75rem;}
 .battle-regle{background:#1c1207;border:1px solid #b45309;border-radius:.4rem;padding:.2rem .45rem;color:#fbbf24;font-size:.72rem;font-weight:700;}
+
+/* --- Clés de voûte ---------------------------------------------------------
+   Le choix qui change la facon de jouer un champion. Une seule peut etre
+   allumee : la grille doit rendre l'exclusivite lisible d'un coup d'oeil, donc
+   une cle ecartee reste visible mais eteinte, jamais cachee. */
+.cles-de-voute{margin-top:1rem;border:1px solid #3f3f6a;border-radius:.8rem;padding:.8rem;background:#12122a}
+.cles-de-voute.verrouillee{opacity:.6}
+.cles-de-voute>header{display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;margin-bottom:.7rem}
+.cles-de-voute h4{margin:.1rem 0;font-size:1rem;color:#e9d5ff}
+.cles-de-voute small{color:#a78bfa;letter-spacing:.08em;font-size:.62rem}
+.cles-de-voute p{margin:.25rem 0 0;color:#94a3b8;font-size:.76rem;line-height:1.35}
+.cles-de-voute>header em{color:#fbbf24;font-size:.72rem;white-space:nowrap}
+.cles-grille{display:grid;gap:.5rem}
+.cle-noeud{display:grid;grid-template-columns:34px 1fr auto;align-items:start;gap:.55rem;
+  text-align:left;padding:.6rem .65rem;border:1px solid #3f3f6a;border-radius:.65rem;
+  background:#181835;color:#e2e8f0;width:100%}
+.cle-noeud .cle-icone{font-size:1.15rem;line-height:1}
+.cle-noeud .cle-corps{display:grid;gap:.18rem;min-width:0}
+.cle-noeud b{font-size:.86rem;color:#f5f3ff}
+.cle-noeud .cle-corps small{color:#cbd5e1;font-size:.75rem;line-height:1.35;letter-spacing:0;text-transform:none}
+.cle-noeud .cle-corps em{color:#a78bfa;font-size:.72rem;font-style:normal}
+.cle-noeud .cle-corps i{color:#fbbf24;font-size:.7rem;font-style:normal}
+.cle-noeud.disponible{border-color:#a855f7;box-shadow:0 0 0 1px #a855f733}
+.cle-noeud.allumee{border-color:#facc15;background:#2e1065}
+.cle-noeud.exclue{opacity:.55}
+.cle-noeud:disabled{cursor:default}
+@media(max-width:560px){.cles-de-voute>header{flex-direction:column}}

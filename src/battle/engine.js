@@ -6,6 +6,15 @@ import{createMythicState,advanceMythicClock,mythicCollapseFactor}from'../utils/m
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const emptyCombatStat=()=>({damage:0,healing:0,damageTaken:0,mitigation:0,criticalDamage:0,dotDamage:0,summonDamage:0,weaponDamage:0,directHealing:0,periodicHealing:0,lifestealHealing:0,shieldMitigation:0,redirectMitigation:0,personalMitigation:0,skillUses:{}});
 const addCombatStat=(battle,id,values={})=>{if(id==null)return battle;const stats={...(battle.combatStats||{})},entry={...emptyCombatStat(),...(stats[id]||{})};Object.entries(values).forEach(([key,value])=>{if(key==='skillUses'&&value&&typeof value==='object'){entry.skillUses={...(entry.skillUses||{})};Object.entries(value).forEach(([effect,count])=>entry.skillUses[effect]=(entry.skillUses[effect]||0)+Math.max(0,Math.round(Number(count)||0)));}else entry[key]=(entry[key]||0)+Math.max(0,Math.round(Number(value)||0));});stats[id]=entry;return{...battle,combatStats:stats};};
+/**
+ * Valeur de la cle de voute d'une unite pour un archetype donne, ou 0.
+ *
+ * Chaque archetype n'a QU'UN point d'accroche dans ce fichier. Si un jour deux
+ * endroits appellent `cleDe` avec le meme archetype, la promesse du module
+ * `data/clesDeVoute` est rompue et un test le dit.
+ */
+const cleDe=(unit,archetype)=>unit?.cleDeVoute?.archetype===archetype?(Number(unit.cleDeVoute.valeur)||0):0;
+
 const copyUnit=unit=>({...unit,buffs:{...unit.buffs},debuffs:{...unit.debuffs},mechanic:{...(unit.mechanic||{}),danceSteps:[...(unit.mechanic?.danceSteps||[])]}});
 const makeEnemies=(source,scale=1,wave=1)=>source.map((enemy,index)=>{let hp=tempoPv(enemy.hp*scale),atk=Math.round(enemy.atk*scale),def=Math.round(enemy.def*scale);return{...enemy,id:`e-w${wave}-${index}-${enemy.id||'mythic'}`,element:normalizeElement(enemy.element),accuracy:enemy.accuracy||10,resistance:enemy.resistance||15,hp,atk,def,maxHp:hp,atb:Math.random()*12,buffs:{},debuffs:{},shield:0,maxShield:0,dead:false,side:'enemy',currentSpd:enemy.spd,skip:false,cooldowns:[0,0],enemyTurnCount:0}});
 const affixState=(ids=[])=>({ids,deathsThisWave:0,revived:false});
@@ -61,7 +70,23 @@ export function createBattle(team,heroes,getStats,options={}){
   const battleId=options.battleId||`battle-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
   return{
     battleId,createdAt:Date.now(),schemaVersion:2,actionSeq:0,tutorialBattle:options.tutorialBattle?{enabled:true,controlled:Boolean(options.tutorialBattle.controlled),scenarioId:options.tutorialBattle.scenarioId||'introduction'}:null,
-    allies:team.map(id=>{const hero=heroes.find(item=>item.id===id),stats=getStats(hero),initialShield=stats.setEffects?.includes('protectionSet')?Math.round(stats.hp*.15):0;return{...hero,element:normalizeElement(hero.element),...stats,hp:Math.max(1,Math.round(tempoPv(stats.hp)*(options.regle?.id==='fragile'?.6:1))),maxHp:tempoPv(stats.hp),atb:options.tutorialBattle?0:Math.random()*12,cooldowns:[0,0,0],buffs:initialShield?{protectionSet:{turns:99}}:{},debuffs:{},shield:initialShield,maxShield:initialShield,dead:false,side:'ally',currentSpd:stats.spd,skip:false,uniqueWeapon:hero.uniqueWeapon||null,weaponCharge:0,mechanic:{key:hero.id,value:0,max:hero.resourceMax??(hero.name==='Korga'||hero.skills?.some(skill=>skill.effect==='shieldExecute')?0:hero.id===19?3:hero.id===21?60:[7,8,13].includes(hero.id)?3:hero.id===14?4:hero.id===28?6:5),mode:hero.id===25?'high':null,targetId:null,lastSkill:null,danceSteps:[],active:[23,25].includes(hero.id)}}}),
+    allies:team.map(id=>{const hero=heroes.find(item=>item.id===id),stats=getStats(hero),initialShield=stats.setEffects?.includes('protectionSet')?Math.round(stats.hp*.15):0;return{...hero,element:normalizeElement(hero.element),...stats,hp:Math.max(1,Math.round(tempoPv(stats.hp)*(options.regle?.id==='fragile'?.6:1))),maxHp:tempoPv(stats.hp),atb:options.tutorialBattle?0:Math.random()*12,cooldowns:[0,0,0],buffs:initialShield?{protectionSet:{turns:99}}:{},debuffs:{},shield:initialShield,maxShield:initialShield,dead:false,side:'ally',currentSpd:stats.spd,skip:false,uniqueWeapon:hero.uniqueWeapon||null,weaponCharge:0,mechanic:{key:hero.id,value:0,max:hero.resourceMax??(hero.name==='Korga'||hero.skills?.some(skill=>skill.effect==='shieldExecute')?0:hero.id===19?3:hero.id===21?60:[7,8,13].includes(hero.id)?3:hero.id===14?4:hero.id===28?6:5),mode:hero.id===25?'high':null,targetId:null,lastSkill:null,danceSteps:[],active:[23,25].includes(hero.id)}}})
+      .map(unite=>{
+        // Amorce et Sacrifice ne peuvent etre poses qu'une fois le plafond
+        // connu : ils s'expriment tous deux en points de ressource. Chacun
+        // n'est lu qu'ICI — un test verifie que le moteur ne lit jamais un
+        // archetype a deux endroits, et il a d'abord echoue parce que
+        // Sacrifice etait lu trois fois.
+        const amorce=cleDe(unite,'amorce'),sacrifice=cleDe(unite,'sacrifice');
+        if(!amorce&&!sacrifice)return unite;
+        const plafond=Math.max(0,Number(unite.mechanic?.max)||0);
+        const depart=sacrifice?plafond:Math.min(plafond,amorce);
+        const facteur=1-Math.min(.9,sacrifice);
+        const maxHp=sacrifice?Math.max(1,Math.round(unite.maxHp*facteur)):unite.maxHp;
+        return{...unite,maxHp,hp:Math.max(1,Math.min(maxHp,sacrifice?Math.round(unite.hp*facteur):unite.hp)),
+          mechanic:{...unite.mechanic,value:depart,
+            active:depart>0&&plafond>0?true:unite.mechanic.active}};
+      }),
     enemies:makeEnemies(enemySource,enemyScale,1).map(unit=>options.regle?.id==='hate'?{...unit,atb:100}:unit).map(unit=>options.tutorialBattle?{...unit,atb:0}:unit),
     regle:options.regle||null,turn:null,winner:null,rewarded:false,combatStats:Object.fromEntries(team.map(id=>[id,emptyCombatStat()])),mythic:options.mythic||null,mythicState:options.mythic?createMythicState(options.mythic.turnBudget):null,wave:1,totalWaves:options.waves?.length||1,waves:options.waves||null,affixState:affixState(options.affixIds),raid:options.raid||null,raidState:options.raid?{charges:0,maxCharges:options.raid.eruptionAt||10,phaseTwo:false,failedMechanic:null,mechanicFailures:0,championActions:0,enrageAt:options.raid.enrageAt||40,enraged:false,enrageTriggeredAt:null,emberRespawnActions:options.raid.emberRespawnActions||7,emberRespawnAt:null,channelAt:options.raid.channelFrom??null,channelActions:options.raid.channelActions||4,channeling:false,channelEndsAt:null,channelsInterrupted:0,channelsCompleted:0}:null,lastEvents:[],eventSeq:0,log:['Le combat commence.']
   };
@@ -129,7 +154,13 @@ export function prepareTutorialTurn(battle,actorId){
 }
 
 export function finish(battle,id,text,retain=0){
-  let allies=battle.allies.map(unit=>unit.id===id?{...unit,atb:retain,cooldowns:unit.cooldowns.map(value=>Math.max(0,value-1)),skip:false}:unit);
+  // Cle de voute — Elan : finir son action au plafond de ressource rend de la
+  // jauge. C'est le seul endroit ou la jauge d'apres-action est fixee.
+  const elanDe=unite=>{
+    const valeur=cleDe(unite,'elan'),plafond=Math.max(0,Number(unite?.mechanic?.max)||0);
+    return valeur&&plafond>0&&(Number(unite?.mechanic?.value)||0)>=plafond?valeur:0;
+  };
+  let allies=battle.allies.map(unit=>unit.id===id?{...unit,atb:Math.min(99,retain+elanDe(unit)),cooldowns:unit.cooldowns.map(value=>Math.max(0,value-1)),skip:false}:unit);
   let enemies=battle.enemies.map(unit=>unit.id===id?{...unit,atb:0,skip:false}:unit),raidState=battle.raidState?{...battle.raidState}:null,events=[];
   if(raidState){
     const actor=allies.find(unit=>unit.id===id),ember=enemies.find(unit=>unit.raidRole==='ember'),previousEmber=battle.enemies.find(unit=>unit.raidRole==='ember');
@@ -485,6 +516,12 @@ export function performAutoAction(battle,priorities={}){
 // bonus de maitrise deja lus partout dans castSkill. Un seul point de jonction,
 // donc aucune surface de bug nouvelle dans le moteur — et la reduction de
 // recharge reste bornee a un tour par le calcul existant.
+// Cle de voute — Persistance : un tour de plus sur TOUT ce que le champion
+// applique. Elle passe par la maitrise, seul endroit ou la duree est calculee.
+const withCle=(mastery,unite)=>{
+  const persistance=cleDe(unite,'persistance');
+  return persistance?{...mastery,duration:(mastery.duration||0)+Math.round(persistance)}:mastery;
+};
 const withEmpreintes=(mastery,bonus)=>bonus
  ?{power:mastery.power+(bonus.power||0),effectRate:mastery.effectRate+(bonus.effectRate||0),
    duration:mastery.duration+(bonus.duration||0),cooldown:mastery.cooldown+(bonus.cooldown||0)}
@@ -494,11 +531,19 @@ export function castSkill(battle,index,targetId){
   // Morts d'avant l'action : sans cet instantane, les affixes qui reagissent
   // a une mort ne voient rien.
   const mortsAvantAction=battle.enemies.filter(unit=>unit.dead).map(unit=>unit.id);
-  const original=battle.allies.find(unit=>unit.id===battle.turn),skill=original?.skills[index],mastery=withEmpreintes(skillBonuses(index,original?.skillLevels?.[index]||1,skill),original?.empreinteSkills?.[index]);
+  const original=battle.allies.find(unit=>unit.id===battle.turn),skill=original?.skills[index],mastery=withCle(withEmpreintes(skillBonuses(index,original?.skillLevels?.[index]||1,skill),original?.empreinteSkills?.[index]),original);
   if(!original||!skill||original.cooldowns[index]>0)return{battle,error:'Action impossible'};
   if(index===2&&original.rarity===3&&(original.currentStars||3)<4&&!battle?.tutorialBattle?.enabled)return{battle,error:'Cette compétence se débloque à l’évolution 4★.'};
   if(original.skip)return{battle:finish(battle,original.id,`${original.name} est étourdi et passe son tour.`)};
   let allies=battle.allies.map(copyUnit),enemies=battle.enemies.map(copyUnit),actor=allies.find(unit=>unit.id===original.id);
+  // Instantane des malus ennemis AVANT la resolution : la cle de voute
+  // Contagion compare l'avant et l'apres plutot que d'intercepter la pose.
+  // Necessaire, pas seulement commode : la moitie des poses de malus du moteur
+  // sont ecrites directement sur la cible sans passer par `debuff()` — dont
+  // toutes les afflictions signature (Givre, Agonie, Corruption, Virulence).
+  // Une accroche sur `debuff()` n'aurait couvert que la moitie du jeu, en
+  // silence, et c'est exactement le defaut que cet audit traque partout.
+  const malusAvant=new Map(enemies.map(unit=>[unit.id,new Set(Object.keys(unit.debuffs||{}))]));
   let chosen=[...allies,...enemies].find(unit=>unit.id===targetId&&!unit.dead);
   if(skill.target==='enemy'&&chosen?.side!=='enemy')chosen=enemies.find(unit=>!unit.dead);
   if(skill.target==='enemy'){const impose=forcedEnemyTarget(battle,original);if(impose)chosen=enemies.find(unit=>unit.id===impose.id&&!unit.dead)||chosen;}
@@ -511,11 +556,22 @@ export function castSkill(battle,index,targetId){
   // permet a l'ecran de choisir l'animation du SORT plutot qu'une gerbe
   // generique, sans que la couche visuelle ait a deviner quoi que ce soit.
   const event=(target,amount,type,extra={})=>events.push({id:`event-${(battle.eventSeq||0)+events.length+1}-${target.id}`,sourceId:actor.id,targetId:target.id,amount:Math.max(0,Math.round(amount)),type,affinity:'neutral',critical:false,skillEffect:skill.effect,element:actor.element,skillTarget:skill.target,skillPower:skill.power||0,...extra});
-  const heal=(target,raw,type='heal')=>{if(battle.regle?.id==='sans-soin')return 0;const necroticMultiplier=1-.06*Math.min(5,target.debuffs?.necrotic?.stacks||0),healingMultiplier=Math.max(.35,(target.debuffs?.healingDown?.60:1)*(target.debuffs?.raidHealingDown?.70:1)*necroticMultiplier),adjusted=raw*COMBAT_TEMPO*healingMultiplier;const voulu=Math.round(adjusted),amount=Math.max(0,Math.min(target.maxHp-target.hp,voulu));target.hp+=amount;healingTotal+=amount;if(amount)event(target,amount,type);
+  const heal=(target,raw,type='heal')=>{if(battle.regle?.id==='sans-soin')return 0;const devouement=cleDe(actor,'devouement');const necroticMultiplier=1-.06*Math.min(5,target.debuffs?.necrotic?.stacks||0),healingMultiplier=Math.max(.35,(target.debuffs?.healingDown?.60:1)*(target.debuffs?.raidHealingDown?.70:1)*necroticMultiplier),adjusted=raw*COMBAT_TEMPO*healingMultiplier*(1+devouement);const voulu=Math.round(adjusted),amount=Math.max(0,Math.min(target.maxHp-target.hp,voulu));target.hp+=amount;healingTotal+=amount;if(amount)event(target,amount,type);
     // Egide des Mille Marees : le surplus de soin n'est plus perdu, il devient
     // une egide partagee. Sans cela, l'arme n'avait aucun effet — c'etait la
     // seule des sept, avec le Baton des Astres Brises, a ne rien faire.
     const surplus=voulu-amount;
+    // Cle de voute — Devouement : le soin est plus grand, et ce qui deborde
+    // protege au lieu d'etre perdu. Sans cela la cle etait presque morte la ou
+    // elle comptait le plus : mesure, le soin de base de Hicho rend deja 96 %
+    // d'une barre pleine, donc +20 % ne s'exprimait jamais sur lui.
+    if(surplus>0&&devouement){
+      const garde=Math.max(1,Math.round(surplus));
+      target.shield=(target.shield||0)+garde;
+      target.maxShield=Math.max(target.maxShield||0,target.shield);
+      target.buffs.shield={turns:2+mastery.duration,source:actor.id};
+      shieldTotal+=garde;event(target,garde,'shield');
+    }
     if(surplus>0&&actor.uniqueWeapon?.uniqueId==='tides'){
       const part=Math.max(1,Math.round(surplus/Math.max(1,allies.filter(x=>!x.dead).length)));
       allies.filter(x=>!x.dead).forEach(x=>{x.shield=(x.shield||0)+part;x.maxShield=Math.max(x.maxShield||0,x.shield);x.buffs.shield={turns:2+mastery.duration,source:actor.id};});
@@ -523,9 +579,22 @@ export function castSkill(battle,index,targetId){
       logs.push(`🌊 ${actor.uniqueWeapon.name} : ${surplus} PV excédentaires deviennent ${part} de bouclier par allié.`);
     }
     return amount};
-  const shield=(target,raw)=>{const amount=Math.max(0,Math.round(raw*COMBAT_TEMPO));target.shield+=amount;target.maxShield=Math.max(target.maxShield||0,target.shield);target.buffs.shield={turns:2+mastery.duration,source:actor.id};shieldTotal+=amount;if(amount)event(target,amount,'shield');return amount};
-  const debuff=(target,key,turns,chance=.75)=>{if(battle.regle?.id==='resistance'&&target.side==='enemy'){resisted.push(`${target.name} résiste : Volonté de fer.`);return false}const relation=affinity(actor.element,target.element);return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,mastery.effectRate,resisted)};
-  const hit=(target,mult=skill.power||0,opts={})=>{if(!target||target.dead||mult<=0)return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'}};if(battle.raidState?.channeling&&target.raidRole==='priest')return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'},channeled:true};const intangible=battle.mythic&&battle.affixState?.ids?.includes('incorporeal')&&target.hp/target.maxHp<.5&&!target.debuffs?.stun&&!target.debuffs?.slow;const relation=affinity(actor.element,target.element),attack=(opts.defScale?actor.def*(actor.buffs.defUp?1.3:1):actor.atk*(actor.buffs.atkUp?1.25:1))*(1+(actor.buffs.damageUp?.power||0)),defense=target.def*(target.buffs.defUp?1.3:1)*(1+.08*(target.buffs?.mythicBolster?.stacks||0))*(target.debuffs.defDown?.7:1)*(typeof opts.pierce==='number'?opts.pierce:opts.pierce?.15:1);let power=mult*(1+mastery.power)*relation.damage*(opts.bonus||1);if(target.debuffs.mark)power*=1.2;if(actor.setEffects?.includes('volcanicFurySet')&&actor.hp/actor.maxHp<.5)power*=1.12;let base=Math.max(5,Math.round(attack*power*100/(100+defense*3)*(intangible?.45:1))),critical=opts.forceCrit||Math.random()<(actor.crit||5)/100,damage=Math.round(base*(critical?1+(actor.critDamage||50)/100:1));const absorbed=Math.min(target.shield||0,opts.shieldBreaker?damage*2:damage);target.shield=Math.max(0,(target.shield||0)-absorbed);if(absorbed>0&&target.shield<=0)target.shieldBroken=true;if(!opts.shieldOnly){damage=Math.max(0,damage-(opts.shieldBreaker?Math.ceil(absorbed/2):absorbed));target.hp=Math.max(0,target.hp-damage);target.dead=target.hp<=0;}damageTotal+=damage;/* Plaie temporelle (Aszhal) : une part des degats infliges a cet ennemi par un allie qu'Aszhal a ameliore est mise de cote, puis rendue d'un coup a l'expiration. On reaffecte l'objet au lieu de le muter : une copie superficielle partagerait la meme reference entre deux unites. */const plaie=target.debuffs?.temporalWound;if(plaie&&damage>0&&actor.buffs?.damageUp?.source===plaie.source)target.debuffs.temporalWound={...plaie,stored:(plaie.stored||0)+Math.round(damage*(plaie.share||0))};if(damage>0&&actor.setEffects?.includes('lifestealSet')&&actor.hp<actor.maxHp){const life=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*.25)));actor.hp+=life;healingTotal+=life;event(actor,life,'heal',{sourceType:'lifesteal'});}const hunter=allies.find(unit=>unit.mechanic?.targetId===target.id&&unit.mechanic?.active&&!unit.dead);if(hunter&&hunter.id!==actor.id)hunter.atb=Math.min(100,hunter.atb+(Number(hunter.resonanceLevel||0)>=4?15:12));event(target,damage,'damage',{affinity:relation.key,critical});return{damage,critical,relation,absorbed}};
+  const shield=(target,raw)=>{const amount=Math.max(0,Math.round(raw*COMBAT_TEMPO*(1+cleDe(actor,'egide'))));target.shield+=amount;target.maxShield=Math.max(target.maxShield||0,target.shield);target.buffs.shield={turns:2+mastery.duration,source:actor.id};shieldTotal+=amount;if(amount)event(target,amount,'shield');return amount};
+  const debuff=(target,key,turns,chance=.75)=>{if(battle.regle?.id==='resistance'&&target.side==='enemy'){resisted.push(`${target.name} résiste : Volonté de fer.`);return false}const relation=affinity(actor.element,target.element);
+return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,mastery.effectRate,resisted)};
+  const hit=(target,mult=skill.power||0,opts={})=>{if(!target||target.dead||mult<=0)return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'}};if(battle.raidState?.channeling&&target.raidRole==='priest')return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'},channeled:true};const intangible=battle.mythic&&battle.affixState?.ids?.includes('incorporeal')&&target.hp/target.maxHp<.5&&!target.debuffs?.stun&&!target.debuffs?.slow;const relation=affinity(actor.element,target.element),attack=(opts.defScale?actor.def*(actor.buffs.defUp?1.3:1):actor.atk*(actor.buffs.atkUp?1.25:1))*(1+(actor.buffs.damageUp?.power||0)),defense=target.def*(target.buffs.defUp?1.3:1)*(1+.08*(target.buffs?.mythicBolster?.stacks||0))*(target.debuffs.defDown?.7:1)*(typeof opts.pierce==='number'?opts.pierce:opts.pierce?.15:1);let power=mult*(1+mastery.power)*relation.damage*(opts.bonus||1);if(target.debuffs.mark)power*=1.2;
+    // Cle de voute — Ferveur : la ressource actuelle amplifie le coup. Garder
+    // ses points devient une option, au lieu d'etre toujours une perte.
+    const ferveur=cleDe(actor,'ferveur');if(ferveur)power*=1+ferveur*Math.max(0,Number(actor.mechanic?.value)||0);
+    // Cle de voute — Acharnement : la cible affaiblie prend davantage.
+    const acharnement=cleDe(actor,'acharnement');
+    if(acharnement&&target.maxHp>0&&target.hp/target.maxHp<.40)power*=1+acharnement;if(actor.setEffects?.includes('volcanicFurySet')&&actor.hp/actor.maxHp<.5)power*=1.12;let base=Math.max(5,Math.round(attack*power*100/(100+defense*3)*(intangible?.45:1))),critical=opts.forceCrit||Math.random()<(actor.crit||5)/100,damage=Math.round(base*(critical?1+(actor.critDamage||50)/100:1));const absorbed=Math.min(target.shield||0,opts.shieldBreaker?damage*2:damage);target.shield=Math.max(0,(target.shield||0)-absorbed);if(absorbed>0&&target.shield<=0)target.shieldBroken=true;if(!opts.shieldOnly){damage=Math.max(0,damage-(opts.shieldBreaker?Math.ceil(absorbed/2):absorbed));target.hp=Math.max(0,target.hp-damage);target.dead=target.hp<=0;}damageTotal+=damage;
+    // Cle de voute — Vampirisme : une part des degats revient en PV.
+    const vampirisme=cleDe(actor,'vampirisme');
+    if(vampirisme&&damage>0&&actor.hp<actor.maxHp){
+      const rendu=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*vampirisme)));
+      actor.hp+=rendu;healingTotal+=rendu;event(actor,rendu,'heal',{sourceType:'vampirisme'});}
+    /* Plaie temporelle (Aszhal) : une part des degats infliges a cet ennemi par un allie qu'Aszhal a ameliore est mise de cote, puis rendue d'un coup a l'expiration. On reaffecte l'objet au lieu de le muter : une copie superficielle partagerait la meme reference entre deux unites. */const plaie=target.debuffs?.temporalWound;if(plaie&&damage>0&&actor.buffs?.damageUp?.source===plaie.source)target.debuffs.temporalWound={...plaie,stored:(plaie.stored||0)+Math.round(damage*(plaie.share||0))};if(damage>0&&actor.setEffects?.includes('lifestealSet')&&actor.hp<actor.maxHp){const life=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*.25)));actor.hp+=life;healingTotal+=life;event(actor,life,'heal',{sourceType:'lifesteal'});}const hunter=allies.find(unit=>unit.mechanic?.targetId===target.id&&unit.mechanic?.active&&!unit.dead);if(hunter&&hunter.id!==actor.id)hunter.atb=Math.min(100,hunter.atb+(Number(hunter.resonanceLevel||0)>=4?15:12));event(target,damage,'damage',{affinity:relation.key,critical});return{damage,critical,relation,absorbed}};
   const targets=skill.target==='allEnemies'?enemies.filter(unit=>!unit.dead):skill.target==='enemy'?[chosen]:[];
   const e=skill.effect,m=actor.mechanic||(actor.mechanic={value:0,max:5}),resonanceIV=Number(actor.resonanceLevel||0)>=4;const vexilInstabilityBefore=actor.id===24?Math.max(0,Math.min(5,Number(m.value)||0)):0;const ghoulTurns=Math.max(0,m.ghoulTurns||0),offensiveSkill=['enemy','allEnemies'].includes(skill.target),ghoulTarget=chosen?.side==='enemy'&&!chosen.dead?chosen:enemies.find(unit=>!unit.dead);if(ghoulTurns>0&&offensiveSkill&&ghoulTarget){const ghoulDamage=Math.round(actor.atk*.28);ghoulTarget.hp=Math.max(0,ghoulTarget.hp-ghoulDamage);ghoulTarget.dead=ghoulTarget.hp<=0;if(ghoulTarget.dead){ghoulTarget.atb=0;ghoulTarget.shield=0;}damageTotal+=ghoulDamage;event(ghoulTarget,ghoulDamage,'ghoul',{sourceType:'ghoul'});m.ghoulTurns=Math.max(0,ghoulTurns-1);m.value=m.ghoulTurns;m.active=m.ghoulTurns>0;if(m.ghoulTurns>0)actor.buffs.ghoul={turns:m.ghoulTurns+1,source:actor.id,damage:ghoulDamage};else delete actor.buffs.ghoul;logs.push(`💀 La Goule de ${actor.name} frappe ${ghoulTarget.name} : ${ghoulDamage} dégâts.`);}
   // Generic damage first, with unique modifiers.
@@ -689,6 +758,25 @@ export function castSkill(battle,index,targetId){
   const caelion=allies.find(x=>x.id===30&&x.mechanic?.active&&x.mechanic?.targetId===actor.id);if(caelion&&skill.cd>0){caelion.mechanic.anchorSpent=true;logs.push(`⏳ L’Ancrage de Caelion mémorise l’utilisation de ${skill.name}.`);}if(['enemy','allEnemies'].includes(skill.target)&&damageTotal>0&&actor.setEffects?.includes('incendiarySet')){const burnTarget=chosen?.side==='enemy'&&!chosen.dead?chosen:enemies.find(unit=>!unit.dead);if(burnTarget&&Math.random()<.25&&tryDebuff(actor,burnTarget,'burn',2,.75,0,resisted))logs.push(`🔥 Set Incendiaire : ${burnTarget.name} subit Brûlure.`);}
   actor.cooldowns=actor.cooldowns.map((value,i)=>i===index?Math.max(0,skill.cd-mastery.cooldown)+1:value);
   const details=[damageTotal?`${damageTotal} dégâts`:null,healingTotal?`${healingTotal} soins`:null,shieldTotal?`${shieldTotal} bouclier`:null].filter(Boolean).join(' · '),resource=actor.name!=='Korga'&&!actor.skills?.some(skill=>skill.effect==='shieldExecute')&&actor.mechanic?.value?` · ${actor.mechanic.value} charge(s)`:'';
+  // Cle de voute — Contagion : chaque malus NOUVEAU se propage a un voisin qui
+  // ne le porte pas. On collecte d'abord et on applique ensuite : propager en
+  // cours de parcours ferait cascader la propagation sur elle-meme.
+  const contagion=cleDe(actor,'contagion');
+  if(contagion){
+    const aPropager=[];
+    enemies.forEach(cible=>{
+      const avant=malusAvant.get(cible.id)||new Set();
+      Object.keys(cible.debuffs||{}).filter(cle=>!avant.has(cle))
+        .forEach(cle=>aPropager.push([cle,cible.debuffs[cle]]));
+    });
+    const propages=[];
+    aPropager.forEach(([cle,valeur])=>{
+      enemies.filter(x=>!x.dead&&!x.debuffs?.[cle])
+        .slice(0,Math.max(0,Math.round(contagion)))
+        .forEach(voisin=>{voisin.debuffs[cle]={...valeur};propages.push(`${DEBUFF_LABELS[cle]||cle} sur ${voisin.name}`)});
+    });
+    if(propages.length)logs.push(`${actor.cleDeVoute?.nom||'Contagion'} : ${propages.join(', ')}.`);
+  }
   enemies=enemies.map(unit=>unit.hp<=0?{...unit,hp:0,dead:true,atb:0,shield:0}:unit);allies=allies.map(unit=>unit.hp<=0?{...unit,hp:0,dead:true,atb:0,shield:0}:unit);
   let next={...battle,allies,enemies,lastEvents:events,eventSeq:(battle.eventSeq||0)+events.length,mortsAvant:mortsAvantAction};const criticalDamage=events.filter(value=>value.type==='damage'&&value.critical&&!value.weapon).reduce((sum,value)=>sum+value.amount,0),dotDamage=events.filter(value=>value.type==='dot').reduce((sum,value)=>sum+value.amount,0),summonDamage=events.filter(value=>value.type==='ghoul').reduce((sum,value)=>sum+value.amount,0),weaponDamage=events.filter(value=>value.weapon).reduce((sum,value)=>sum+value.amount,0),lifestealHealing=events.filter(value=>value.type==='heal'&&value.sourceType==='lifesteal').reduce((sum,value)=>sum+value.amount,0);next=addCombatStat(next,actor.id,{damage:damageTotal,healing:healingTotal,criticalDamage,dotDamage,summonDamage,weaponDamage,directHealing:Math.max(0,healingTotal-lifestealHealing),lifestealHealing,skillUses:{[skill.effect]:1}});
   return{battle:finish(next,actor.id,`${actor.name} utilise ${skill.name}${details?` : ${details}`:''}${resource}.${resisted.length?` ${resisted.join(' ')}`:''}${logs.length?` ${logs.join(' ')}`:''}`,retain)};

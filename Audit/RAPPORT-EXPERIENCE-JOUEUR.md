@@ -1105,3 +1105,148 @@ il n'empêche pas de changer, il oblige à regarder ce qui change.
 
 `tests/aszhal.plaie.test.js` : 23 tests, **20 mutations sur 20 tuées**.
 Suite complète : **1 550 tests**, 72 fichiers.
+
+## 20. Refonte des Empreintes : un arbre pour 32 champions, et une bonne réponse
+
+Le joueur a dit « je trouve le système bof ». Il avait raison, et voici de quoi.
+
+### Diagnostic — quatre mesures
+
+**1. Il n'y avait pas 32 arbres, il y en avait un, appliqué 32 fois.**
+
+| | |
+|---|---|
+| Champions | 32 |
+| Jeux de **noms** de nœuds distincts | **1** |
+| Jeux de **bonus** distincts | 12 |
+
+« Poigne assurée », « Second souffle », « Sommet » : tout le roster portait les
+mêmes douze nœuds, dans le même ordre. Aucun ne parlait du champion.
+
+**2. Une branche sur trois mentait, pour la moitié du roster.**
+
+46 nœuds sur 384 (12 %) n'accordaient pas ce que leur branche annonçait, et pas
+au hasard : **17 champions sur 32 n'ont aucun effet à jet**. Pour eux, la branche
+Emprise (« fiabilité et durée ») retombait sur `power`. Mesure sur Kaelen :
+Emprise complète = **+28 % de puissance**. Une seconde branche Force déguisée.
+
+**3. L'arbre demandait plus que les champions ne pouvaient porter.**
+
+C'est la cause de tout le reste :
+
+> L'arbre exigeait **12 nœuds distincts** à des champions qui n'offrent que
+> **4 à 11 ancrages** (médiane 7). Caelion, avec quatre, portait **sept
+> doublons**.
+
+Il avait été dimensionné sans jamais demander ce que les champions savaient
+recevoir. La cascade de secours de `ancrerBonus` n'était pas une commodité :
+c'était le pansement qui cachait ça.
+
+**4. Il y avait une bonne réponse et dix-huit pièges.**
+
+| 6★ R5 | |
+|---|---|
+| Répartitions légales | 19 |
+| Meilleure (F3/E3/X0) | +46 % de puissance |
+| Pire (F1/E2/X3) | +14 % |
+| **Écart** | **32 points** |
+
+Plus : **la Résonance 5 n'apportait aucun point** (6 à R4 comme à R5).
+
+Régler les pourcentages n'y aurait rien changé. Le défaut était structurel.
+
+### La refonte
+
+**Le socle passe de 12 nœuds à 6**, dimensionné sur ce que les champions
+portent réellement. Résultat : **31 champions sur 32 n'ont plus aucun doublon**
+(Caelion en garde un, irréductible : il n'offre que quatre ancrages).
+
+**Le nom d'un nœud est dérivé du bonus réellement retenu**, comme le texte
+l'était déjà. « Prise ferme » devient « Fiabilité · Nova de givre » ou
+« Puissance · Trait de givre » selon ce que le nœud fait vraiment. Un nom fixe
+posé par la branche ne pouvait que mentir ; celui-ci ne le peut plus.
+
+**Chaque champion reçoit trois clés de voûte, et ne peut en allumer qu'une.**
+C'est là que vivent l'identité et la décision. Une clé ne donne jamais un chiffre
+de plus : elle change la forme du jeu.
+
+| | |
+|---|---|
+| Clés écrites | **96** (3 × 32 champions) |
+| Archétypes | **10** |
+| Points d'accroche dans le moteur | **10 — un par archétype, et un seul** |
+
+C'est ce dernier point qui rend 96 clés tenables : il n'y a que dix
+comportements à vérifier, tout le reste est de la donnée. Un test l'épingle —
+et il a échoué d'emblée, parce que `sacrifice` était lu **trois fois**.
+
+Les dix archétypes : Amorce, Élan, Ferveur, Persistance, Contagion, Sacrifice,
+Acharnement, Vampirisme, Égide, Dévouement. Chacun sert entre 5 et 18 champions,
+sous un nom et un texte écrits pour chacun d'eux.
+
+### L'échelle de Résonance : cinq paliers, cinq effets de nature différente
+
+| Palier | Ce qu'il apporte |
+|---|---|
+| R1 | ouvre l'étage II |
+| R2 | +1 point |
+| R3 | **ouvre la clé de voûte** |
+| R4 | +1 point |
+| R5 | **la clé coûte 1 point au lieu de 2** |
+
+Ce dernier n'est pas un réglage, c'est ce qui rend l'arbitrage **symétrique** :
+au sommet, 6 points pour 6 nœuds de socle et une clé à 1. Prendre tout le socle
+ou prendre une clé coûtent exactement le même budget, **et l'on ne peut pas
+avoir les deux**. Une version intermédiaire donnait 7 points : le socle complet
+en gaspillait un, et la clé devenait de fait obligatoire — j'ai écrit le texte
+d'écran avant de mesurer ça, et la mesure m'a contredit.
+
+### Trouvé en chemin : la moitié des malus contourne `debuff()`
+
+En branchant la Contagion, j'ai mesuré **28 appels à `debuff()` contre 28
+écritures directes** `.debuffs.X=` dans le moteur — dont **toutes les afflictions
+signature** (Givre, Agonie, Corruption, Virulence, Plaie temporelle).
+
+Ce n'est pas seulement gênant pour la Contagion, que j'ai donc branchée sur un
+diff avant/après plutôt que sur `debuff()`. C'est surtout que le chemin direct
+**contourne trois règles** : la règle spéciale « Volonté de fer », le bonus de
+`effectRate` des Empreintes, et le modificateur d'affinité. Autrement dit, un
+nœud « Fiabilité » n'agit pas sur la moitié des malus du jeu.
+
+**Je n'ai pas corrigé ça** : router 28 écritures vers `debuff()` est un chantier
+à part, avec un vrai risque d'effets de bord sur l'équilibrage. C'est consigné
+ici, pas enterré.
+
+### Dévouement était presque mort là où il comptait
+
+Mesure des soins, en part d'une barre pleine : Hicho **96 %**, Yunmei 43–53 %.
+Le soin de base de Hicho sature donc systématiquement — un « +20 % de soins »
+ne s'exprimait jamais sur lui, alors que c'est à lui que la clé est proposée.
+
+Le Dévouement **convertit désormais le surplus en bouclier** au lieu de le
+perdre. La clé est utile partout, et le mécanisme existait déjà dans le jeu
+(l'Égide des Mille Marées fait la même chose).
+
+### Deux mutants avaient raison
+
+- **`sacrifice` lu trois fois.** Ma propre promesse — un archétype, une accroche
+  — était fausse dès la première version. Le test l'a dit avant moi.
+- **La Contagion propageait aussi les malus déjà en place.** Frapper un ennemi
+  déjà affligé aurait répandu des malus posés par quelqu'un d'autre, des tours
+  plus tôt. Aucun de mes scénarios ne partait d'une cible déjà touchée.
+
+**23 mutants sur 23** au final.
+
+### Couverture
+
+`tests/cles.de.voute.test.js` : 36 tests. Les fichiers `empreintes.test.js`,
+`empreintes.vivantes.test.js` et `empreintes.cablage.test.js` ont été remis à
+jour sur la nouvelle structure, en gardant leur intention. Suite complète :
+**1 589 tests**, 73 fichiers.
+
+### Ce qui reste ouvert
+
+- Les 28 écritures directes de malus (ci-dessus).
+- Le désaccord entre `EFFETS_A_JET`/`EFFETS_TEMPORELS`/`EFFETS_A_PUISSANCE` et
+  ce que le moteur fait vraiment, relevé en section 19 et toujours là. Il est
+  d'ailleurs lié : ces listes décident de `peutRecevoir`, donc des ancrages.

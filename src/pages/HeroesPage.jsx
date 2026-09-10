@@ -117,10 +117,10 @@ export default function HeroesPage({squad=false}){
         <section className="empreintes-panel">
           <header className="empreintes-heading">
             <div><small>ARBRE D’EMPREINTES</small><h3>{empreintes.depenses}/{empreintes.points} gravées</h3>
-              <p>Le budget n’atteint jamais l’arbre entier : {empreintes.arbre.length} nœuds pour {empreintes.points} point{empreintes.points>1?'s':''}. On ne renforce pas un champion, on le spécialise.</p></div>
+              <p>{empreintes.arbre.length} nœuds, ou {empreintes.arbre.length-empreintes.coutCle} nœuds et une clé de voûte : les deux coûtent {empreintes.points} point{empreintes.points>1?'s':''}, et l’on ne peut pas avoir les deux. On ne renforce pas un champion, on le spécialise.</p></div>
             <div className="empreintes-meta">
               <span>⭐ {progress.stars}★ · {progress.stars-2} point{progress.stars-2>1?'s':''}</span>
-              <span>✦ Résonance {progress.resonance} · étages I–{['I','II','III','IV'][empreintes.profondeur-1]}</span>
+              <span>✦ Résonance {progress.resonance} · étages I–{['I','II'][empreintes.profondeur-1]||'I'}</span>
               {empreintes.depenses>0&&<button className="secondary" onClick={()=>setEmpreinteMessage(resetEmpreintes(hero.id))}>Tout effacer</button>}
             </div>
           </header>
@@ -132,7 +132,7 @@ export default function HeroesPage({squad=false}){
                   className={`empreinte-noeud ${noeud.allume?'allume':''} ${noeud.disponible?'disponible':''} ${!noeud.etageOuvert?'verrouille':''}`}
                   disabled={!noeud.disponible}
                   onClick={()=>setEmpreinteMessage(lightEmpreinte(hero.id,noeud.id))}>
-                  <span className="empreinte-etage">{['I','II','III','IV'][noeud.etage-1]}</span>
+                  <span className="empreinte-etage">{['I','II'][noeud.etage-1]}</span>
                   <span className="empreinte-icone">{noeud.etageOuvert?noeud.icon:'🔒'}</span>
                   <span className="empreinte-corps"><b>{noeud.name}</b><small>{noeud.detail}</small>
                     {!noeud.etageOuvert&&<em>Résonance {ETAGE_RESONANCE[noeud.etage-1]} requise</em>}
@@ -142,6 +142,29 @@ export default function HeroesPage({squad=false}){
                 </button>)}
             </article>)}
           </div>
+          <section className={`cles-de-voute ${empreintes.cleOuverte?'':'verrouillee'}`}>
+            <header>
+              <div><small>UNE SEULE, JAMAIS DEUX</small><h4>🗝️ Clé de voûte</h4>
+                <p>Elle ne donne pas un chiffre de plus : elle change la façon de jouer {hero.name}. Elle coûte {empreintes.coutCle} point{empreintes.coutCle>1?'s':''} — autant de nœuds de socle auxquels il faut renoncer.{empreintes.coutCle>1?' À la Résonance 5, elle n’en coûte plus qu’un.':''}</p></div>
+              {!empreintes.cleOuverte&&<em>Résonance {empreintes.resonanceCle} requise</em>}
+            </header>
+            <div className="cles-grille">
+              {empreintes.cles.map(cle=>
+                <button key={cle.noeudId} type="button"
+                  className={`cle-noeud ${cle.allumee?'allumee':''} ${cle.disponible?'disponible':''} ${cle.exclue?'exclue':''} ${cle.ouverte?'':'verrouillee'}`}
+                  disabled={!cle.disponible}
+                  onClick={()=>setEmpreinteMessage(lightEmpreinte(hero.id,cle.noeudId))}>
+                  <span className="cle-icone">{cle.ouverte?'🗝️':'🔒'}</span>
+                  <span className="cle-corps">
+                    <b>{cle.nom}</b>
+                    <small>{cle.texte}</small>
+                    <em>{cle.effet}</em>
+                    {cle.exclue&&<i>Efface la clé actuelle pour choisir celle-ci</i>}
+                  </span>
+                  {cle.allumee&&<span className="empreinte-marque">✦</span>}
+                </button>)}
+            </div>
+          </section>
           {empreinteMessage&&<p className={empreinteMessage.ok?'evolution-success':'evolution-error'}>{empreinteMessage.message}</p>}
         </section>
       </div>

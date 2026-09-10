@@ -34,8 +34,25 @@ describe('aucun nœud d’Empreinte n’est décoratif',()=>{
     expect(morts,`${morts.length} nœuds morts`).toEqual([]);
   });
 
-  it('chaque champion garde bien ses douze nœuds',()=>{
-    HEROES.forEach(h=>expect(empreinteTree(h),h.name).toHaveLength(12));
+  it('chaque champion garde bien ses six nœuds',()=>{
+    // L'arbre en demandait douze a des champions qui n'offrent que 4 a 11
+    // ancrages (mediane 7) : Caelion, avec quatre, portait sept doublons.
+    HEROES.forEach(h=>expect(empreinteTree(h),h.name).toHaveLength(6));
+  });
+
+  it('un arbre ne se répète plus : chaque nœud ancré est unique',()=>{
+    // Mesure avant refonte : jusqu'a sept noeuds identiques dans un meme
+    // arbre. Un choix entre deux noeuds identiques n'est pas un choix.
+    const ecarts=[];
+    HEROES.forEach(h=>{
+      const couples=empreinteTree(h).flatMap(n=>Object.keys(n.effect||{})
+        .filter(c=>c!=='skill'&&c!=='stats').map(c=>`${n.effect.skill}:${c}`));
+      const doublons=couples.length-new Set(couples).size;
+      // Caelion n'offre que quatre ancrages pour cinq noeuds ancres : un
+      // doublon est irreductible chez lui, et chez lui seulement.
+      if(doublons>(h.name==='Caelion'?1:0))ecarts.push(`${h.name} : ${doublons} doublon(s)`);
+    });
+    expect(ecarts).toEqual([]);
   });
 
   it('un nœud à deux bonus les porte sur la même compétence',()=>{

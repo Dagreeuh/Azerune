@@ -1,7 +1,7 @@
 import{describe,it,expect}from'vitest';
 import fs from'node:fs';
 import{fileURLToPath}from'node:url';
-import{BRANCHES,ETAGE_RESONANCE,RESONANCE_POINT_TIERS,ETAGES}from'../src/data/empreintes';
+import{BRANCHES,ETAGE_RESONANCE,RESONANCE_POINT_TIERS,ETAGES,RESONANCE_CLE,coutDeCle}from'../src/data/empreintes';
 
 // Meme garde que pour les portails d'invocation : une cle que la page reclame
 // sans que le fournisseur l'expose ne casse aucun test unitaire — le panneau
@@ -58,7 +58,8 @@ describe('l’ecran dit ce que le code fait',()=>{
       const donnePoint=RESONANCE_POINT_TIERS.includes(palier);
       const index=ETAGE_RESONANCE.indexOf(palier);
       // L'un ou l'autre doit exister, sinon le JSX afficherait « étage undefined ».
-      expect(donnePoint||(index>=0&&index<ETAGES),`Résonance ${palier}`).toBe(true);
+      // R3 est le palier de la cle de voute : elle n'ouvre ni etage ni point.
+      expect(donnePoint||(index>=0&&index<ETAGES)||palier===RESONANCE_CLE||coutDeCle({resonance:palier})<coutDeCle({resonance:palier-1}),`Résonance ${palier}`).toBe(true);
     }
   });
 

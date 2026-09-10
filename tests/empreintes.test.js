@@ -1,7 +1,7 @@
 import{describe,it,expect}from'vitest';
 import{HEROES}from'../src/data/heroes';
 import{BRANCHES,ETAGES,ETAGE_RESONANCE,RESONANCE_POINT_TIERS,
-  empreinteTree,empreintePoints,empreinteDepth,empreinteStatus,empreinteBonuses,allTrees}from'../src/data/empreintes';
+  empreinteTree,empreintePoints,empreinteDepth,empreinteStatus,empreinteBonuses,allTrees,COUT_CLE,RESONANCE_CLE,coutDeCle}from'../src/data/empreintes';
 import{defaultChampionProgress,normalizeChampionProgress,MAX_RESONANCE,MAX_STARS}from'../src/utils/progression';
 import{totalStats,championPower}from'../src/utils/stats';
 import{createBattle,castSkill}from'../src/battle/engine';
@@ -20,7 +20,7 @@ describe('l’arbre existe pour tout le roster',()=>{
       expect(new Set(arbre.map(noeud=>noeud.id)).size,hero.name).toBe(TAILLE);
       BRANCHES.forEach(({id})=>{
         const noeuds=arbre.filter(noeud=>noeud.branche===id);
-        expect(noeuds.map(noeud=>noeud.etage).sort()).toEqual([1,2,3,4]);
+        expect(noeuds.map(noeud=>noeud.etage).sort()).toEqual([1,2]);
       });
     });
   });
@@ -53,9 +53,12 @@ describe('l’arbre existe pour tout le roster',()=>{
 describe('le budget n’atteint jamais l’arbre entier',()=>{
   // C'est la garantie d'equilibre du systeme. Un joueur ne renforce pas son
   // champion, il le specialise : deux Thorgar pleinement investis diffèrent.
-  it('même au sommet absolu, la moitié de l’arbre reste éteinte',()=>{
-    expect(empreintePoints(complet)).toBeLessThan(TAILLE);
-    expect(empreintePoints(complet)).toBe(TAILLE/2);
+  it('même au sommet absolu, on ne peut pas tout prendre',()=>{
+    // La contrainte ne porte plus sur le seul socle mais sur le systeme
+    // entier : six noeuds plus une cle de voute a deux points font huit, pour
+    // sept points au maximum. Prendre tout le socle, c'est renoncer a la cle.
+    expect(empreintePoints(complet),'le budget couvre socle et clé').toBeLessThan(TAILLE+COUT_CLE);
+    expect(empreintePoints(complet)).toBe(TAILLE);
   });
 
   it('un champion neuf dispose déjà d’un point',()=>{
@@ -80,7 +83,7 @@ describe('le budget n’atteint jamais l’arbre entier',()=>{
         const points=empreintePoints(valeur);
         expect(Number.isFinite(points)).toBe(true);
         expect(points).toBeGreaterThanOrEqual(1);
-        expect(points).toBeLessThanOrEqual(TAILLE/2);
+        expect(points).toBeLessThanOrEqual(TAILLE+COUT_CLE-1);
       });
   });
 });
@@ -109,7 +112,13 @@ describe('la Résonance ouvre la profondeur',()=>{
     for(let resonance=1;resonance<=MAX_RESONANCE;resonance+=1){
       const ouvreUnEtage=empreinteDepth({resonance})>empreinteDepth({resonance:resonance-1});
       const donneUnPoint=empreintePoints({stars:6,resonance})>empreintePoints({stars:6,resonance:resonance-1});
-      expect(ouvreUnEtage||donneUnPoint,`Résonance ${resonance}`).toBe(true);
+      // R3 n'ouvre ni etage ni point : elle ouvre la cle de voute, qui est le
+      // vrai contenu de ce palier.
+      // R3 ouvre la cle de voute, R5 en abaisse le cout : ni l'un ni l'autre
+      // n'ouvre d'etage ni ne verse de point, et tous deux comptent.
+      const ouvreLaCle=resonance===RESONANCE_CLE;
+      const allegeLaCle=coutDeCle({resonance})<coutDeCle({resonance:resonance-1});
+      expect(ouvreUnEtage||donneUnPoint||ouvreLaCle||allegeLaCle,`Résonance ${resonance}`).toBe(true);
     }
   });
 });

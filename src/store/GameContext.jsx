@@ -261,7 +261,23 @@ export function GameProvider({children}){
   const lightEmpreinte=(heroId,noeudId)=>{
     const hero=HEROES.find(entry=>entry.id===heroId);
     if(!hero)return{ok:false,message:'Champion introuvable.'};
-    const etat=getEmpreinteStatus(hero),noeud=etat.noeuds.find(entry=>entry.id===noeudId);
+    const etat=getEmpreinteStatus(hero);
+    // Une cle de voute passe par le meme chemin qu'un noeud : meme stockage,
+    // memes refus, un seul endroit ou la regle vit.
+    const cle=etat.cles.find(entry=>entry.noeudId===noeudId);
+    if(cle){
+      if(cle.allumee)return{ok:false,message:'Cette clé de voûte est déjà gravée.'};
+      if(cle.exclue)return{ok:false,message:`Une seule clé de voûte à la fois : efface d’abord « ${etat.cleActive.nom} ».`};
+      if(!cle.ouverte)return{ok:false,message:`Résonance ${etat.resonanceCle} requise pour une clé de voûte.`};
+      if(etat.restants<etat.coutCle)return{ok:false,message:`Il faut ${etat.coutCle} point${etat.coutCle>1?'s':''} d’Empreinte libre${etat.coutCle>1?'s':''}.`};
+      setChampionProgress(current=>{
+        const courant=normalizeChampionProgress(hero,current[heroId]);
+        if(courant.empreintes.includes(noeudId))return current;
+        return{...current,[heroId]:{...courant,empreintes:[...courant.empreintes,noeudId]}};
+      });
+      return{ok:true,message:`${cle.nom} gravée.`,cle};
+    }
+    const noeud=etat.noeuds.find(entry=>entry.id===noeudId);
     if(!noeud)return{ok:false,message:'Empreinte inconnue.'};
     if(noeud.allume)return{ok:false,message:'Empreinte déjà gravée.'};
     if(!noeud.etageOuvert)return{ok:false,message:`Résonance ${ETAGE_RESONANCE[noeud.etage-1]} requise pour cet étage.`};
