@@ -1171,3 +1171,19 @@ body.combat-plein-ecran .battle-side .units{flex:1;align-content:start}
 .hero,.panel{border:2px solid var(--bord-clair);
   background:linear-gradient(#1f1a12,var(--fond))}
 .hero h2,.panel h2{color:var(--or-clair);text-shadow:0 2px 0 #000}
+
+/* ---- Arène pixel art (prototype) ---------------------------------------- */
+/* Le cadre reprend la pierre et l'or du reste de l'interface : le prototype
+   doit se juger DANS l'ambiance, pas sur fond blanc. */
+.arene-prototype .arene-avertissement{color:var(--texte-doux);font-size:.86rem;margin:0 0 10px}
+.arene-pixi{border:2px solid var(--bord);border-radius:8px;overflow:hidden;
+  background:var(--pierre-900);box-shadow:var(--relief);line-height:0}
+.arene-pixi canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.arene-mesure{color:var(--texte-doux);font-size:.86rem;margin:8px 0 0}
+.arene-mesure strong{color:var(--or-clair);font-variant-numeric:tabular-nums}
+.arene-erreur{color:var(--or-clair);background:var(--pierre-800);border:1px solid var(--bord);
+  border-radius:6px;padding:8px 10px;margin:8px 0 0}
+.arene-verdict{font-family:var(--police-titre);color:var(--or-clair);font-size:1.2rem;margin:8px 0 0}
+.arene-journal{list-style:none;padding:0;margin:10px 0 0;color:var(--texte-doux);font-size:.84rem}
+.arene-journal li{padding:3px 0;border-bottom:1px solid var(--pierre-700)}
+.arene-journal li:first-child{color:var(--texte-vif)}

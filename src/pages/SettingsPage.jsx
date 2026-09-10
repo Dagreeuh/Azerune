@@ -9,7 +9,7 @@ import{applySaveImport,createSaveExport,validateSaveExport}from'../utils/storage
 const RESET_WORD='REINITIALISER';
 const decodeBase64Utf8=value=>{const binary=atob(value),bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));return new TextDecoder('utf-8').decode(bytes)};
 
-export default function SettingsPage(){
+export default function SettingsPage({setPage}){
   const{summonerProfile,summonerXpRequired}=useGame();
   const[step,setStep]=useState(0); const PREF_KEY='azerune-summon-preferences-v1'; const readPrefs=()=>{try{return{confirmMultiSummon:true,reducedAnimations:false,...JSON.parse(localStorage.getItem(PREF_KEY)||'{}')}}catch{return{confirmMultiSummon:true,reducedAnimations:false}}}; const[summonPrefs,setSummonPrefs]=useState(readPrefs); const updateSummonPref=(key,value)=>{const next={...summonPrefs,[key]:value};setSummonPrefs(next);localStorage.setItem(PREF_KEY,JSON.stringify(next))};
   const[input,setInput]=useState('');
@@ -136,6 +136,14 @@ export default function SettingsPage(){
         {error&&<p className="reset-error">{error}</p>}
         <div className="reset-actions"><button className="secondary" onClick={cancel}>Annuler</button><button className="danger" disabled={input.trim().toUpperCase()!==RESET_WORD} onClick={resetProgress}>Effacer définitivement</button></div>
       </div>}
+    </article>
+
+    <article className="settings-card arene-acces">
+      <h3>Arène pixel art (prototype)</h3>
+      <p>Un écran d’essai : le vrai moteur de combat, rendu en pixel art par
+        PixiJS. Les sprites sont générés et provisoires — ce qu’on regarde ici,
+        c’est la fluidité et la lisibilité avant d’engager de vrais dessins.</p>
+      <button className="secondary" onClick={()=>setPage?.('arene')}>Ouvrir l’arène d’essai</button>
     </article>
   </section>;
 }

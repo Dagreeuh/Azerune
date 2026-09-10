@@ -1478,3 +1478,128 @@ porte désormais un nom accessible complet, puisque le texte visible est court.
 `.team-prep-presets`, qui porte les mêmes propriétés plus haut dans la feuille.
 Rejoués sur la bonne règle : 4 sur 4. C'est la troisième fois de cet audit qu'une
 ancre de mutation ambiguë fait douter d'un test qui, lui, fonctionnait.
+
+---
+
+## 1.78.0 — L'arène pixel art, un prototype qu'on peut juger sur pièce
+
+Question posée : *quel moteur permettrait de faire de plus belles animations, et
+le combat en pixel art ?* J'avais répondu PixiJS et proposé de le prototyper
+plutôt que de l'affirmer. Voici la pièce.
+
+### Ce qui a été construit
+
+Un écran d'essai (Paramètres → « Ouvrir l'arène d'essai ») où le **vrai moteur
+de combat** joue, rendu par PixiJS : `createBattle`, `nextTurn`,
+`performAutoAction` et `enemyAction`, sans la moindre simulation d'affichage.
+Les dégâts affichés sont lus en comparant les points de vie avant et après
+l'action — s'ils devaient mentir, autant ne rien montrer.
+
+Trois pièces, volontairement étanches :
+
+| Fichier | Rôle | Ce qu'il ignore |
+|---|---|---|
+| `outils/generer-sprites.mjs` | dessine les sprites, encode les PNG, écrit l'atlas | tout le reste |
+| `src/pixi/arene.js` | rendu, animations, chiffres flottants | React **et** le moteur de combat |
+| `src/components/ArenePixi.jsx` | montage, démontage, panne WebGL | le dessin |
+
+Cette étanchéité n'est pas de la coquetterie : elle permet de tester l'arène
+sans React et React sans WebGL, et elle rend les sprites remplaçables par de
+vrais dessins sans toucher au moteur de rendu — seul `atlas.json` changerait.
+
+### La direction artistique demandée
+
+Lisibilité « Disney pixel RPG » posée sur le vocabulaire d'armure de WoW. Trois
+règles techniques la portent :
+
+1. **Contour noir déduit, pas dessiné.** Le dessin remplit un masque de
+   *matières* ; le rendu marque en noir toute matière voisine du vide et éclaire
+   ou assombrit selon une lumière en haut à gauche. Le relief vient donc du
+   volume, sans placer un pixel de contour à la main.
+2. **L'élément ne teinte que le tissu, la cape et l'énergie.** L'acier, l'or, la
+   peau et l'os restent constants : c'est ce qui tient les six variantes
+   ensemble au lieu d'en faire six monochromes.
+3. **Deux volumes voisins ne partagent jamais la même matière**, et les membres
+   sont séparés du tronc par une colonne de vide.
+
+La règle 3 vient d'un échec : la première version faisait fusionner les
+épaulières, les bras et le tronc en une seule tache grise, et le monstre
+ressemblait à un robot. Le contour ne se déclenchant que contre le vide, deux
+pièces d'acier collées n'ont aucune frontière. Les épaulières sont passées en
+or, les membres du monstre dans une chair plus sombre.
+
+### Ce que la mesure a dit — et ce qu'elle ne dit pas
+
+Images par seconde, sous bridage CPU émulé, trois champions contre trois
+ennemis :
+
+| Bridage CPU | Relevés | IPS médian | min | max |
+|---|---|---|---|---|
+| ×1 | 8 | **60** | 60 | 60 |
+| ×4 | 8 | **60** | 60 | 61 |
+| ×6 | 8 | **60** | 30 | 60 |
+
+**Ce que ces chiffres ne prouvent pas**, et je préfère l'écrire que le laisser
+supposer : la mesure tourne sur un rendu logiciel (SwiftShader) piloté par un
+processeur de serveur bridé. Cela émule un processeur lent, **pas** un GPU de
+téléphone ni la chauffe. Six sprites de 48 px sont par ailleurs une charge
+légère. Ce tableau dit « rien n'indique un problème de fluidité » ; il ne dit
+pas « ça tournera à 60 sur ton téléphone ». Seul ton appareil le dira.
+
+Point acquis en revanche, et vérifié au paquet : **PixiJS n'entre pas dans le
+bundle principal**. Il forme un morceau séparé de 312 ko (98 ko compressés)
+chargé à l'ouverture de l'arène et nulle part ailleurs.
+
+### Une couleur qu'il aurait été facile de mentir
+
+À l'écran, les trois ennemis sortent tous en arcane. J'ai d'abord cru à un bug
+de rendu et écrit un repli qui dérivait une couleur du nom de l'ennemi — de la
+variété gratuite. C'était faux, et pire : malhonnête.
+
+`normalizeElement` rabat **tout élément inconnu sur Arcane**, et ni
+`enemies.js` ni `campaign.js` ne déclarent d'élément. Les ennemis de la campagne
+sont donc réellement tous arcane. La conséquence dépasse le rendu : **l'affinité
+élémentaire n'a aucun effet sur toute la campagne**, sauf pour un champion Ombre
+ou Lumière. Les boss, le mythique, les défis et le tutoriel, eux, déclarent bien
+leurs éléments.
+
+Le repli a été retiré. La teinte suit l'élément, elle ne l'invente pas : la
+couleur annonce une affinité au joueur, un ennemi peint en rouge qui ne brûle
+pas serait un mensonge à l'écran.
+
+### Couverture
+
+`tests/arene.pixels.test.js` (42 tests) juge les **pixels réellement écrits**,
+pas l'intention du code : aucun cadre vide, rien qui déborde du cadre, et la
+silhouette d'un seul tenant. `tests/arene.contrats.test.js` (11 tests) garde ce
+qui ne se voit pas — dont le filtrage au plus proche voisin, seule régression
+capable d'annuler toute la direction artistique sans provoquer la moindre
+erreur.
+
+**Le test a trouvé un défaut que mon œil avait laissé passer** : les pieds des
+six monstres sortaient du cadre au dernier cadre de mort. Corrigé.
+
+**11 mutants sur 11 tués**, mais après deux faux départs qui valent d'être
+notés :
+
+- Un mutant a survécu en remplaçant `performAutoAction` — il mutait en réalité
+  la **ligne d'import**, et mon test se contentait de chercher le *nom* dans le
+  fichier. Le test exige désormais l'appel. C'est une vraie faiblesse, trouvée
+  par une mauvaise mutation.
+- Deux mutations censées « détacher » un bras puis les cornes ont survécu parce
+  qu'elles ne détachaient rien : les pièces restaient adjacentes d'un pixel.
+
+**Limite assumée de l'instrument** : le comptage des morceaux attrape une pièce
+réellement séparée, pas une pièce qui *semble* détachée tout en restant collée
+d'un pixel — le défaut des cornes, lui, ne se voyait qu'à l'œil. Aucun test ne
+remplace le fait de regarder les sprites.
+
+Suite complète : **1 690 tests**, 78 fichiers.
+
+### Ce que ce prototype ne fait pas
+
+Il ne remplace pas l'écran de combat. Il ne gère ni les compétences ciblées à la
+main, ni les effets visuels de sorts, ni les vagues, ni les récompenses. C'est
+délibéré : la question était « est-ce que ça vaut le coup », pas « remplaçons
+tout ce soir ». Les sprites sont générés par script et provisoires — leur seul
+mérite est de prouver que la chaîne complète tient, du pixel jusqu'à l'écran.
