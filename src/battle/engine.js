@@ -181,11 +181,15 @@ export function finish(battle,id,text,retain=0){
       if(battle.raid.level>=7)boss.buffs.atkUp={turns:3};events.push('ÉCHEC DE MÉCANIQUE : Rhazakar déclenche Éruption du Cœur-Monde.');
     }
   }
-  if(battle.mythic){const before=new Map(battle.enemies.map(unit=>[unit.id,unit.dead])),newDeaths=enemies.filter(unit=>unit.dead&&!before.get(unit.id));if(newDeaths.length){const ids=battle.affixState?.ids||[];if(ids.includes('bolstering'))enemies=enemies.map(unit=>unit.dead?unit:{...unit,buffs:{...unit.buffs,mythicBolster:{turns:2,stacks:Math.min(4,(unit.buffs?.mythicBolster?.stacks||0)+newDeaths.length)}}});if(ids.includes('bursting')){const rate=Math.min(.10,.025*newDeaths.length);allies=allies.map(unit=>unit.dead?unit:(()=>{const damage=Math.min(unit.hp,Math.round(unit.maxHp*rate)),hp=Math.max(0,unit.hp-damage);battle=addCombatStat(battle,unit.id,{damageTaken:damage});return{...unit,hp,dead:hp<=0}})());}events.push(`${newDeaths.length} ennemi(s) vaincu(s) déclenchent les affixes.`);}}
+  // `battle` est deja l'etat d'APRES l'action : comparer ses morts a eux-memes
+  // ne trouvait jamais rien, et Galvanisant comme Detonant ne se declenchaient
+  // jamais. L'appelant fournit donc la liste des morts d'AVANT son action.
+  if(battle.mythic){const before=new Set(battle.mortsAvant||enemies.filter(unit=>unit.dead).map(unit=>unit.id)),newDeaths=enemies.filter(unit=>unit.dead&&!before.has(unit.id));if(newDeaths.length){const ids=battle.affixState?.ids||[];if(ids.includes('bolstering'))enemies=enemies.map(unit=>unit.dead?unit:{...unit,buffs:{...unit.buffs,mythicBolster:{turns:2,stacks:Math.min(4,(unit.buffs?.mythicBolster?.stacks||0)+newDeaths.length)}}});if(ids.includes('bursting')){const rate=Math.min(.10,.025*newDeaths.length);allies=allies.map(unit=>unit.dead?unit:(()=>{const damage=Math.min(unit.hp,Math.round(unit.maxHp*rate)),hp=Math.max(0,unit.hp-damage);battle=addCombatStat(battle,unit.id,{damageTaken:damage});return{...unit,hp,dead:hp<=0}})());}events.push(`${newDeaths.length} ennemi(s) vaincu(s) déclenchent les affixes.`);}}
   return{...battle,allies,enemies,raidState,actionSeq:(Number(battle.actionSeq)||0)+1,turn:null,winner:winner(allies,enemies),log:[...events.reverse(),text,...battle.log].slice(0,16)};
 }
 
 export function enemyAction(battle){
+  const mortsAvantAction=battle.enemies.filter(unit=>unit.dead).map(unit=>unit.id);
   const actor=battle.enemies.find(unit=>unit.id===battle.turn);
   if(!actor||actor.dead)return{...battle,turn:null};
   if(actor.skip)return finish(battle,actor.id,`${actor.name} est étourdi et passe son tour.`);
@@ -245,12 +249,12 @@ export function enemyAction(battle){
   }else if(actor.expeditionRole==='guard'&&expeditionBoss){expeditionBoss.buffs.defUp={turns:2};const result=hit(victim,.75);text=`${actor.name} protège le Trésorier et frappe ${victim.name} : ${result.damage} dégâts.`;
   }else if(actor.expeditionRole==='thief'){const result=hit(victim,1.05);text=`${actor.name} tente de s’enfuir avec le butin : ${result.damage} dégâts.`;
   }else if(actor.expeditionRole==='time-spirit'){choices.forEach(target=>target.atb=Math.max(0,target.atb-18));const result=hit(victim,.7);text=`${actor.name} ralentit le temps : ${result.damage} dégâts et jauge de l’équipe réduite.`;
-  }else if(actor.expeditionRole==='ancient'){actor.buffs.atkUp={turns:3};const result=hit(victim,1+.04*Math.min(8,turnCount));text=`${actor.name} accumule la puissance des âges : ${result.damage} dégâts.`;
+  }else if(actor.expeditionRole==='ancient'){self.buffs.atkUp={turns:3};const result=hit(victim,1+.04*Math.min(8,turnCount));text=`${actor.name} accumule la puissance des âges : ${result.damage} dégâts.`;
   }else if(actor.expeditionRole==='offense-crystal'&&expeditionBoss){expeditionBoss.buffs.atkUp={turns:2};text=`${actor.name} augmente l’Attaque du Golem astral.`;
   }else if(actor.expeditionRole==='defense-crystal'&&expeditionBoss){expeditionBoss.buffs.defUp={turns:2};text=`${actor.name} augmente la Défense du Golem astral.`;
   }else if(actor.expeditionRole==='healing-crystal'&&expeditionBoss){const heal=Math.round(pvReference(expeditionBoss)*.08);expeditionBoss.hp=Math.min(expeditionBoss.maxHp,expeditionBoss.hp+heal);actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}`,sourceId:actor.id,targetId:expeditionBoss.id,amount:heal,type:'heal',affinity:'neutral',critical:false});text=`${actor.name} rend ${heal} PV au Golem astral.`;
   }else if(actor.raidRole==='priest'&&cooldowns[0]===0&&raidBoss){const boss=raidBoss;const heal=Math.round(pvReference(boss)*.08);boss.hp=Math.min(boss.maxHp,boss.hp+heal);actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}`,sourceId:actor.id,targetId:boss.id,amount:heal,type:'heal',affinity:'neutral',critical:false});boss.buffs.atkUp={turns:2};cooldowns[0]=3;text=`${actor.name} canalise Flamme nourricière : ${heal} PV rendus à Rhazakar et Attaque augmentée.`;
-  }else if(actor.raidRole==='guardian'&&cooldowns[0]===0){choices.forEach(target=>tryDebuff(actor,target,'provoke',1,.55,0,resisted));actor.buffs.defUp={turns:2};cooldowns[0]=3;text=`${actor.name} utilise Rempart de lave : Provocation et Défense augmentée.`;
+  }else if(actor.raidRole==='guardian'&&cooldowns[0]===0){choices.forEach(target=>tryDebuff(actor,target,'provoke',1,.55,0,resisted));self.buffs.defUp={turns:2};cooldowns[0]=3;text=`${actor.name} utilise Rempart de lave : Provocation et Défense augmentée.`;
   }else if(actor.aiRole==='lunar-stag'){
     if(cooldowns[0]===0&&turnCount%2===0){let total=0;for(const target of choices.filter(unit=>!unit.dead)){const result=hit(target,.55);total+=result.damage;}cooldowns[0]=3;text=`${actor.name} utilise Onde lunaire : ${total} dégâts de zone.`;}
     else{const result=hit(victim,1);text=`${actor.name}${result.critical?' réalise un coup critique et':''} frappe ${victim.name} : ${result.damage} dégâts · ${result.relation.label}${result.absorbed?` · ${result.absorbed} absorbés`:''}.`;}
@@ -263,15 +267,15 @@ export function enemyAction(battle){
     cooldowns[0]=3;
   }else if(actor.campaignUnit&&cooldowns[0]===0&&turnCount%2===0){
     const z=actor.campaignZone;let result;
-    if(z==='crypte-sanglante'){result=hit(victim,1.08);const life=Math.round(result.damage*.35);actor.hp=Math.min(actor.maxHp,actor.hp+life);actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}`,sourceId:actor.id,targetId:actor.id,amount:life,type:'heal',affinity:'neutral',critical:false});text=`${actor.name} assouvit sa Soif carmine : ${result.damage} dégâts et ${life} PV récupérés.`;}
+    if(z==='crypte-sanglante'){result=hit(victim,1.08);const life=Math.round(result.damage*.35);self.hp=Math.min(self.maxHp,self.hp+life);actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}`,sourceId:actor.id,targetId:actor.id,amount:life,type:'heal',affinity:'neutral',critical:false});text=`${actor.name} assouvit sa Soif carmine : ${result.damage} dégâts et ${life} PV récupérés.`;}
     else if(z==='cimes-vent'){choices.forEach(t=>t.atb=Math.max(0,t.atb-12));enemies.filter(e=>!e.dead).forEach(e=>e.atb=Math.min(100,e.atb+10));result=hit(victim,.78);text=`${actor.name} inverse les courants : ${result.damage} dégâts et jauges déplacées.`;}
     else if(z==='arene-lames'){victim.debuffs.mark={turns:2};result=hit(victim,victim.hp/victim.maxHp<=.35?1.55:1.18);text=`${actor.name} pose une Marque d’exécution : ${result.damage} dégâts.`;}
     else if(z==='netherys'){victim.debuffs.healingDown={turns:2};result=hit(victim,1+.04*Math.min(8,turnCount));text=`${actor.name} propage l’Érosion du Vide : ${result.damage} dégâts, soins réduits.`;}
     else if(z==='couronne-givree'){victim.debuffs.slow={turns:2};victim.debuffs.healingDown={turns:2};result=hit(victim,.95);text=`${actor.name} applique Gel persistant : ${result.damage} dégâts.`;}
     else if(z==='fournaise-incendiaire'||z==='coeur-ignifuge'){victim.debuffs.burn={turns:3,source:actor.id,sourceAtk:actor.atk};if(z==='coeur-ignifuge')victim.debuffs.healingDown={turns:2};result=hit(victim,1.02);text=`${actor.name} embrase ${victim.name} : ${result.damage} dégâts.`;}
-    else if(z==='trone-volcan'){if(actor.hp/actor.maxHp<=.4){actor.buffs.atkUp={turns:3};actor.buffs.speedUp={turns:3}}result=hit(victim,actor.hp/actor.maxHp<=.4?1.42:1.05);text=`${actor.name} libère sa Furie volcanique : ${result.damage} dégâts.`;}
-    else if(z==='chambre-echos'){actor.buffs.atkUp={turns:2};result=hit(victim,1.12);text=`${actor.name} renvoie un Écho vengeur : ${result.damage} dégâts.`;}
-    else if(z==='khazdrum'){actor.buffs.atkUp={turns:2};result=hit(victim,1+.06*Math.min(5,turnCount));text=`${actor.name} monte en Surchauffe : ${result.damage} dégâts.`;}
+    else if(z==='trone-volcan'){const enfureur=self.hp/self.maxHp<=.4;if(enfureur){self.buffs.atkUp={turns:3};self.buffs.speedUp={turns:3}}result=hit(victim,enfureur?1.42:1.05);text=`${actor.name} libère sa Furie volcanique : ${result.damage} dégâts.`;}
+    else if(z==='chambre-echos'){self.buffs.atkUp={turns:2};result=hit(victim,1.12);text=`${actor.name} renvoie un Écho vengeur : ${result.damage} dégâts.`;}
+    else if(z==='khazdrum'){self.buffs.atkUp={turns:2};result=hit(victim,1+.06*Math.min(5,turnCount));text=`${actor.name} monte en Surchauffe : ${result.damage} dégâts.`;}
     else if(z==='oeil-clair'){victim.debuffs.accuracyDown={turns:2};result=hit(victim,.92);text=`${actor.name} brouille la vision : ${result.damage} dégâts et Précision réduite.`;}
     else{result=hit(victim,1.12);text=`${actor.name} exploite la mécanique de ${actor.campaignMechanic?.name||'la zone'} : ${result.damage} dégâts.`;}
     cooldowns[0]=3;
@@ -291,7 +295,7 @@ export function enemyAction(battle){
   }
   enemies=enemies.map(unit=>unit.id===actor.id?{...unit,cooldowns,enemyTurnCount:turnCount}:unit);
   if(resisted.length)text+=` ${resisted.join(' ')}`;
-  const resolved=finish({...battle,allies,enemies,lastEvents:actionEvents,eventSeq:(battle.eventSeq||0)+actionEvents.length},actor.id,text||`${actor.name} termine son tour.`);return resolved.turn===actor.id?{...resolved,turn:null}:resolved;
+  const resolved=finish({...battle,allies,enemies,lastEvents:actionEvents,eventSeq:(battle.eventSeq||0)+actionEvents.length,mortsAvant:mortsAvantAction},actor.id,text||`${actor.name} termine son tour.`);return resolved.turn===actor.id?{...resolved,turn:null}:resolved;
 }
 // Purification : quel malus retirer en premier.
 //
@@ -483,6 +487,9 @@ const withEmpreintes=(mastery,bonus)=>bonus
  :mastery;
 
 export function castSkill(battle,index,targetId){
+  // Morts d'avant l'action : sans cet instantane, les affixes qui reagissent
+  // a une mort ne voient rien.
+  const mortsAvantAction=battle.enemies.filter(unit=>unit.dead).map(unit=>unit.id);
   const original=battle.allies.find(unit=>unit.id===battle.turn),skill=original?.skills[index],mastery=withEmpreintes(skillBonuses(index,original?.skillLevels?.[index]||1,skill),original?.empreinteSkills?.[index]);
   if(!original||!skill||original.cooldowns[index]>0)return{battle,error:'Action impossible'};
   if(index===2&&original.rarity===3&&(original.currentStars||3)<4&&!battle?.tutorialBattle?.enabled)return{battle,error:'Cette compétence se débloque à l’évolution 4★.'};
@@ -669,6 +676,6 @@ export function castSkill(battle,index,targetId){
   actor.cooldowns=actor.cooldowns.map((value,i)=>i===index?Math.max(0,skill.cd-mastery.cooldown)+1:value);
   const details=[damageTotal?`${damageTotal} dégâts`:null,healingTotal?`${healingTotal} soins`:null,shieldTotal?`${shieldTotal} bouclier`:null].filter(Boolean).join(' · '),resource=actor.name!=='Korga'&&!actor.skills?.some(skill=>skill.effect==='shieldExecute')&&actor.mechanic?.value?` · ${actor.mechanic.value} charge(s)`:'';
   enemies=enemies.map(unit=>unit.hp<=0?{...unit,hp:0,dead:true,atb:0,shield:0}:unit);allies=allies.map(unit=>unit.hp<=0?{...unit,hp:0,dead:true,atb:0,shield:0}:unit);
-  let next={...battle,allies,enemies,lastEvents:events,eventSeq:(battle.eventSeq||0)+events.length};const criticalDamage=events.filter(value=>value.type==='damage'&&value.critical&&!value.weapon).reduce((sum,value)=>sum+value.amount,0),dotDamage=events.filter(value=>value.type==='dot').reduce((sum,value)=>sum+value.amount,0),summonDamage=events.filter(value=>value.type==='ghoul').reduce((sum,value)=>sum+value.amount,0),weaponDamage=events.filter(value=>value.weapon).reduce((sum,value)=>sum+value.amount,0),lifestealHealing=events.filter(value=>value.type==='heal'&&value.sourceType==='lifesteal').reduce((sum,value)=>sum+value.amount,0);next=addCombatStat(next,actor.id,{damage:damageTotal,healing:healingTotal,criticalDamage,dotDamage,summonDamage,weaponDamage,directHealing:Math.max(0,healingTotal-lifestealHealing),lifestealHealing,skillUses:{[skill.effect]:1}});
+  let next={...battle,allies,enemies,lastEvents:events,eventSeq:(battle.eventSeq||0)+events.length,mortsAvant:mortsAvantAction};const criticalDamage=events.filter(value=>value.type==='damage'&&value.critical&&!value.weapon).reduce((sum,value)=>sum+value.amount,0),dotDamage=events.filter(value=>value.type==='dot').reduce((sum,value)=>sum+value.amount,0),summonDamage=events.filter(value=>value.type==='ghoul').reduce((sum,value)=>sum+value.amount,0),weaponDamage=events.filter(value=>value.weapon).reduce((sum,value)=>sum+value.amount,0),lifestealHealing=events.filter(value=>value.type==='heal'&&value.sourceType==='lifesteal').reduce((sum,value)=>sum+value.amount,0);next=addCombatStat(next,actor.id,{damage:damageTotal,healing:healingTotal,criticalDamage,dotDamage,summonDamage,weaponDamage,directHealing:Math.max(0,healingTotal-lifestealHealing),lifestealHealing,skillUses:{[skill.effect]:1}});
   return{battle:finish(next,actor.id,`${actor.name} utilise ${skill.name}${details?` : ${details}`:''}${resource}.${resisted.length?` ${resisted.join(' ')}`:''}${logs.length?` ${logs.join(' ')}`:''}`,retain)};
 }

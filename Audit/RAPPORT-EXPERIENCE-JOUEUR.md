@@ -643,3 +643,73 @@ toujours, donc **n'importe quelle arme, même décorative, passait le test**. Il
 toute la séquence, Cendre-Sépulcrale est tombée immédiatement.
 
 Un test instable n'est pas un détail de confort : c'est un test qui ment.
+
+
+---
+
+## 15. Battue des modes : Mythic+, Raids, Expéditions
+
+### Deux affixes Mythic+ sur huit ne se déclenchaient jamais
+
+**Galvanisant** et **Détonant** réagissent tous deux à la mort d'un ennemi. Le
+code qui les déclenche vit dans `finish()` et compare les morts « d'avant » aux
+morts « d'après » :
+
+```js
+const before=new Map(battle.enemies.map(unit=>[unit.id,unit.dead]));
+const newDeaths=enemies.filter(unit=>unit.dead&&!before.get(unit.id));
+```
+
+Or `battle` est **déjà l'état d'après l'action**, et `enemies` en dérive. Les
+deux listes étaient donc toujours identiques, `newDeaths` toujours vide, et les
+deux affixes **complètement inertes** — dans toutes les saisons, à tous les
+niveaux, depuis toujours.
+
+L'appelant fournit désormais la liste des morts d'avant son action, et les deux
+chemins qui tuent — le sort d'un champion et l'action d'un ennemi, riposte
+comprise — la transmettent.
+
+Les six autres affixes ont été vérifiés **en simulation, chiffre par chiffre**,
+en comparant l'effet mesuré à la phrase affichée au joueur : Fortifié (+20 % PV,
++12 % Attaque, +5 Résistance), Tyrannique (+25 %, +15 %, +8 Précision), Déchaîné
+(seuil 30 %, +15 % Attaque, +20 % Vitesse), Détonant (2,5 % par mort, plafond
+10 %), Nécrotique (−6 % par cumul, 5 maximum), Affligé et Incorporel. Tous
+conformes.
+
+### Cinq mécaniques écrivaient dans le vide
+
+Le moteur documente en commentaire que muter `actor` n'a aucun effet — `actor`
+vient du combat reçu, `self` est la copie qui est commitée. Cinq mécaniques
+annoncées mutaient pourtant `actor` : elles infligeaient bien leurs dégâts, mais
+leur renforcement ou leur soin **disparaissait à chaque tour**.
+
+| Mécanique | Promesse | État |
+|---|---|---|
+| ⚒️ Surchauffe (Khaz-Drum) | « L'Attaque augmente au fil des actions » | perdue |
+| 🩸 Soif carmine (Crypte Sanglante) | « Les ennemis récupèrent une partie des dégâts » | perdue |
+| 📚 Esprits anciens (Sanctuaire) | « Les Esprits gagnent de l'Attaque à chaque action » | perdue |
+| 🛡️ Rempart de lave (Raid) | Défense du Gardien | perdue |
+| 🌋 Furie volcanique · ↩️ Écho vengeur | — | perdues, mais zones non jouables |
+
+### Six mécaniques de zone en réserve
+
+`CAMPAIGN_MECHANICS` déclare seize zones pour dix jouables. Les six autres —
+Rempart des Anciens, Netherys, Chambre des Échos, Couronne Givrée, Fournaise
+Incendiaire, Trône du Volcan — ont pour la plupart déjà leur code moteur. Ce
+n'est pas un défaut, c'est du contenu en attente, mais mieux vaut que ce soit
+écrit : c'est ce qui m'a d'abord fait croire que la Furie volcanique était
+cassée. Un test le consigne.
+
+### Le reste est propre
+
+Les quatre Expéditions et leurs treize rôles de serviteurs sont tous traités, et
+chaque mécanique annoncée a été vérifiée en jeu — le Cristal régénérant soigne
+bien, l'Éclat majeur protège bien, l'Éclat mineur accélère bien. Les quatre
+Raids déclarent 34 champs, tous lus.
+
+### Cinquième fois où ma mesure mentait
+
+Mon test « une mort par riposte déclenche Détonant » mesurait les PV perdus par
+l'allié — or l'ennemi venait justement de le frapper. L'assertion était vraie
+quoi qu'il arrive. Il a fallu un témoin sans l'affixe pour que la mesure porte
+sur la détonation elle-même.
