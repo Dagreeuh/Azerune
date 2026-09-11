@@ -1914,3 +1914,58 @@ Suite complète : **1 751 tests**, 81 fichiers.
 - Les compétences qui ne touchent aucun point de vie (un bouclier pur) placent
   leur effet sur la cible désignée, faute de mieux : le moteur n'expose pas la
   liste des unités affectées autrement que par comparaison d'états.
+
+### 1.80.1 — Les champions tournaient en rond
+
+Signalé par le joueur : *« les deux champions tournent en rond dans leurs
+animations, j'aimerais juste des avants arrière »*.
+
+C'était littéral, et la cause n'est pas dans le code : **la rangée « Idle » des
+feuilles reçues n'est pas une boucle d'attente, c'est un tour de
+présentation** — face, trois-quarts, dos. Lelianna en a cinq cadres, dont les
+deux derniers la montrent de dos. Rejouée du premier au dernier puis reprise au
+premier, elle pivotait sans fin, avec un saut sec au bouclage.
+
+Deux corrections, la seconde allant au-delà de la demande :
+
+1. **Aller-retour** (ce qui était demandé). La série se lit à l'endroit puis à
+   l'envers, sans rejouer les extrémités — les rejouer marquerait un temps
+   d'arrêt aux deux bouts. Deux cadres consécutifs sont alors toujours voisins
+   dans la série d'origine : plus aucun saut. Un test le vérifie en parcourant
+   le cycle bouclé et en exigeant que l'écart d'indice reste de 1.
+2. **Limiter l'attente aux poses de face.** L'aller-retour seul supprimait le
+   saut mais gardait le demi-tour : le champion continuait de montrer son dos à
+   l'ennemi une fois sur deux. Un champ `attente` par champion dit combien de
+   cadres employer — 3 sur 5 pour Lelianna, 3 sur 4 pour Hicho. Le cycle devient
+   face → face → trois-quarts → retour.
+
+Seule l'attente est rognée : rogner une frappe ou une mort couperait
+l'animation en plein geste. Et seules l'attente et la marche partent en
+aller-retour — un coup de bâton rejoué à l'envers n'a aucun sens, une mort qui
+revient en arrière ressusciterait le champion.
+
+### Ce que je n'ai pas réussi à mesurer
+
+J'ai cherché à détecter automatiquement qu'un cadre montre le dos du
+personnage, pour qu'un `attente` trop généreux soit rattrapé par un test.
+L'écart moyen au premier cadre vaut **0,303 pour le trois-quarts de Lelianna et
+0,307 pour son dos** : aucun seuil ne les sépare. Les silhouettes changent trop
+d'un cadre à l'autre pour que la différence de pose ressorte.
+
+Je l'écris plutôt que d'inventer un seuil calé sur deux feuilles, qui aurait
+donné un faux test. Le garde-fou retenu est plus modeste et honnête : une
+valeur d'`attente` qui ne retranche rien est une déclaration inutile, et le
+test la refuse. C'est ce qui tue le mutant « demi-tour réintroduit ».
+
+### Couverture
+
+`tests/cadence.test.js` : 15 tests, **8 mutants sur 8 tués** (7 sur 8 à la
+première passe, le survivant étant celui ci-dessus).
+
+Un test existant a cassé pour une bonne raison : il figeait la forme exacte de
+deux lignes voisines (`textures=…` puis `appliquerEchelle`). L'insertion d'une
+variable entre elles l'a fait échouer alors que l'intention — réappliquer
+l'échelle à chaque changement d'animation — restait respectée. Il exige
+désormais l'enchaînement, pas la syntaxe.
+
+Suite complète : **1 766 tests**, 82 fichiers.

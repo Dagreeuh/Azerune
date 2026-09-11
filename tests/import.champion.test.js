@@ -225,7 +225,10 @@ describe('l’arène sait afficher une feuille dessinée',()=>{
 
   it('applique l’échelle à chaque changement d’animation',()=>{
     expect(arene).toMatch(/function appliquerEchelle/);
-    expect(arene).toMatch(/e\.sprite\.textures=e\.jeux\[anim\];\s*appliquerEchelle\(e,anim\)/);
+    // On exige que l'échelle soit réappliquée juste après le changement de
+    // textures, sans figer la forme exacte de l'expression : la première
+    // version de ce test cassait dès qu'une variable s'intercalait.
+    expect(arene).toMatch(/e\.sprite\.textures=[^;]+;\s*appliquerEchelle\(e,anim\)/);
   });
 
   it('place les unités d’après leur largeur mesurée',()=>{

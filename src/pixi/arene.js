@@ -6,6 +6,7 @@
 // vérité, l'arène n'est qu'une vitrine. Le jour où de vrais assets remplacent
 // les sprites générés, seul `atlas.json` change.
 import{Application,Assets,Texture,Rectangle,AnimatedSprite,Sprite,Container,Graphics,Text}from'pixi.js';
+import{allerRetour,cadresAttente,enBoucle}from'./cadence';
 
 const ZOOM=3;                     // un pixel d'art = 3 pixels d'écran
 const SOL=0.72;                   // hauteur du sol, en part de la scène
@@ -27,7 +28,7 @@ const chargerAtlas=()=>{
       atlas.champions={};
       fiches.forEach(([heroId,e,fiche])=>{
         atlas.feuilles[e.nom]={fichier:e.fichier,cadres:fiche.cadres,
-          echelles:fiche.echelles,zoomBase:1,sorts:fiche.sorts||[]};
+          echelles:fiche.echelles,zoomBase:1,sorts:fiche.sorts||[],attente:fiche.attente||0};
         atlas.champions[heroId]=e.nom;
       });
     }catch{
@@ -52,7 +53,8 @@ async function texturesDe(atlas,nom){
   Object.entries(def.cadres).forEach(([anim,cadres])=>{
     jeux[anim]=cadres.map(c=>new Texture({source:feuille.source,frame:new Rectangle(c.x,c.y,c.w,c.h)}));
   });
-  const fiche={jeux,echelles:def.echelles||{},zoomBase:def.zoomBase||ZOOM,sorts:def.sorts||[]};
+  const fiche={jeux,echelles:def.echelles||{},zoomBase:def.zoomBase||ZOOM,
+    sorts:def.sorts||[],attente:def.attente||0};
   cache.set(nom,fiche);
   return fiche;
 }
@@ -96,10 +98,10 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
       const groupe=cotes[cote];
       for(let i=0;i<groupe.length;i+=1){
         const u=groupe[i];
-        const{jeux,echelles,zoomBase,sorts}=await texturesDe(atlas,u.feuille);
+        const{jeux,echelles,zoomBase,sorts,attente}=await texturesDe(atlas,u.feuille);
         const noeud=new Container();
         const ombre=new Graphics();
-        const sprite=new AnimatedSprite(jeux.repos);
+        const sprite=new AnimatedSprite(allerRetour(cadresAttente(jeux.repos,attente)));
         sprite.anchor.set(.5,1);
         sprite.animationSpeed=VITESSE.repos;
         sprite.play();
@@ -115,7 +117,7 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
         noeud.y=sol+8+i*10;
         scene.addChild(noeud);
         ombre.ellipse(0,0,hauteur*.22,hauteur*.07).fill({color:0x000000,alpha:.42});
-        const etat={id:u.id,cote,noeud,sprite,barre,jeux,echelles,zoomBase,hauteur,sorts,
+        const etat={id:u.id,cote,noeud,sprite,barre,jeux,echelles,zoomBase,hauteur,sorts,attente,
           base:{x:0,y:noeud.y},mort:false};
         unites.set(u.id,etat);
         appliquerEchelle(etat,'repos');
@@ -158,11 +160,13 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
   function animer(id,anim,{boucle=false}={}){
     const e=unites.get(id);
     if(!e||!e.jeux[anim])return;
-    e.sprite.textures=e.jeux[anim];
+    const boucler=boucle||enBoucle(anim);
+    const suite=anim==='repos'?cadresAttente(e.jeux[anim],e.attente):e.jeux[anim];
+    e.sprite.textures=boucler?allerRetour(suite):suite;
     appliquerEchelle(e,anim);
     e.sprite.animationSpeed=VITESSE[anim]||.12;
-    e.sprite.loop=boucle;
-    e.sprite.onComplete=boucle?null:()=>{if(!e.mort)animer(id,'repos',{boucle:true})};
+    e.sprite.loop=boucler;
+    e.sprite.onComplete=boucler?null:()=>{if(!e.mort)animer(id,'repos',{boucle:true})};
     e.sprite.gotoAndPlay(0);
   }
 
