@@ -1769,12 +1769,13 @@ forçant la page par `sessionStorage` comme le faisaient mes sondes précédente
 C'est exactement ce qui m'avait empêché de voir le problème : toutes mes
 vérifications entraient dans l'arène par la porte de derrière.
 
-Trois tests garantissent l'accès : l'onglet existe, il n'est verrouillé derrière
-aucun niveau, et il pointe sur une vraie page.
+Quatre tests garantissent l'accès et la lisibilité : l'onglet existe, il n'est
+verrouillé derrière aucun niveau, il pointe sur une vraie page, et la scène se
+resserre sur petit écran.
 
 **Corrigé au passage** : sur un écran de 420 px, les 960 pixels logiques de la
 scène étaient écrasés dans 380 px et les champions devenaient illisibles — or
 c'est précisément ce qu'on vient regarder. La scène passe à 520×360 sous 700 px
 de large : on réduit le décor, pas les personnages.
 
-Suite complète : **1 723 tests**, 79 fichiers.
+Suite complète : **1 726 tests**, 79 fichiers.
