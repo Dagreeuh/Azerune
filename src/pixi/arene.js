@@ -5,7 +5,7 @@
 // bouger une barre de vie. C'est volontaire — le moteur de jeu reste la seule
 // vérité, l'arène n'est qu'une vitrine. Le jour où de vrais assets remplacent
 // les sprites générés, seul `atlas.json` change.
-import{Application,Assets,Texture,Rectangle,AnimatedSprite,Container,Graphics,Text}from'pixi.js';
+import{Application,Assets,Texture,Rectangle,AnimatedSprite,Sprite,Container,Graphics,Text}from'pixi.js';
 
 const ZOOM=3;                     // un pixel d'art = 3 pixels d'écran
 const SOL=0.72;                   // hauteur du sol, en part de la scène
@@ -27,7 +27,7 @@ const chargerAtlas=()=>{
       atlas.champions={};
       fiches.forEach(([heroId,e,fiche])=>{
         atlas.feuilles[e.nom]={fichier:e.fichier,cadres:fiche.cadres,
-          echelles:fiche.echelles,zoomBase:1};
+          echelles:fiche.echelles,zoomBase:1,sorts:fiche.sorts||[]};
         atlas.champions[heroId]=e.nom;
       });
     }catch{
@@ -52,7 +52,7 @@ async function texturesDe(atlas,nom){
   Object.entries(def.cadres).forEach(([anim,cadres])=>{
     jeux[anim]=cadres.map(c=>new Texture({source:feuille.source,frame:new Rectangle(c.x,c.y,c.w,c.h)}));
   });
-  const fiche={jeux,echelles:def.echelles||{},zoomBase:def.zoomBase||ZOOM};
+  const fiche={jeux,echelles:def.echelles||{},zoomBase:def.zoomBase||ZOOM,sorts:def.sorts||[]};
   cache.set(nom,fiche);
   return fiche;
 }
@@ -96,7 +96,7 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
       const groupe=cotes[cote];
       for(let i=0;i<groupe.length;i+=1){
         const u=groupe[i];
-        const{jeux,echelles,zoomBase}=await texturesDe(atlas,u.feuille);
+        const{jeux,echelles,zoomBase,sorts}=await texturesDe(atlas,u.feuille);
         const noeud=new Container();
         const ombre=new Graphics();
         const sprite=new AnimatedSprite(jeux.repos);
@@ -115,7 +115,7 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
         noeud.y=sol+8+i*10;
         scene.addChild(noeud);
         ombre.ellipse(0,0,hauteur*.22,hauteur*.07).fill({color:0x000000,alpha:.42});
-        const etat={id:u.id,cote,noeud,sprite,barre,jeux,echelles,zoomBase,hauteur,
+        const etat={id:u.id,cote,noeud,sprite,barre,jeux,echelles,zoomBase,hauteur,sorts,
           base:{x:0,y:noeud.y},mort:false};
         unites.set(u.id,etat);
         appliquerEchelle(etat,'repos');
@@ -193,6 +193,82 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
       .fill({color:e.cote==='allie'?0x5a9e3f:0x8c2b1e});
   }
 
+  // Un effet de sort est un cadre de la feuille du LANCEUR : c'est son dessin
+  // qui voyage ou éclot, jamais un rectangle générique. Trois placements
+  // couvrent tout ce qu'on a rencontré : sur le lanceur, sur la cible, ou en
+  // projectile de l'un vers l'autre.
+  function effetSprite(lanceur,spec){
+    const jeu=lanceur.jeux[spec.source];
+    const texture=jeu?.[spec.index];
+    if(!texture)return null;
+    const s=new Sprite(texture);
+    s.anchor.set(.5,.5);
+    const k=lanceur.zoomBase*(lanceur.echelles[spec.source]??1);
+    s.scale.set(k,k);
+    volants.addChild(s);
+    return s;
+  }
+
+  const centre=e=>({x:e.noeud.x,y:e.noeud.y-e.hauteur*.55});
+
+  function jouerEffet(lanceur,cibles,spec,rapport){
+    const s=effetSprite(lanceur,spec);
+    if(!s){
+      // Un effet demandé mais introuvable est un défaut de liaison, pas un
+      // détail cosmétique : on le fait remonter au lieu de ne rien afficher.
+      rapport?.manquants.push(`${spec.source}#${spec.index}`);
+      return Promise.resolve();
+    }
+    rapport?.joues.push(`${spec.source}#${spec.index}→${spec.ou}`);
+    if(spec.ou==='projectile'){
+      const cible=cibles[0]||lanceur;
+      const a=centre(lanceur),b=centre(cible);
+      if(lanceur.cote==='ennemi')s.scale.x=-Math.abs(s.scale.x);
+      return tween(t=>{
+        s.x=a.x+(b.x-a.x)*t;
+        s.y=a.y+(b.y-a.y)*t-Math.sin(t*Math.PI)*26;   // une cloche, pas une ligne droite
+        s.alpha=t>.85?(1-t)/.15:1;
+      },440).then(()=>s.destroy());
+    }
+    const cible=spec.ou==='lanceur'?lanceur:(cibles[0]||lanceur);
+    const p=centre(cible);
+    s.x=p.x;s.y=p.y;
+    return tween(t=>{
+      s.alpha=t<.25?t/.25:t>.7?(1-t)/.3:1;
+      s.scale.set(s.scale.x<0?-1:1,1);
+      const k=lanceur.zoomBase*(lanceur.echelles[spec.source]??1)*(.82+t*.28);
+      s.scale.set(k,k);
+    },560).then(()=>s.destroy());
+  }
+
+  // Un sort complet : l'animation du lanceur et ses effets partent ENSEMBLE.
+  // Les jouer l'un après l'autre donnait une frappe, un silence, puis un éclair.
+  // Rend compte de ce qui a VRAIMENT été joué : quelle animation, quels effets,
+  // et lesquels manquaient à l'appel. Sans ce retour, un effet absent ne se
+  // distingue pas d'un effet trop rapide pour être vu.
+  function sort(lanceurId,cibleIds,spec){
+    const lanceur=unites.get(lanceurId);
+    const debut=performance.now();
+    const rapport={anim:null,joues:[],manquants:[],cibles:(cibleIds||[]).length,ms:0};
+    if(!lanceur)return Promise.resolve(rapport);
+    const cibles=(cibleIds||[]).map(id=>unites.get(id)).filter(Boolean);
+    const anim=lanceur.jeux[spec?.anim]?spec.anim:(lanceur.jeux.attaque?'attaque':'repos');
+    rapport.anim=anim;
+    const mouvements=[];
+    animer(lanceurId,anim);
+    // Le pas vers la cible ne vaut que pour un sort de contact.
+    const effets=spec?.effets||[];
+    const contact=effets.every(e=>e.ou!=='projectile');
+    if(contact&&cibles.length&&cibles[0].cote!==lanceur.cote)
+      mouvements.push(frapper(lanceurId,cibles[0].id));
+    effets.forEach(e=>{
+      if(e.ou==='cibles')cibles.forEach(c=>mouvements.push(jouerEffet(lanceur,[c],e,rapport)));
+      else mouvements.push(jouerEffet(lanceur,cibles,e,rapport));
+    });
+    if(!mouvements.length)mouvements.push(tween(()=>{},380));
+    return Promise.all(mouvements).then(()=>{rapport.ms=Math.round(performance.now()-debut);return rapport});
+  }
+
   // Chiffre flottant : il monte, ralentit, s'efface. Sans le ralentissement il
   // se lit comme une notification ; avec, comme un coup.
   function chiffre(id,texte,{couleur=0xf4d35e,taille=20}={}){
@@ -225,8 +301,9 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
   }
 
   return{
-    app,placer,animer,frapper,toucher,mourir,pv,chiffre,
+    app,placer,animer,frapper,toucher,mourir,pv,chiffre,sort,
     feuillePour:heroId=>atlas.champions?.[String(heroId)]||null,
+    sortsDe:id=>unites.get(id)?.sorts||[],
     ips:()=>Math.round(app.ticker.FPS),
     detruire(){encours.forEach(b=>app.ticker.remove(b));encours.clear();
       app.destroy(true,{children:true});},

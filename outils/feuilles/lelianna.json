@@ -32,6 +32,50 @@
       "nom": "portrait",
       "rangee": 5,
       "xMax": 600
+    },
+    {
+      "nom": "effets",
+      "rangee": 4,
+      "minLargeur": 60,
+      "echelle": 1
+    }
+  ],
+  "sorts": [
+    {
+      "anim": "attaque",
+      "effets": [
+        {
+          "source": "effets",
+          "index": 1,
+          "ou": "projectile"
+        }
+      ]
+    },
+    {
+      "anim": "soin",
+      "effets": [
+        {
+          "source": "effets",
+          "index": 2,
+          "ou": "cible"
+        }
+      ]
+    },
+    {
+      "anim": "attaque",
+      "coups": 3,
+      "effets": [
+        {
+          "source": "effets",
+          "index": 4,
+          "ou": "lanceur"
+        },
+        {
+          "source": "effets",
+          "index": 0,
+          "ou": "cible"
+        }
+      ]
     }
   ]
 }

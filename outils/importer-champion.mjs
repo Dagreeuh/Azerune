@@ -113,9 +113,12 @@ jeux.forEach((j,n)=>{
 const nom=config.champion.toLowerCase();
 fs.mkdirSync('public/sprites/champions',{recursive:true});
 fs.writeFileSync(`public/sprites/champions/${nom}.png`,encoderPNG(LARGEUR,HAUTEUR,feuille));
+// `sorts` lie une compétence du MOTEUR à une animation et à des effets. C'est
+// une donnée d'auteur : l'importeur la recopie sans l'interpréter, pour que
+// changer un effet ne demande jamais de retoucher du code.
 const meta={champion:config.champion,heroId:config.heroId,
   fichier:`/sprites/champions/${nom}.png`,hauteurCible:config.hauteurCible,
-  cadres:atlasCadres,echelles};
+  cadres:atlasCadres,echelles,sorts:config.sorts||[]};
 fs.writeFileSync(`public/sprites/champions/${nom}.json`,JSON.stringify(meta,null,1));
 const indexChemin='public/sprites/champions/index.json';
 const index=fs.existsSync(indexChemin)?JSON.parse(fs.readFileSync(indexChemin,'utf8')):{};

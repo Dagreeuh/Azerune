@@ -213,6 +213,50 @@
     "w": 156,
     "h": 171
    }
+  ],
+  "effets": [
+   {
+    "x": 0,
+    "y": 934,
+    "w": 118,
+    "h": 97
+   },
+   {
+    "x": 120,
+    "y": 934,
+    "w": 140,
+    "h": 109
+   },
+   {
+    "x": 262,
+    "y": 934,
+    "w": 138,
+    "h": 114
+   },
+   {
+    "x": 402,
+    "y": 934,
+    "w": 119,
+    "h": 125
+   },
+   {
+    "x": 523,
+    "y": 934,
+    "w": 152,
+    "h": 114
+   },
+   {
+    "x": 677,
+    "y": 934,
+    "w": 81,
+    "h": 71
+   },
+   {
+    "x": 760,
+    "y": 934,
+    "w": 82,
+    "h": 92
+   }
   ]
  },
  "echelles": {
@@ -221,6 +265,45 @@
   "attaque": 1.5238,
   "soin": 1.1765,
   "mort": 0.8421,
-  "portrait": 0.9302
- }
+  "portrait": 0.9302,
+  "effets": 1
+ },
+ "sorts": [
+  {
+   "anim": "attaque",
+   "effets": [
+    {
+     "source": "effets",
+     "index": 1,
+     "ou": "projectile"
+    }
+   ]
+  },
+  {
+   "anim": "soin",
+   "effets": [
+    {
+     "source": "effets",
+     "index": 2,
+     "ou": "cible"
+    }
+   ]
+  },
+  {
+   "anim": "attaque",
+   "coups": 3,
+   "effets": [
+    {
+     "source": "effets",
+     "index": 4,
+     "ou": "lanceur"
+    },
+    {
+     "source": "effets",
+     "index": 0,
+     "ou": "cible"
+    }
+   ]
+  }
+ ]
 }

@@ -56,5 +56,42 @@
       "xMin": 520,
       "echelle": 1
     }
+  ],
+  "sorts": [
+    {
+      "anim": "soin",
+      "effets": [
+        {
+          "source": "effets",
+          "index": 3,
+          "ou": "cible"
+        }
+      ]
+    },
+    {
+      "anim": "soin",
+      "effets": [
+        {
+          "source": "totem",
+          "index": 2,
+          "ou": "lanceur"
+        }
+      ]
+    },
+    {
+      "anim": "soin",
+      "effets": [
+        {
+          "source": "effets",
+          "index": 6,
+          "ou": "lanceur"
+        },
+        {
+          "source": "effets",
+          "index": 3,
+          "ou": "cibles"
+        }
+      ]
+    }
   ]
 }

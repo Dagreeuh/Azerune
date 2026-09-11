@@ -1179,11 +1179,55 @@ body.combat-plein-ecran .battle-side .units{flex:1;align-content:start}
 .arene-pixi{border:2px solid var(--bord);border-radius:8px;overflow:hidden;
   background:var(--pierre-900);box-shadow:var(--relief);line-height:0}
 .arene-pixi canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
-.arene-mesure{color:var(--texte-doux);font-size:.86rem;margin:8px 0 0}
-.arene-mesure strong{color:var(--or-clair);font-variant-numeric:tabular-nums}
+.arene-mesure{color:var(--texte-doux);font-size:.82rem;font-variant-numeric:tabular-nums;
+  margin-left:auto;white-space:nowrap}
+
+/* Bandeau de tour : qui joue, mode automatique, images par seconde. */
+.arene-barre{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin-top:10px;padding:8px 12px;background:var(--pierre-800);
+  border:1px solid var(--bord);border-radius:6px}
+.arene-tour{font-family:var(--police-titre);color:var(--or-clair);font-size:1rem}
+.arene-auto{display:flex;align-items:center;gap:6px;color:var(--texte-doux);font-size:.84rem}
+.arene-auto input{accent-color:var(--or)}
+
+/* Barre de sorts : l'icône porte la reconnaissance, le libellé confirme. */
+.arene-sorts,.arene-ciblage ul{list-style:none;display:flex;gap:10px;flex-wrap:wrap;
+  padding:0;margin:10px 0 0}
+.arene-sorts button,.arene-ciblage button:not(.secondary){display:flex;flex-direction:column;
+  align-items:center;gap:2px;min-width:104px;min-height:64px;padding:8px 12px;
+  background:linear-gradient(var(--pierre-700),var(--pierre-900));
+  border:1px solid var(--bord-clair);border-radius:7px;box-shadow:var(--biseau);
+  color:var(--texte-vif);cursor:pointer;font:inherit}
+.arene-sorts button:hover:not(:disabled),.arene-ciblage button:not(.secondary):hover{
+  border-color:var(--or);box-shadow:var(--lueur-or)}
+.arene-sorts button:disabled{opacity:.45;cursor:not-allowed}
+.arene-sorts b{font-size:1.3rem;line-height:1}
+.arene-sorts span,.arene-ciblage span{font-size:.82rem;text-align:center}
+.arene-sorts small,.arene-ciblage small{color:var(--texte-faible);font-size:.74rem}
+.arene-sorts button:disabled small{color:var(--sang)}
+
+.arene-ciblage{margin-top:10px;padding:10px 12px;background:var(--pierre-800);
+  border:1px solid var(--or-sombre);border-radius:6px}
+.arene-ciblage p{margin:0;color:var(--or-pale);font-size:.9rem}
+.arene-ciblage button:not(.secondary){min-width:92px;min-height:52px}
 .arene-erreur{color:var(--or-clair);background:var(--pierre-800);border:1px solid var(--bord);
   border-radius:6px;padding:8px 10px;margin:8px 0 0}
 .arene-verdict{font-family:var(--police-titre);color:var(--or-clair);font-size:1.2rem;margin:8px 0 0}
 .arene-journal{list-style:none;padding:0;margin:10px 0 0;color:var(--texte-doux);font-size:.84rem}
 .arene-journal li{padding:3px 0;border-bottom:1px solid var(--pierre-700)}
 .arene-journal li:first-child{color:var(--texte-vif)}
+
+/* Lecture de la liaison sort → animation → effets. Sur un prototype, voir le
+   câblage vaut mieux que le deviner : un effet absent se distingue alors d'un
+   effet trop bref pour être vu. */
+.arene-liaisons{list-style:none;padding:0;margin:10px 0 0}
+.arene-liaisons li{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;
+  padding:6px 12px;margin-bottom:4px;background:var(--pierre-900);
+  border-left:3px solid var(--or-sombre);border-radius:0 6px 6px 0;
+  color:var(--texte-doux);font-size:.8rem}
+.arene-liaisons li:first-child{border-left-color:var(--or);color:var(--texte)}
+.arene-liaisons b{color:var(--or-clair);font-family:var(--police-titre);font-size:.9rem}
+.arene-liaisons .liaison-sort{color:var(--texte-vif)}
+.arene-liaisons code{color:var(--azur);background:var(--pierre-700);
+  padding:1px 5px;border-radius:3px;font-size:.76rem}
+.arene-liaisons em{color:var(--sang);font-style:normal;font-weight:700}

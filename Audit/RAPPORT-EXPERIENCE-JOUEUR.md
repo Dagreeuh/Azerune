@@ -1816,3 +1816,101 @@ version. La consigne qui aurait évité tout ceci y tient maintenant en gras :
 après un `git pull`, relancer `npm install`.
 
 Suite complète : **1 732 tests**, 80 fichiers.
+
+## 1.80.0 — Les sorts : du moteur à l'écran
+
+Demande du joueur : *voir comment les sorts, les animations et les dégâts se
+lient*. Il ne voulait pas une démonstration, il voulait le câblage.
+
+### Combat jouable dans l'arène
+
+L'arène n'est plus une boucle automatique qu'on regarde. À son tour, un
+champion présente ses **vraies compétences** — nom, icône, rechargement — on en
+choisit une, puis une cible, et `castSkill` tranche. Les ennemis jouent seuls ;
+une case « Automatique » rend la main au moteur pour les alliés aussi.
+
+Le moteur reste seul juge. Quand il refuse une action, son message s'affiche
+tel quel plutôt que d'être contourné : un test le vérifie.
+
+### La liaison, déclarative
+
+Une compétence est reliée à son animation et à ses effets dans le fichier du
+champion, `outils/feuilles/<nom>.json` :
+
+```json
+{"anim":"attaque","effets":[{"source":"effets","index":1,"ou":"projectile"}]}
+```
+
+`ou` vaut `lanceur`, `cible`, `cibles` ou `projectile`. L'importeur recopie
+cette liaison sans l'interpréter : changer l'effet d'un sort ne demande jamais
+de toucher au code. Les effets eux-mêmes sortent de la feuille du champion —
+c'est SON dessin qui voyage, jamais un rectangle générique.
+
+Résultat sur les deux champions dessinés :
+
+| Champion | Compétence | Animation | Effet |
+|---|---|---|---|
+| Lelianna | Châtiment | `attaque` | comète dorée, en projectile |
+| Lelianna | Mot de pouvoir : Bouclier | `soin` | croix de lumière sur la cible |
+| Lelianna | Pénitence | `attaque` | phénix sur elle, éclat sur la cible |
+| Hicho | Vague de soins | `soin` | tourbillon vert sur la cible |
+| Hicho | Totem guérisseur | `soin` | totem Kyrian sur lui |
+| Hicho | Marée ancestrale | `soin` | esprit-renard sur lui, tourbillon sur chaque allié |
+
+Les champions sans feuille dessinée gardent leur animation d'attaque et aucun
+effet — ce que l'arène annonce plutôt que de le masquer.
+
+### Ce que l'arène dit d'elle-même
+
+Chaque action laisse une ligne : **qui, quelle compétence, quelle animation,
+quels effets, combien de cibles, en combien de millisecondes**. Un effet
+demandé mais introuvable y apparaît en rouge, au lieu de ne rien afficher.
+
+Ce n'était pas prévu comme fonctionnalité — je l'ai écrit pour me débloquer,
+puis gardé, parce que c'est exactement ce que le joueur demandait à voir.
+
+### Trois instruments menteurs, dans la même séance
+
+Le rendu marchait. J'ai passé l'essentiel du temps à le croire cassé.
+
+1. **Un compteur de pixels qui renvoyait zéro au repos.** Relire un canevas
+   WebGL par `drawImage` hors de la boucle de rendu donne une image vide —
+   le tampon n'est pas conservé. Mesure inutilisable, et elle « prouvait »
+   l'absence d'effet.
+2. **Une ligne d'affichage écrasée.** La liaison ne montrait que la dernière
+   action ; les ennemis jouant aussitôt après, je lisais leur ligne en croyant
+   lire celle du joueur. C'est ce qui a transformé la ligne en historique.
+3. **Des captures systématiquement en retard.** Chaque capture Playwright coûte
+   du temps ; une rafale de huit arrive toujours après un sort de 440 ms. Tous
+   mes clichés montraient l'après-coup — le chiffre de dégâts déjà posé, le
+   projectile déjà détruit.
+
+Ce qui a tranché : faire **tracer au sprite sa propre position** en vol.
+Réponse : `x334 y211, opacité 1.00, 140×109 px, attaché à l'affichage, scène
+960×420`. Il était à l'écran depuis le début. La trace a été retirée une fois
+sa démonstration faite. L'image, elle, a fini par être prise avec un
+enregistrement d'écran continu, qui n'a pas ce coût par image.
+
+### Couverture
+
+`tests/sorts.arene.test.js` : 19 tests, **9 mutants sur 9 tués**. Le contrôle
+qui compte le plus : **un effet lié doit exister dans la feuille**. Un index
+hors bornes ne provoque aucune erreur à l'exécution — l'effet ne s'affiche
+simplement jamais, et rien ne le signalerait. Sont vérifiés de la même façon :
+une animation absente de la feuille, une source d'effet inconnue, un placement
+non géré, et une compétence sans effet.
+
+Un test existant a rattrapé une régression que j'avais introduite : ma
+réécriture de la page avait supprimé l'avertissement sur les sprites
+provisoires. Il est revenu, corrigé : les champions dessinés ne sont plus
+provisoires, les générés le restent.
+
+Suite complète : **1 751 tests**, 81 fichiers.
+
+### Ce qui reste ouvert
+
+- Les trois coups de Pénitence sont joués comme un seul : `coups: 3` est
+  déclaré dans la liaison mais le rendu ne le lit pas encore.
+- Les compétences qui ne touchent aucun point de vie (un bouclier pur) placent
+  leur effet sur la cible désignée, faute de mieux : le moteur n'expose pas la
+  liste des unités affectées autrement que par comparaison d'états.
