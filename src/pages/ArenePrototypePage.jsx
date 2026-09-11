@@ -21,7 +21,15 @@ export const feuilleDe=(unite,genre)=>{
   return `${genre}-${ELEMENTS.includes(e)?e:'arcane'}`;
 };
 
+// Sur téléphone, 960 pixels logiques écrasés dans 380 pixels d'écran rendent
+// les champions illisibles — or c'est exactement ce qu'on vient regarder. On
+// réduit donc la scène plutôt que les personnages : moins de décor, même
+// taille de sprite.
+const tailleArene=()=>(typeof window!=='undefined'&&window.innerWidth<700)
+  ?{largeur:520,hauteur:360}:{largeur:960,hauteur:420};
+
 export default function ArenePrototypePage(){
+  const [taille]=useState(tailleArene);
   const{HEROES,team,stats,getProgress,autoSkillPriorities}=useGame();
   const arene=useRef(null);
   const combat=useRef(null);
@@ -103,7 +111,7 @@ export default function ArenePrototypePage(){
       Écran d'essai. Le moteur de combat est le vrai ; les sprites sont générés
       et provisoires. On regarde ici la fluidité et la lisibilité, rien d'autre.
     </p>
-    <ArenePixi largeur={960} hauteur={420} onPret={pret}
+    <ArenePixi largeur={taille.largeur} hauteur={taille.hauteur} onPret={pret}
       onPerdu={()=>setEtat('sans-webgl')}/>
     <p className="arene-mesure">Images par seconde : <strong>{ips||'—'}</strong></p>
     {etat==='sans-webgl'&&<p className="arene-erreur">WebGL indisponible sur cet appareil : l'arène ne peut pas s'afficher.</p>}

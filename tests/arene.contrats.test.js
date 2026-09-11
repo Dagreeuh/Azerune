@@ -62,6 +62,36 @@ describe('cycle de vie',()=>{
   });
 });
 
+describe('accès depuis le jeu',()=>{
+  // L'arène a d'abord été cachée dans un bouton en bas des Paramètres, APRÈS
+  // la zone d'effacement : le joueur ne l'a jamais trouvée. Une page
+  // inatteignable n'existe pas.
+  const layout=lire('src/components/Layout.jsx');
+  const app=lire('src/App.jsx');
+
+  it('a son propre onglet dans la navigation',()=>{
+    expect(layout).toMatch(/\['arene',[^\]]*\]/);
+  });
+
+  it('n’est verrouillée derrière aucun niveau d’Invocateur',()=>{
+    const onglet=layout.match(/\['arene','[^']*','[^']*',(\d+)\]/);
+    expect(onglet,'onglet arene absent de la barre').not.toBeNull();
+    expect(Number(onglet[1]),'un niveau requis rendrait l’onglet grisé').toBe(1);
+  });
+
+  it('est branchée sur une vraie page',()=>{
+    expect(app).toMatch(/page==='arene'\?<ArenePrototypePage\/>/);
+  });
+
+  it('rétrécit la scène sur téléphone, pas les champions',()=>{
+    // Écraser 960 px logiques dans 380 px d'écran rendait les sprites
+    // illisibles sur mobile.
+    expect(page).toMatch(/window\.innerWidth<700/);
+    expect(page).toMatch(/largeur:520/);
+    expect(page).not.toMatch(/largeur=\{960\}/);
+  });
+});
+
 describe('honnêteté du prototype',()=>{
   it('utilise le vrai moteur, pas une simulation d’affichage',()=>{
     expect(page).toMatch(/from'\.\.\/battle\/engine'/);

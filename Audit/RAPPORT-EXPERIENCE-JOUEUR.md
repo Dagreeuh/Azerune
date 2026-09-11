@@ -1749,3 +1749,32 @@ ne se serait jamais affichée, et rien ne l'aurait signalé à l'exécution.
 
 **5 mutants sur 5 tués** (3 sur 5 à la première passe). Suite complète :
 **1 722 tests**, 79 fichiers.
+
+### 1.79.2 — L'arène était introuvable
+
+Signalé par le joueur : *« je ne vois pas l'onglet arène pour essayer »*.
+
+Il avait raison, et c'était une faute de ma part. J'avais mis l'accès dans une
+carte des **Paramètres, placée après la zone d'effacement de sauvegarde** —
+l'endroit le moins consulté de toute l'application. Pire : j'avais annoncé cet
+emplacement dans deux notes de patch comme si c'était un choix.
+
+Une page inatteignable n'existe pas. L'arène a maintenant **son propre onglet**
+dans la barre de navigation (🎬 Arène), sans niveau d'Invocateur requis. La
+carte des Paramètres a été retirée : elle faisait double emploi, et la page
+porte déjà son propre avertissement.
+
+Vérifié dans un navigateur en **cliquant réellement sur l'onglet**, pas en
+forçant la page par `sessionStorage` comme le faisaient mes sondes précédentes.
+C'est exactement ce qui m'avait empêché de voir le problème : toutes mes
+vérifications entraient dans l'arène par la porte de derrière.
+
+Trois tests garantissent l'accès : l'onglet existe, il n'est verrouillé derrière
+aucun niveau, et il pointe sur une vraie page.
+
+**Corrigé au passage** : sur un écran de 420 px, les 960 pixels logiques de la
+scène étaient écrasés dans 380 px et les champions devenaient illisibles — or
+c'est précisément ce qu'on vient regarder. La scène passe à 520×360 sous 700 px
+de large : on réduit le décor, pas les personnages.
+
+Suite complète : **1 723 tests**, 79 fichiers.
