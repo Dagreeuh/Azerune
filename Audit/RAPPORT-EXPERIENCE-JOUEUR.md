@@ -2015,3 +2015,106 @@ lui, ne se trompe pas de coupable.
 
 `tests/cadence.test.js` : 21 tests, **6 mutants sur 6 tués** (5 sur 6 à la
 première passe). Suite complète : **1 773 tests**, 82 fichiers.
+
+---
+
+## 1.81.0 — L'affinité élémentaire : mesure
+
+Chantier ouvert à la demande du joueur : le plus intéressant du projet. Étape
+de mesure uniquement — aucune donnée de jeu n'est modifiée.
+
+### D'abord, une erreur de ma part
+
+J'avais écrit dans le rapport 1.78.0 que « ni `enemies.js` ni `campaign.js` ne
+déclarent d'élément » et que « l'affinité n'a aucun effet sur toute la
+campagne ». **C'est faux.**
+
+Mon grep cherchait `element:'…'` dans le source. Or l'élément d'un ennemi de
+campagne est passé **positionnellement** : du tuple de zone jusqu'au
+constructeur `enemy()`. Invisible à la lecture du texte, présent dans les
+données.
+
+Règle que j'en retire, et qui vaut pour la suite de cet audit : **lire les
+données instanciées, jamais le texte source.** Le harnais
+`Audit/mesures/affinite-campagne.test.js` construit les vraies missions et lit
+les vrais ennemis.
+
+### Ce que le joueur affronte réellement
+
+Une zone = **un seul élément**, pour ses 21 combats.
+
+| Zone | Élément |
+|---|---|
+| Valebrume | Nature |
+| Forges de Khaz-Drum | Feu |
+| Bastion de Pierre | Nature |
+| Sanctuaire de l'Œil Clair | Lumière |
+| Arène des Lames | Feu |
+| Cimes du Vent | Arcane |
+| Temple Inébranlable | Lumière |
+| Crypte Sanglante | Ombre |
+| Rempart du Dernier Serment | Lumière |
+| Cœur Ignifugé | Feu |
+
+Sur les 210 ennemis de la campagne : **Feu 30 %, Lumière 30 %, Nature 20 %,
+Arcane 10 %, Ombre 10 %, et Eau 0 %.**
+
+**Aucun ennemi de campagne n'est jamais de l'élément Eau.**
+
+### Ce que ça vaut, par élément de champion
+
+| Élément | Champions | Efficace | Neutre | Inefficace | Net |
+|---|---|---|---|---|---|
+| Feu | 5 | 20 % | 80 % | 0 % | **+20 pts** |
+| Ombre | 5 | 30 % | 60 % | 10 % | **+20 pts** |
+| Eau | 5 | 30 % | 50 % | 20 % | **+10 pts** |
+| Lumière | 4 | 10 % | 80 % | 10 % | 0 pt |
+| Arcane | 5 | 10 % | 60 % | 30 % | **−20 pts** |
+| **Nature** | **8** | **0 %** | 70 % | 30 % | **−30 pts** |
+
+**Nature est le groupe le plus nombreux du roster — 8 champions — et il ne peut
+jamais être efficace nulle part dans la campagne.** Nature ne bat que l'Eau, et
+l'Eau est absente. Ces huit champions n'ont structurellement aucun bon moment,
+et un mauvais moment sur 30 % du contenu. Ce n'est pas une décision de
+conception : c'est une conséquence de la distribution des zones.
+
+### Ce que ça coûte en combat
+
+Expérience contrôlée : même équipe, même mission, mêmes graines, statistiques
+identiques pour tous. **Seul l'élément d'un champion sur trois change.**
+
+Crypte Sanglante, ennemis Ombre, au point de bascule de difficulté :
+
+| Élément du champion | Relation | Victoires | Actions |
+|---|---|---|---|
+| Arcane | EFFICACE | **20/20** | 89 |
+| Feu · Nature · Eau · Ombre | NEUTRE | 16/20 | 127 |
+| Lumière | INEFFICACE | **0/20** | — |
+
+En régime large (l'équipe gagne toujours), le même changement fait varier la
+durée du combat de **71 à 85 actions, soit 20 %**.
+
+L'affinité n'est donc pas un ornement : à difficulté serrée, **l'élément d'un
+seul champion décide du combat**.
+
+### Deux mesures ratées, gardées pour mémoire
+
+1. **Une équipe surpuissante ne mesure rien.** Mon premier essai donnait 3,8
+   actions par combat et le même chiffre pour les six éléments : un allié qui
+   tue en un coup tue en un coup, quelle que soit l'affinité. Une mesure doit
+   avoir la résolution de ce qu'elle prétend voir.
+2. **Je lisais un champ qui n'existe pas.** `simulerMission` renvoie `taux` et
+   `victoires` ; je lisais `chances`, d'où « 0 victoire » partout, y compris
+   dans les cas où l'équipe gagnait 20 fois sur 20.
+
+### Ce que la mesure ne dit pas
+
+Elle porte sur la difficulté **Normal** et sur trois zones. Les multiplicateurs
+Difficile (×1,34) et Hardcore (×1,72) déplacent le point de bascule, donc
+l'ampleur de l'effet — pas son existence. Et elle ne dit rien des raids, du
+mythique ni des défis, qui déclarent leurs éléments séparément.
+
+### Ce que je n'ai pas fait
+
+Aucune donnée n'a été modifiée. Redistribuer les éléments change le jeu — les
+options ne se valent pas et la décision appartient au joueur.
