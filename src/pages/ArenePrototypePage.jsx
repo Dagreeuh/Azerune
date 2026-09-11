@@ -71,6 +71,7 @@ export default function ArenePrototypePage(){
         feuille:arene.current.feuillePour(u.id)||feuilleDe(u,'heros')})),
       ...bataille.enemies.map(u=>({id:u.id,cote:'ennemi',nom:u.name,feuille:feuilleDe(u,'monstre')})),
     ]);
+    arene.current.actif(null);
     setJournal(['Le combat commence.']);
     setEtat('en-cours');
     avancer();
@@ -88,6 +89,7 @@ export default function ArenePrototypePage(){
     b=nextTurn(b);
     combat.current=b;
     const acteur=[...b.allies,...b.enemies].find(u=>u.id===b.turn);
+    arene.current?.actif(acteur?.id||null);
     if(!acteur){rafraichir();return}
     if(acteur.side==='ally'&&!auto){setSortChoisi(null);rafraichir();return}
     await jouer(acteur.side==='ally'
@@ -137,7 +139,7 @@ export default function ArenePrototypePage(){
         if(u.dead&&!v.dead)a.mourir(u.id);
       });
       setJournal(j=>[String(b.log?.[0]||''),...j].slice(0,6));
-      if(b.winner)setEtat(b.winner==='ally'?'victoire':'defaite');
+      if(b.winner){a.actif(null);setEtat(b.winner==='ally'?'victoire':'defaite');}
     }finally{
       occupe.current=false;
       rafraichir();

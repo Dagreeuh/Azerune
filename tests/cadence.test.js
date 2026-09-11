@@ -103,6 +103,53 @@ describe('quelles animations bouclent',()=>{
   });
 });
 
+describe('immobilité hors tour',()=>{
+  // Une scène où tout le monde s'agite en permanence fatigue et ne dit rien.
+  // Figer l'attente rend le mouvement porteur de sens — ce qui bouge est ce
+  // qui se passe — et désigne au passage le champion qui a la main.
+  const arene=lire('src/pixi/arene.js');
+  const page=lire('src/pages/ArenePrototypePage.jsx');
+
+  it('ne lance aucune animation à la mise en place',()=>{
+    // `play()` sur le sprite fraîchement créé faisait boucler tout le monde
+    // dès l'ouverture, avant la moindre action.
+    const creation=arene.slice(arene.indexOf('new AnimatedSprite('),
+      arene.indexOf('const hauteur='));
+    expect(creation).not.toMatch(/sprite\.play\(\)/);
+  });
+
+  it('arrête l’attente de qui n’a pas la main',()=>{
+    expect(arene).toMatch(/if\(e\.id===actifId\)e\.sprite\.gotoAndPlay\(0\);\s*else e\.sprite\.gotoAndStop\(0\)/);
+  });
+
+  it('fait passer TOUT retour à l’attente par la règle d’immobilité',()=>{
+    // Chemin atteignable : un champion dont la feuille n'a pas de rangée
+    // « Attaque » lance ses sorts sur l'animation d'attente. Sans ce
+    // routage, il se mettrait à boucler alors que ce n'est pas son tour.
+    expect(arene).toMatch(/if\(anim==='repos'\)\{poseRepos\(e\);return\}/);
+    expect(arene).toMatch(/lanceur\.jeux\.attaque\?'attaque':'repos'/);
+  });
+
+  it('n’interrompt pas une frappe en cours pour la figer',()=>{
+    // Un sort en cours doit aller au bout ; son `onComplete` reposera
+    // l'attente avec la bonne décision.
+    expect(arene).toMatch(/if\(!e\.mort&&e\.sprite\.loop\)poseRepos\(e\)/);
+  });
+
+  it('revient à l’attente figée après une animation ponctuelle',()=>{
+    expect(arene).toMatch(/onComplete=boucler\?null:\(\)=>\{if\(!e\.mort\)poseRepos\(e\)\}/);
+  });
+
+  it('la page désigne l’actif à chaque tour',()=>{
+    expect(page).toMatch(/arene\.current\?\.actif\(acteur\?\.id\|\|null\)/);
+  });
+
+  it('personne n’a la main avant le premier tour, ni après la fin',()=>{
+    expect(page).toMatch(/arene\.current\.actif\(null\)/);
+    expect(page).toMatch(/if\(b\.winner\)\{a\.actif\(null\)/);
+  });
+});
+
 describe('branchement dans l’arène',()=>{
   const arene=lire('src/pixi/arene.js');
 

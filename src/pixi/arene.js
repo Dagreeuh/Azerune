@@ -104,7 +104,6 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
         const sprite=new AnimatedSprite(allerRetour(cadresAttente(jeux.repos,attente)));
         sprite.anchor.set(.5,1);
         sprite.animationSpeed=VITESSE.repos;
-        sprite.play();
         const hauteur=Math.round((jeux.repos[0]?.height||atlas.taille)*zoomBase*(echelles.repos||1));
         const barre=new Graphics();
         const nom=new Text({text:u.nom,style:{fontFamily:'Georgia, serif',fontSize:12,
@@ -120,7 +119,7 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
         const etat={id:u.id,cote,noeud,sprite,barre,jeux,echelles,zoomBase,hauteur,sorts,attente,
           base:{x:0,y:noeud.y},mort:false};
         unites.set(u.id,etat);
-        appliquerEchelle(etat,'repos');
+        poseRepos(etat);
         pv(u.id,1);
         places.push(etat);
       }
@@ -157,16 +156,44 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
     e.sprite.scale.set(e.cote==='allie'?k:-k,k);   // l'ennemi regarde vers nous
   }
 
+  // Qui a la main. Seul celui-là anime son attente : les autres tiennent leur
+  // première pose. Une scène où TOUT LE MONDE s'agite en permanence fatigue et
+  // ne dit rien ; figer l'attente rend le mouvement porteur de sens — ce qui
+  // bouge est ce qui se passe — et désigne au passage le champion actif.
+  let actifId=null;
+
+  function poseRepos(e){
+    if(!e||e.mort||!e.jeux.repos)return;
+    e.sprite.textures=allerRetour(cadresAttente(e.jeux.repos,e.attente));
+    appliquerEchelle(e,'repos');
+    e.sprite.animationSpeed=VITESSE.repos;
+    e.sprite.loop=true;
+    e.sprite.onComplete=null;
+    if(e.id===actifId)e.sprite.gotoAndPlay(0);
+    else e.sprite.gotoAndStop(0);
+  }
+
+  // Change la main. Appelé à chaque tour : ce qui s'anime suit le moteur.
+  function actif(id){
+    actifId=id??null;
+    unites.forEach(e=>{
+      // Ne rien faire pendant qu'une frappe ou un sort se joue : son
+      // `onComplete` remettra l'attente, avec la bonne décision.
+      if(!e.mort&&e.sprite.loop)poseRepos(e);
+    });
+  }
+
   function animer(id,anim,{boucle=false}={}){
     const e=unites.get(id);
     if(!e||!e.jeux[anim])return;
+    if(anim==='repos'){poseRepos(e);return}
     const boucler=boucle||enBoucle(anim);
     const suite=anim==='repos'?cadresAttente(e.jeux[anim],e.attente):e.jeux[anim];
     e.sprite.textures=boucler?allerRetour(suite):suite;
     appliquerEchelle(e,anim);
     e.sprite.animationSpeed=VITESSE[anim]||.12;
     e.sprite.loop=boucler;
-    e.sprite.onComplete=boucler?null:()=>{if(!e.mort)animer(id,'repos',{boucle:true})};
+    e.sprite.onComplete=boucler?null:()=>{if(!e.mort)poseRepos(e)};
     e.sprite.gotoAndPlay(0);
   }
 
@@ -305,7 +332,7 @@ export async function creerArene(conteneur,{largeur=640,hauteur=360}={}){
   }
 
   return{
-    app,placer,animer,frapper,toucher,mourir,pv,chiffre,sort,
+    app,placer,animer,frapper,toucher,mourir,pv,chiffre,sort,actif,
     feuillePour:heroId=>atlas.champions?.[String(heroId)]||null,
     sortsDe:id=>unites.get(id)?.sorts||[],
     ips:()=>Math.round(app.ticker.FPS),

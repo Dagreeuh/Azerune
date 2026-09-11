@@ -1969,3 +1969,49 @@ l'échelle à chaque changement d'animation — restait respectée. Il exige
 désormais l'enchaînement, pas la syntaxe.
 
 Suite complète : **1 766 tests**, 82 fichiers.
+
+### 1.80.2 — Tout le monde s'agitait en permanence
+
+Signalé par le joueur : *« les personnes sont toujours en mouvement pendant le
+combat alors que je n'ai pas encore fait d'action »*.
+
+Exact, et c'était bien dans le code : le sprite était mis en lecture dès sa
+création (`play()`), et chaque retour à l'attente relançait la boucle. Six
+combattants bouclaient donc leur attente sans interruption, du premier
+affichage à la fin du combat.
+
+**Désormais, seul le champion qui a la main anime son attente.** Les autres
+tiennent leur première pose. Avant le premier tour et après la victoire,
+personne ne bouge.
+
+Ce n'est pas qu'une question de calme : une scène où tout s'agite en permanence
+ne dit rien. Figer l'attente rend le mouvement porteur de sens — ce qui bouge
+est ce qui se passe — et désigne au passage le champion actif, sans ajouter le
+moindre élément d'interface.
+
+Deux précautions :
+
+- **Une animation ponctuelle en cours n'est jamais interrompue** pour être
+  figée : la frappe va au bout, et c'est sa fin qui repose l'attente, avec la
+  bonne décision.
+- **Tout retour à l'attente passe par la même règle.** Un champion dont la
+  feuille n'aurait pas de rangée « Attaque » lance ses sorts sur l'animation
+  d'attente ; sans ce routage, il se remettrait à boucler hors de son tour.
+  Aucune des deux feuilles actuelles n'emprunte ce chemin — c'est un mutant
+  survivant qui l'a mis en évidence, et il est désormais couvert.
+
+### Mesure
+
+Au tour de Lelianna, images successives comparées pixel à pixel : le mouvement
+est confiné entre x21 et x123 — sa seule colonne. **88 % de la scène ne change
+pas d'un pixel.** Thorgar et les trois ennemis : zéro.
+
+Une première mesure avait accusé Lelianna de bouger pendant le tour d'Hicho.
+C'était ma découpe en colonnes qui coupait le sprite d'Hicho en deux : sa queue
+et son bâton débordaient dans la zone voisine. Le profil colonne par colonne,
+lui, ne se trompe pas de coupable.
+
+### Couverture
+
+`tests/cadence.test.js` : 21 tests, **6 mutants sur 6 tués** (5 sur 6 à la
+première passe). Suite complète : **1 773 tests**, 82 fichiers.
