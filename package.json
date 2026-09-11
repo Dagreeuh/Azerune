@@ -1,9 +1,10 @@
 {
   "name": "chroniques-azerune",
   "private": true,
-  "version": "1.79.2",
+  "version": "1.79.3",
   "type": "module",
   "scripts": {
+    "predev": "node outils/verifier-deps.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -12,7 +13,8 @@
     "mesures": "vitest run --config vitest.mesures.config.js",
     "sprites": "node outils/generer-sprites.mjs",
     "decouper": "node outils/decouper-feuille.mjs",
-    "importer": "node outils/importer-champion.mjs"
+    "importer": "node outils/importer-champion.mjs",
+    "verifier-deps": "node outils/verifier-deps.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

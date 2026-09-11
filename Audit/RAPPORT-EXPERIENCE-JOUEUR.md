@@ -1779,3 +1779,40 @@ c'est précisément ce qu'on vient regarder. La scène passe à 520×360 sous 70
 de large : on réduit le décor, pas les personnages.
 
 Suite complète : **1 726 tests**, 79 fichiers.
+
+### 1.79.3 — L'erreur qui ne disait pas quoi faire
+
+Le joueur, après avoir récupéré la branche :
+`Failed to resolve import "pixi.js" from "src/pixi/arene.js"`, au milieu d'une
+pile d'appels de trente lignes pointant dans `node_modules/vite`.
+
+Ce n'était pas un bug du code. `pixi.js` et `vitest` sont deux dépendances
+ajoutées depuis `main` ; elles figurent bien dans `package.json` **et** dans
+`package-lock.json` avec leur empreinte d'intégrité — vérifié. Il manquait
+simplement un `npm install` après le `git pull`.
+
+Mais l'erreur ne le disait nulle part. Elle désignait un fichier source
+parfaitement correct, sur une ligne parfaitement correcte. C'est le genre de
+message qui fait chercher au mauvais endroit pendant vingt minutes.
+
+**`npm run dev` contrôle désormais les dépendances avant de démarrer** et
+s'arrête sur une phrase :
+
+```
+  Dépendances manquantes : pixi.js
+  Elles ont été ajoutées depuis ta dernière installation.
+
+     npm install
+```
+
+Le contrôle a été validé **en reproduisant la panne** — `pixi.js` réellement
+retiré de `node_modules`, message obtenu, dépendance remise. Il ne bloque que
+pour ce motif : un manifeste illisible ou absent le fait s'effacer en silence
+plutôt qu'empêcher de travailler, et c'est testé.
+
+**Écrit aussi le README racine**, qui ne contenait qu'une ligne (`# Azerune`)
+alors que le dépôt compte plus de quarante fichiers `README-v*` de notes de
+version. La consigne qui aurait évité tout ceci y tient maintenant en gras :
+après un `git pull`, relancer `npm install`.
+
+Suite complète : **1 732 tests**, 80 fichiers.
