@@ -129,21 +129,16 @@ describe('le texte d’un nœud décrit le bonus qu’il porte',()=>{
 describe('contrat avec le moteur : les listes ne doivent pas dériver',()=>{
   const effets=[...new Set(HEROES.flatMap(h=>h.skills.map(s=>s.effect)))];
 
-  it('les effets qui tentent un jet sont exactement ceux du moteur',()=>{
-    const reels=effets.filter(e=>{const c=gestion(e);return c.includes('debuff(')||c.includes('tryDebuff(')});
-    expect([...EFFETS_A_JET].filter(e=>effets.includes(e)).sort()).toEqual(reels.sort());
-  });
-
-  it('les effets qui posent quelque chose de temporaire aussi',()=>{
-    const reels=effets.filter(e=>{const c=gestion(e);
-      return c.includes('mastery.duration')||c.includes('debuff(')||c.includes('tryDebuff(')});
-    expect([...EFFETS_TEMPORELS].filter(e=>effets.includes(e)).sort()).toEqual(reels.sort());
-  });
-
-  it('les effets dont la magnitude suit la maîtrise aussi',()=>{
-    const reels=effets.filter(e=>gestion(e).includes('mastery.power'));
-    expect([...EFFETS_A_PUISSANCE].filter(e=>effets.includes(e)).sort()).toEqual(reels.sort());
-  });
+  // Les trois dérivations qui vivaient ici lisaient le TEXTE du moteur — elles
+  // cherchaient `debuff(` ou `mastery.duration` dans le bloc de chaque effet.
+  // Angle mort : elles ne voyaient pas ce que font les HELPERS. `shield()`
+  // écrit `turns:2+mastery.duration`, donc cinq sorts à bouclier avaient une
+  // durée qui suivait le bonus sans jamais écrire `mastery` chez eux ; ils
+  // manquaient à la liste, et le joueur se voyait refuser un bonus qui
+  // fonctionnait.
+  //
+  // Elles sont remplacées par `tests/effets.proprietes.test.js`, qui EXÉCUTE
+  // chaque sort et observe ce qui change.
 
   it('l’ancrage retombe toujours sur un bonus utilisable',()=>{
     HEROES.forEach(hero=>[0,1,2].forEach(idx=>TYPES.forEach(type=>{

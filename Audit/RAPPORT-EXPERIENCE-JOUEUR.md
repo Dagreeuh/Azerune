@@ -2512,3 +2512,105 @@ que le défaut est passé. `npm run lint` reste disponible séparément.
   restent hors de portée de la suite.
 
 Suite complète : **1 831 tests**, 88 fichiers.
+
+---
+
+## 1.84.0 — Trois listes qui décidaient des Empreintes mentaient
+
+Les nœuds d'Empreinte ne s'appliquent pas à n'importe quelle compétence. Trois
+listes dans `src/data/empreintes.js` arbitrent :
+
+| Liste | Ce qu'elle autorise |
+|---|---|
+| `EFFETS_A_JET` | le nœud **chance d'effet** |
+| `EFFETS_TEMPORELS` | le nœud **durée** |
+| `EFFETS_A_PUISSANCE` | le nœud **puissance** |
+
+Un sort absent de la bonne liste se voit **refuser** le nœud. Le joueur ne voit
+pas une erreur : il voit une option grisée, et en conclut que son sort ne
+bénéficie pas de ce bonus. Si la liste se trompe, le jeu lui ment.
+
+### Le contrat qui les gardait lisait le code au lieu de l'exécuter
+
+`tests/empreintes.vivantes.test.js` dérivait la vérité en **cherchant du texte
+dans le source du moteur** : le bloc de l'effet contient-il `debuff(` ?
+`mastery.duration` ? `mastery.power` ?
+
+Cette méthode a un angle mort qu'aucune relecture ne comble : **elle ne voit
+pas ce que font les helpers.** `shield()` écrit :
+
+```js
+target.buffs.shield={turns:2+mastery.duration,source:actor.id};
+```
+
+Un sort qui appelle `shield()` a donc une durée qui suit le bonus — sans que le
+mot `mastery` apparaisse jamais dans son propre bloc. Le contrat ne pouvait pas
+le savoir. Il validait une liste fausse, et confirmait chaque jour qu'elle était
+juste.
+
+### Mesure : jouer les 96 effets plutôt que les lire
+
+`Audit/mesures/effets-proprietes.test.js` lance chaque sort du roster **deux
+fois** — une fois sans bonus, une fois avec — et regarde ce qui change dans
+l'état de combat : le nombre d'altérations posées, leur durée, la magnitude des
+charges. Ce qui bouge est influencé ; ce qui ne bouge pas ne l'est pas.
+
+| Liste | Déclaré | Mesuré | Verdict |
+|---|---|---|---|
+| `EFFETS_A_JET` | 26 | 26 | accord parfait |
+| `EFFETS_TEMPORELS` | 45 | **50** | **5 sorts privés d'un bonus qui marche** |
+| `EFFETS_A_PUISSANCE` | 88 | 86 | 2 écarts, expliqués plus bas |
+
+Les cinq manquants — `aegisStrike`, `guardianWall`, `rescueSanctuary`,
+`rescueShield`, `soulMetamorphosis` — sont **tous des poseurs de bouclier**.
+Exactement la famille que `shield()` rendait invisible. Ils sont ajoutés.
+
+### Six fois où mon propre instrument a menti
+
+Le banc d'essai a produit six faux écarts avant de donner un résultat que je
+puisse croire. Chacun a été diagnostiqué, pas contourné :
+
+| Faux écart | Cause réelle |
+|---|---|
+| tout `power` semblait divergent | je comparais aux listes brutes, alors que `peutRecevoir` accepte aussi `sort.power>0` |
+| écarts instables d'un lancement à l'autre | le tirage d'amorçage décalait le tirage mesuré ; fixé juste avant le sort testé |
+| `healingSeed` | effet différé : il fallait 4 tours de décantation, pas une mesure immédiate |
+| `impactQuake`, `frostShatter`, `virulentSpread` | le sort 1 de Brom **consomme** la ressource : le plan d'amorçage `0,1,0,1` n'atteignait jamais le seuil de 3 |
+| `totemHeal`, `totemTide` | alliés à 60 % de PV : un soin de 48 % des PV max **saturait au plafond**, le bonus n'avait nulle part où aller. Alliés remis à 3 % |
+| `ebonMight` | sa puissance part dans un **buff**, pas dans des dégâts : il fallait observer aussi les charges de buff |
+
+Aucun n'était un défaut du jeu. Tous étaient des défauts de ma mesure.
+
+### Les deux écarts restants sont nommés, pas effacés
+
+`guardianLink` et `refluxRelease` lisent bien `mastery.power` — je l'ai vérifié
+dans leur bloc — mais rien ne peut l'observer sur un banc : le premier transfère
+des dégâts encaissés par un allié lié (ce qui n'arrive jamais ici), le second ne
+libère que de l'énergie déjà stockée. Ils sont inscrits dans un ensemble
+`INOBSERVABLES` **commenté sort par sort**. Une exception nommée et justifiée
+vaut mieux qu'une assertion qui ferme les yeux.
+
+### Le nouveau contrat
+
+`tests/effets.proprietes.test.js` remplace les trois dérivations par texte. Il
+**joue** les sorts et compare au déclaré. Les trois dérivations sont retirées de
+`empreintes.vivantes.test.js` (10 tests restants) — les garder aurait signifié
+maintenir deux vérités dont une est fausse.
+
+### Mutation : un mutant a survécu, et il a appris quelque chose
+
+| Mutant | Verdict |
+|---|---|
+| `aegisStrike` retiré de `EFFETS_TEMPORELS` | tué |
+| `rescueShield` retiré | tué |
+| `peutRecevoir` ne regarde plus `sort.power` | tué |
+| `INOBSERVABLES` vidé | tué |
+| **nom d'effet inexistant ajouté à une liste** | **survécu** |
+
+Les deux côtés de la comparaison étaient filtrés par les effets réellement
+présents dans le roster : un nom mort restait invisible des deux côtés. Il ne
+casse rien aujourd'hui — et c'est bien le problème, il survivrait à la
+disparition du sort qui l'a justifié. Un cinquième test l'interdit ; les trois
+variantes du mutant sont maintenant tuées.
+
+Suite complète : **1 833 tests**, 89 fichiers.
