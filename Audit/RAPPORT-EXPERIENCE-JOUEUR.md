@@ -2212,3 +2212,73 @@ Suite complète : **1 781 tests**, 83 fichiers.
 L'étape 4 du plan — faire passer les 28 écritures directes `.debuffs.X=` par
 `debuff()` — n'est pas entamée. C'est la même racine : une règle centrale
 existe, la moitié du code ne passe pas par elle.
+
+### 1.81.1 — L'affinité pèse selon la difficulté
+
+Retour du joueur sur la redistribution : *« le but n'est pas de changer
+d'équipe à chaque zone. En Normal ça doit moins demander d'avoir les affinités
+parfaites, mais au moins une équipe avec stuff et niveau appropriés. Difficile
+et Hardcore, c'est une autre histoire. »*
+
+Réglage juste : en Normal, le mur doit être l'équipement et le niveau, pas la
+couleur. L'affinité est donc **pondérée par la difficulté** — ×0,45 en Normal,
+×0,80 en Difficile, ×1 en Hardcore. Hors campagne (raids, mythique, boss de
+monde, défis, arène) le poids reste entier : ce sont des contenus de fin de
+parcours.
+
+Le libellé ne change jamais : « EFFICACE » reste « EFFICACE ». Seule l'ampleur
+bouge.
+
+### Mesure : combien d'équipement coûte une mauvaise affinité ?
+
+Le taux de victoire est un mauvais instrument ici — la bascule est presque
+binaire, 0/20 puis 20/20 en deux crans. On mesure donc **le seuil
+d'équipement** à partir duquel l'équipe gagne à tous les coups, selon
+l'affinité. L'écart entre le seuil « efficace » et le seuil « inefficace » dit
+exactement ce que la couleur remplace d'équipement.
+
+| Difficulté | Poids | Une mauvaise affinité exige |
+|---|---|---|
+| **Normal, avant** | ×1 | **+79 % d'équipement** |
+| **Normal, après** | ×0,45 | **+26 %** |
+| Difficile | ×0,80 | +59 % |
+| Hardcore | ×1 | +90 % |
+
+En Normal, une équipe mal assortie doit donc être **26 % mieux équipée** —
+réel, mais rattrapable en montant son stuff. En Hardcore, presque le double :
+la composition redevient déterminante.
+
+### L'affichage ne peut plus mentir
+
+Le combat annonçait **« ×1,30 » en dur à quatre endroits**. Atténuer sans y
+toucher aurait recréé exactement le défaut que cet audit traque depuis le
+début : annoncé au joueur, jamais appliqué.
+
+Ces quatre endroits **dérivent désormais de la relation elle-même**, via
+`detailAffinite()`. Un test vérifie qu'aucun multiplicateur n'est plus écrit en
+dur dans l'écran de combat, et qu'aucun appel à `affinity()` n'y oublie la
+difficulté. Le tutoriel, lui, annonce le poids plein et précise que le mode
+Normal l'adoucit.
+
+### Un artefact de protocole, corrigé
+
+Ma première mesure donnait **6 % pour Hardcore**, moins que pour Normal —
+absurde. Cause : je ne faisais varier l'élément **que d'un champion sur trois**,
+alors que la décision réelle du joueur porte sur toute l'équipe. Sur un tiers
+du groupe, le signal était noyé par la survie, qui devient le facteur limitant
+à haute difficulté.
+
+Mesuré sur l'équipe entière — ce que le joueur décide vraiment — l'ordre
+attendu apparaît : 26 %, 59 %, 90 %. **Une mesure doit reproduire la décision
+qu'elle prétend éclairer.**
+
+### Couverture
+
+`tests/affinite.difficulte.test.js` : 13 tests, **10 mutants sur 10 tués**.
+Sont verrouillés : l'ordre des poids, le poids entier hors campagne, le neutre
+jamais atténué, le libellé et la couleur inchangés, les effets atténués comme
+les dégâts, la difficulté transmise par les options puis retenue par le
+combat, les cinq lectures d'affinité du moteur, et l'absence de tout
+multiplicateur écrit en dur dans l'interface.
+
+Suite complète : **1 794 tests**, 84 fichiers.

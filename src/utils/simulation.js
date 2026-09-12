@@ -21,6 +21,7 @@ export const ACTIONS_MAX=600;
  */
 export const optionsDeCombat=mission=>({
   enemies:mission?mission.enemies:undefined,
+  difficulte:mission?.difficultyId||null,
   enemyScale:mission?.scale||1,
   raid:mission?.raid?{...mission.raidData,level:mission.raidLevel}:null,
   mythic:mission?.mythic?{level:mission.mythicLevel,season:mission.mythicSeason,turnBudget:mission.turnBudget}:null,

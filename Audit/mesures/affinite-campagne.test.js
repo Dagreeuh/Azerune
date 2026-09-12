@@ -18,6 +18,7 @@ import{HEROES}from'../../src/data/heroes';
 import{normalizeElement,ELEMENTS}from'../../src/utils/elements';
 import{affinity}from'../../src/utils/elements';
 import{simulerMission}from'../../src/utils/simulation';
+import{poidsAffinite,POIDS_AFFINITE}from'../../src/utils/elements';
 import{seedRandom}from'../../tests/helpers';
 
 const NOMS=Object.keys(ELEMENTS);
@@ -121,4 +122,77 @@ it('3 · ce que ça coûte vraiment, en combat',()=>{
       });
     });
   });
+});
+
+it('4 · combien d’équipement une mauvaise affinité coûte-t-elle ?',()=>{
+  // Demande du joueur : en Normal, le mur doit être l'équipement et le niveau,
+  // pas la couleur ; en Difficile et Hardcore, la composition redevient
+  // déterminante.
+  //
+  // Le taux de victoire est un mauvais instrument ici : la bascule est presque
+  // binaire (0/20 puis 20/20 en deux crans). On mesure donc autre chose, qui
+  // répond directement à la question posée — LE SEUIL D'ÉQUIPEMENT à partir
+  // duquel l'équipe gagne à tous les coups, selon l'affinité du champion.
+  // L'écart entre le seuil « efficace » et le seuil « inefficace » dit
+  // exactement ce que la couleur remplace d'équipement.
+  const base={def:130,spd:100,crit:10,critDamage:60,accuracy:40,resistance:20,
+    setEffects:[],resonanceLevel:0};
+  const EQUIPE=[HEROES[0].id,HEROES[1].id,HEROES[2].id];
+  const continent=CONTINENTS[7],stage=continent.stages[4];
+
+  const seuil=(mission,element)=>{
+    for(let hp=600;hp<=12000;hp=Math.round(hp*1.06)){
+      const S={...base,hp,atk:Math.round(hp*.038)};
+      // TOUTE l'équipe porte l'élément testé : c'est la décision réelle du
+      // joueur — « j'emmène mon groupe Feu dans cette zone » —, pas le
+      // remplacement d'un seul champion. Mesurer sur un tiers de l'équipe
+      // diluait le signal au point de rendre Hardcore moins sensible que
+      // Normal, ce qui était un artefact de protocole, pas une propriété.
+      const heroes=HEROES.map(h=>EQUIPE.includes(h.id)
+        ?{...h,element,currentStars:5}:{...h,currentStars:5});
+      seedRandom(7);
+      const r=simulerMission({mission,team:EQUIPE,heroes,getStats:()=>({...S}),tirages:20});
+      if(r.victoires===20)return hp;
+    }
+    return null;
+  };
+
+  console.log('\n=== 4 · Seuil d’équipement pour gagner à coup sûr ===');
+  DIFFICULTIES.forEach(diff=>{
+    const mission=createMission(diff,continent,stage);
+    const cible=normalizeElement(mission.enemies[0].element);
+    const par={};
+    NOMS.forEach(e=>{
+      const rel=affinity(e,cible,diff.id);
+      (par[rel.label]=par[rel.label]||[]).push({e,hp:seuil(mission,e),mult:rel.damage});
+    });
+    const moyenne=t=>t&&t.length?Math.round(t.reduce((a,b)=>a+(b.hp||0),0)/t.length):null;
+    const eff=moyenne(par.EFFICACE),neu=moyenne(par.NEUTRE),fai=moyenne(par.INEFFICACE);
+    console.log(`\n  ${diff.name} — poids de l’affinité ×${poidsAffinite(diff.id)} · ennemis ${cible}`);
+    ['EFFICACE','NEUTRE','INEFFICACE'].forEach(nom=>{
+      const t=par[nom];
+      if(!t)return;
+      console.log(`    ${nom.padEnd(12)} ×${t[0].mult.toFixed(2)}   seuil ${String(moyenne(t)).padStart(5)} pv`);
+    });
+    if(eff&&fai)console.log(
+      `    → une mauvaise affinité exige ${((fai/eff-1)*100).toFixed(0)} % d’équipement en plus`);
+  });
+
+  // Avant/après sur le mode Normal : on rétablit le poids plein le temps d'une
+  // mesure, pour chiffrer ce que l'atténuation a réellement changé.
+  const normal=createMission(DIFFICULTIES[0],continent,stage);
+  const cibleN=normalizeElement(normal.enemies[0].element);
+  const ancien=POIDS_AFFINITE.normal;
+  POIDS_AFFINITE.normal=1;
+  const avantEff=[],avantFai=[];
+  NOMS.forEach(e=>{
+    const k=affinity(e,cibleN,'normal').key;
+    if(k==='effective')avantEff.push(seuil(normal,e));
+    if(k==='weak')avantFai.push(seuil(normal,e));
+  });
+  POIDS_AFFINITE.normal=ancien;
+  const m=t=>t.length?t.reduce((a,b)=>a+b,0)/t.length:null;
+  if(m(avantEff)&&m(avantFai))console.log(
+    `\n  Normal, AVANT atténuation (poids ×1) : `
+    +`une mauvaise affinité exigeait ${((m(avantFai)/m(avantEff)-1)*100).toFixed(0)} % d’équipement en plus`);
 });

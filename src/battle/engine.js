@@ -95,7 +95,7 @@ export function createBattle(team,heroes,getStats,options={}){
             active:depart>0&&plafond>0?true:unite.mechanic.active}};
       }),
     enemies:makeEnemies(enemySource,enemyScale,1).map(unit=>options.regle?.id==='hate'?{...unit,atb:100}:unit).map(unit=>options.tutorialBattle?{...unit,atb:0}:unit),
-    regle:options.regle||null,turn:null,winner:null,rewarded:false,combatStats:Object.fromEntries(team.map(id=>[id,emptyCombatStat()])),mythic:options.mythic||null,mythicState:options.mythic?createMythicState(options.mythic.turnBudget):null,wave:1,totalWaves:options.waves?.length||1,waves:options.waves||null,affixState:affixState(options.affixIds),raid:options.raid||null,raidState:options.raid?{charges:0,maxCharges:options.raid.eruptionAt||10,phaseTwo:false,failedMechanic:null,mechanicFailures:0,championActions:0,enrageAt:options.raid.enrageAt||40,enraged:false,enrageTriggeredAt:null,emberRespawnActions:options.raid.emberRespawnActions||7,emberRespawnAt:null,channelAt:options.raid.channelFrom??null,channelActions:options.raid.channelActions||4,channeling:false,channelEndsAt:null,channelsInterrupted:0,channelsCompleted:0}:null,lastEvents:[],eventSeq:0,log:['Le combat commence.']
+    regle:options.regle||null,difficulte:options.difficulte||null,turn:null,winner:null,rewarded:false,combatStats:Object.fromEntries(team.map(id=>[id,emptyCombatStat()])),mythic:options.mythic||null,mythicState:options.mythic?createMythicState(options.mythic.turnBudget):null,wave:1,totalWaves:options.waves?.length||1,waves:options.waves||null,affixState:affixState(options.affixIds),raid:options.raid||null,raidState:options.raid?{charges:0,maxCharges:options.raid.eruptionAt||10,phaseTwo:false,failedMechanic:null,mechanicFailures:0,championActions:0,enrageAt:options.raid.enrageAt||40,enraged:false,enrageTriggeredAt:null,emberRespawnActions:options.raid.emberRespawnActions||7,emberRespawnAt:null,channelAt:options.raid.channelFrom??null,channelActions:options.raid.channelActions||4,channeling:false,channelEndsAt:null,channelsInterrupted:0,channelsCompleted:0}:null,lastEvents:[],eventSeq:0,log:['Le combat commence.']
   };
 }
 
@@ -244,7 +244,7 @@ export function enemyAction(battle){
   const tankIds=new Set([1,8,18,25]);
   const isTank=unit=>tankIds.has(Number(unit.id))||/gardien|gardienne|tank|brise-fer|vengeance/i.test(String(unit.role||''));
   const targetScore=unit=>{
-    const ratio=unit.maxHp>0?unit.hp/unit.maxHp:1,relation=affinity(actor.element,unit.element);
+    const ratio=unit.maxHp>0?unit.hp/unit.maxHp:1,relation=affinity(actor.element,unit.element,battle.difficulte);
     let score=Math.random()*15;
     if(isTank(unit))score+=75;
     if(relation.key==='effective')score+=50;
@@ -264,7 +264,7 @@ export function enemyAction(battle){
     const defense=target.def*(target.buffs.defUp?1.3:1)*(1+.08*(target.buffs?.mythicBolster?.stacks||0))*(target.debuffs.defDown?0.7:1);
     const raging=battle.mythic&&battle.affixState?.ids?.includes('raging')&&actor.hp/actor.maxHp<.30;const attackPower=actor.atk*(1+.08*(actor.buffs?.mythicBolster?.stacks||0))*(raging?1.15:1)*mythicCollapseFactor(battle.mythicState)*(actor.debuffs.atkDown?.7:1);
     const variance=.92+Math.random()*.16,critical=Math.random()<(actor.bossUnit?(actor.campaignUnit?({easy:.10,normal:.13,hard:.16,hardcore:.19}[actor.campaignDifficulty]||.13):.16):.08);
-    const relation=affinity(actor.element,target.element);
+    const relation=affinity(actor.element,target.element,battle.difficulte);
     let damage=Math.max(6,Math.round(attackPower*multiplier*100/(100+defense*3)*variance*(actor.bossUnit?(actor.campaignUnit?({easy:1.04,normal:1.08,hard:1.13,hardcore:1.18}[actor.campaignDifficulty]||1.08):1.12):1)*(critical?1.5:1)*relation.damage)),personalMitigation=0;if(target.id===25&&target.mechanic?.mode==='high'){const reduced=Math.max(1,Math.round(damage*.82));personalMitigation=damage-reduced;damage=reduced;}
     const absorbed=Math.min(target.shield,damage),shieldSource=target.buffs?.shield?.source;if(personalMitigation)battle=addCombatStat(battle,target.id,{mitigation:personalMitigation,personalMitigation});if(absorbed&&shieldSource)battle=addCombatStat(battle,shieldSource,{mitigation:absorbed,shieldMitigation:absorbed});damage-=absorbed;
     target.hp=Math.max(0,target.hp-damage);target.shield=Math.max(0,target.shield-absorbed);target.dead=target.hp<=0;if(battle.mythic&&battle.affixState?.ids?.includes('necrotic')&&damage>0)target.debuffs.necrotic={turns:2,stacks:Math.min(5,(target.debuffs.necrotic?.stacks||0)+1)};if(battle.mythic&&battle.affixState?.ids?.includes('afflicted')&&damage>0)target.debuffs.affliction={turns:99,stacks:Math.min(5,(target.debuffs.affliction?.stacks||0)+1)};
@@ -437,7 +437,7 @@ export function chooseAutoEnemyTarget(battle,actor,skill){
     if(effect==='alchemyCatalyst')special=-100*['poison','burn','bleed'].filter(key=>enemy.debuffs?.[key]).length;
     if(effect==='huntMark'){special-=Math.round(hpRatio(enemy)*220)+(enemy.bossUnit?-500:0);}if(['huntStrike','huntFinish'].includes(effect)&&actor.mechanic?.targetId===enemy.id&&enemy.debuffs?.hunt?.source===actor.id)special-=800;
     if(['feralShred','feralFinish'].includes(effect)&&enemy.debuffs?.bleed)special-=900;if(['feralFinish','rogueFinish'].includes(effect))special-=Math.round((1-hpRatio(enemy))*500);
-    return special-achevement(enemy)+affinityRank(affinity(actor.element,enemy.element).key)*100+index;
+    return special-achevement(enemy)+affinityRank(affinity(actor.element,enemy.element,battle.difficulte).key)*100+index;
   };
   return enemies.map((enemy,index)=>({enemy,value:score(enemy,index)})).sort((a,b)=>a.value-b.value)[0]?.enemy||enemies[0];
 }
@@ -587,9 +587,9 @@ export function castSkill(battle,index,targetId){
     }
     return amount};
   const shield=(target,raw)=>{const amount=Math.max(0,Math.round(raw*COMBAT_TEMPO*(1+cleDe(actor,'egide'))));target.shield+=amount;target.maxShield=Math.max(target.maxShield||0,target.shield);target.buffs.shield={turns:2+mastery.duration,source:actor.id};shieldTotal+=amount;if(amount)event(target,amount,'shield');return amount};
-  const debuff=(target,key,turns,chance=.75)=>{if(battle.regle?.id==='resistance'&&target.side==='enemy'){resisted.push(`${target.name} résiste : Volonté de fer.`);return false}const relation=affinity(actor.element,target.element);
+  const debuff=(target,key,turns,chance=.75)=>{if(battle.regle?.id==='resistance'&&target.side==='enemy'){resisted.push(`${target.name} résiste : Volonté de fer.`);return false}const relation=affinity(actor.element,target.element,battle.difficulte);
 return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,mastery.effectRate,resisted)};
-  const hit=(target,mult=skill.power||0,opts={})=>{if(!target||target.dead||mult<=0)return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'}};if(battle.raidState?.channeling&&target.raidRole==='priest')return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'},channeled:true};const intangible=battle.mythic&&battle.affixState?.ids?.includes('incorporeal')&&target.hp/target.maxHp<.5&&!target.debuffs?.stun&&!target.debuffs?.slow;const relation=affinity(actor.element,target.element),attack=(opts.defScale?actor.def*(actor.buffs.defUp?1.3:1):actor.atk*(actor.buffs.atkUp?1.25:1))*(1+(actor.buffs.damageUp?.power||0)),defense=target.def*(target.buffs.defUp?1.3:1)*(1+.08*(target.buffs?.mythicBolster?.stacks||0))*(target.debuffs.defDown?.7:1)*(typeof opts.pierce==='number'?opts.pierce:opts.pierce?.15:1);let power=mult*(1+mastery.power)*relation.damage*(opts.bonus||1);if(target.debuffs.mark)power*=1.2;
+  const hit=(target,mult=skill.power||0,opts={})=>{if(!target||target.dead||mult<=0)return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'}};if(battle.raidState?.channeling&&target.raidRole==='priest')return{damage:0,critical:false,relation:{key:'neutral',label:'NEUTRE'},channeled:true};const intangible=battle.mythic&&battle.affixState?.ids?.includes('incorporeal')&&target.hp/target.maxHp<.5&&!target.debuffs?.stun&&!target.debuffs?.slow;const relation=affinity(actor.element,target.element,battle.difficulte),attack=(opts.defScale?actor.def*(actor.buffs.defUp?1.3:1):actor.atk*(actor.buffs.atkUp?1.25:1))*(1+(actor.buffs.damageUp?.power||0)),defense=target.def*(target.buffs.defUp?1.3:1)*(1+.08*(target.buffs?.mythicBolster?.stacks||0))*(target.debuffs.defDown?.7:1)*(typeof opts.pierce==='number'?opts.pierce:opts.pierce?.15:1);let power=mult*(1+mastery.power)*relation.damage*(opts.bonus||1);if(target.debuffs.mark)power*=1.2;
     // Cle de voute — Ferveur : la ressource actuelle amplifie le coup. Garder
     // ses points devient une option, au lieu d'etre toujours une perte.
     const ferveur=cleDe(actor,'ferveur');if(ferveur)power*=1+ferveur*Math.max(0,Number(actor.mechanic?.value)||0);
