@@ -18,6 +18,7 @@ const ExpeditionsPage=React.lazy(()=>import('./pages/ExpeditionsPage'));
 const AchievementsPage=React.lazy(()=>import('./pages/AchievementsPage'));const MythicPage=React.lazy(()=>import('./pages/MythicPage')); const InventoryPage=React.lazy(()=>import('./pages/InventoryPage'));
 const WorldBossPage=React.lazy(()=>import('./pages/WorldBossPage'));
 const TutorialAcademyPage=React.lazy(()=>import('./pages/TutorialAcademyPage'));
+const ArenePrototypePage=React.lazy(()=>import('./pages/ArenePrototypePage'));
 const TUTORIAL_KEY='azerune-tutorial-completed-v1';
 
 export default function App(){
@@ -26,6 +27,6 @@ export default function App(){
   const completeTutorial=()=>{localStorage.setItem(TUTORIAL_KEY,'true');setTutorial(false);setPage('home')};
   if(tutorial)return <GameProvider><TutorialPage onComplete={completeTutorial}/></GameProvider>;
   const replayTutorial=()=>setTutorial(true);
-  const view=page==='home'?<HomePage setPage={setPage} onTutorial={replayTutorial}/>:page==='campaign'?<CampaignPage setPage={setPage}/>:page==='raids'?<RaidsPage setPage={setPage}/>:page==='codex'?<HeroesPage/>:page==='squad'?<HeroesPage squad/>:page==='gear'?<EquipmentPage/>:page==='inventory'?<InventoryPage setPage={setPage}/>:page==='shop'?<ShopPage/>:page==='quests'?<QuestsPage setPage={setPage}/>:page==='summon'?<SummonPage/>:page==='history'?<HistoryPage/>:page==='expeditions'?<ExpeditionsPage setPage={setPage}/>:page==='achievements'?<AchievementsPage/>:page==='mythic'?<MythicPage/>:page==='worldboss'?<WorldBossPage setPage={setPage}/>:page==='battle'?<BattlePage setPage={setPage}/>:page==='academy'?<TutorialAcademyPage/>:page==='settings'?<SettingsPage/>:<HomePage setPage={setPage} onTutorial={replayTutorial}/>;
+  const view=page==='home'?<HomePage setPage={setPage} onTutorial={replayTutorial}/>:page==='campaign'?<CampaignPage setPage={setPage}/>:page==='raids'?<RaidsPage setPage={setPage}/>:page==='codex'?<HeroesPage/>:page==='squad'?<HeroesPage squad/>:page==='gear'?<EquipmentPage/>:page==='inventory'?<InventoryPage setPage={setPage}/>:page==='shop'?<ShopPage/>:page==='quests'?<QuestsPage setPage={setPage}/>:page==='summon'?<SummonPage/>:page==='history'?<HistoryPage/>:page==='expeditions'?<ExpeditionsPage setPage={setPage}/>:page==='achievements'?<AchievementsPage/>:page==='mythic'?<MythicPage/>:page==='worldboss'?<WorldBossPage setPage={setPage}/>:page==='battle'?<BattlePage setPage={setPage}/>:page==='academy'?<TutorialAcademyPage/>:page==='arene'?<ArenePrototypePage/>:page==='settings'?<SettingsPage/>:<HomePage setPage={setPage} onTutorial={replayTutorial}/>;
   return <GameProvider><Layout page={page} setPage={setPage}><Suspense fallback={<p>Chargement...</p>}>{view}</Suspense></Layout></GameProvider>;
 }

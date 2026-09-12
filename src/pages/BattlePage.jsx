@@ -1,0 +1,367 @@
+import React,{useEffect,useMemo,useRef,useState}from'react';
+import{useGame}from'../store/GameContext';
+import{Bar}from'../components/Cards';
+import ChampionGuideModal from'../components/ChampionGuideModal';
+import{createBattle,nextTurn,enemyAction,castSkill,advanceMythicWave,performAutoAction,chooseAutoEnemyTarget}from'../battle/engine';
+import{optionsDeCombat}from'../utils/simulation';
+import{affinity,areaAffinity,elementMeta,detailAffinite,POIDS_AFFINITE}from'../utils/elements';
+import{championIdentity}from'../data/championIdentities'; import{skillMechanic,skillPowerLabel,skillMaxLevel}from'../utils/skills';
+import{CONTINENTS,DIFFICULTIES,createMission}from'../data/campaign';
+import SpellVfx from'../components/SpellVfx';
+import{ressourceAffichee,classeRessource}from'../data/ressourcesChampions';
+import{bonusDeCle}from'../data/clesDeVoute';
+import{empreinteBonuses}from'../data/empreintes';
+import{skillDamageProfile,bonusLabel}from'../utils/skillMath';
+import{createRaidMission}from'../data/raids';
+import{createExpeditionMission}from'../data/expeditions';
+import{createMythicMission}from'../data/mythic';
+import{mythicSandLeft,mythicOvertime,mythicCollapsed}from'../utils/mythic';
+import{QUALITIES,SETS,STAT_LABELS,effectiveMainValue,effectiveSubstats,formatItemValue}from'../data/items';
+
+const EFFECTS={atkUp:{icon:'⚔️',label:'ATQ +',type:'buff'},defUp:{icon:'🛡️',label:'DEF +',type:'buff'},speedUp:{icon:'⚡',label:'VIT +',type:'buff'},regen:{icon:'💚',label:'Régén.',type:'buff'},shield:{icon:'🔷',label:'Bouclier',type:'buff'},atkDown:{icon:'📉',label:'ATQ -',type:'debuff'},accuracyDown:{icon:'🌫️',label:'PRÉC. -',type:'debuff'},healingDown:{icon:'💔',label:'Soins -',type:'debuff'},raidHealingDown:{icon:'🩸',label:'Soins - (enrage)',type:'debuff'},necrotic:{icon:'☣️',label:'Nécrose',type:'debuff'},mythicBolster:{icon:'💪',label:'Galvanisé',type:'buff'},raidEnrage:{icon:'😤',label:'Enrage',type:'buff'},frost:{icon:'❄️',label:'Givre',type:'debuff'},affliction:{icon:'🦠',label:'Affliction',type:'debuff'},damageUp:{icon:'🔺',label:'Dégâts +',type:'buff'},defDown:{icon:'💢',label:'DEF -',type:'debuff'},slow:{icon:'🐌',label:'VIT -',type:'debuff'},mark:{icon:'🎯',label:'Marqué',type:'debuff'},temporalWound:{icon:'⏳',label:'Plaie temporelle',type:'debuff'},stun:{icon:'💫',label:'Étourdi',type:'debuff'},provoke:{icon:'📣',label:'Provoqué',type:'debuff'},burn:{icon:'🔥',label:'Brûlure',type:'debuff'},bleed:{icon:'🩸',label:'Saign.',type:'debuff'},poison:{icon:'☠️',label:'Poison',type:'debuff'},hunt:{icon:'🎯',label:'Traque',type:'debuff'},virulence:{icon:'🦠',label:'Virulence',type:'debuff'},exposed:{icon:'🔓',label:'Exposé',type:'debuff'},agony:{icon:'🕯️',label:'Agonie',type:'debuff'},corruption:{icon:'🌑',label:'Corruption',type:'debuff'},festering:{icon:'🦠',label:'Blessures',type:'debuff'},atonement:{icon:'🕊️',label:'Expiation',type:'buff'},guardianLink:{icon:'🔗',label:'Serment',type:'buff'},healingSeed:{icon:'🌱',label:'Graine',type:'buff'},healingTotem:{icon:'🗿',label:'Totem',type:'buff'},livingGarden:{icon:'🌳',label:'Jardin',type:'buff'},timeAnchor:{icon:'⏳',label:'Ancrage',type:'buff'},vanish:{icon:'🥷',label:'Disparition',type:'buff'},aimed:{icon:'🎯',label:'Visée',type:'buff'},ghoul:{icon:'💀',label:'Goule',type:'buff'}};
+const TARGET_LABEL={enemy:'Ennemi',allEnemies:'Tous les ennemis',ally:'Allié',allAllies:'Toute l’équipe',self:'Lanceur'};
+const KEY_STATS={healLow:'ATQ · Vitesse · PV',cleanseHeal:'PV · Vitesse · Défense',teamRegen:'PV · Vitesse · Défense',heal:'PV · Vitesse',teamHeal:'PV · Vitesse',shield:'PV · Défense · Vitesse',singleShield:'PV · Défense',defScale:'Défense · Critique · Vitesse',poison:'Précision · Vitesse · PV',burn:'Précision · ATQ · Vitesse',bleed:'Précision · ATQ · Vitesse',slow:'Précision · Vitesse',slowDrain:'Précision · Vitesse',stun:'Précision · Vitesse',default:'ATQ · Critique · Vitesse'};
+const advice=effect=>['healLow','cleanseHeal','teamRegen','heal','teamHeal','shield','singleShield'].includes(effect)?'Privilégier Vitesse et survie, puis la statistique utilisée par le soin ou le bouclier.':effect==='defScale'?'Privilégier Défense et Critique, puis Vitesse.':['poison','burn','bleed','slow','slowDrain','stun','defDown','atkDown'].includes(effect)?'Privilégier Précision et Vitesse afin de fiabiliser les effets.':'Privilégier Attaque et Critique, puis Vitesse.';
+
+function EffectList({unit}){const list=[...Object.entries(unit.buffs||{}),...Object.entries(unit.debuffs||{})];return <div className={`effect-list compact-effects ${list.length?'':'empty'}`}>{list.length?list.map(([key,value])=>{const meta=EFFECTS[key],stacks=Math.max(0,Number(value.stacks)||0);const nom=value.label||meta.label;return meta?<span key={key} className={`effect-chip ${meta.type} ${stacks?'stacked-effect':''}`} title={`${nom}${stacks?` · ${stacks} cumul(s)`:''} · ${value.turns} tour(s)`}><b>{meta.icon}</b><span>{nom}</span>{stacks>0&&<strong className="effect-stack-count">×{stacks}</strong>}<em title="Durée restante">{value.turns}</em></span>:null}):<small>Aucun effet</small>}</div>}
+function EventFloat({events=[]}){return <div className="combat-float-stack">{events.map((event,index)=>{const affinityLabel=event.affinity==='effective'?'EFFICACE':event.affinity==='weak'?'INEFFICACE':'NEUTRE',label=event.type==='heal'?'SOINS':event.type==='shield'?'BOUCLIER':event.type==='dot'?'DÉGÂTS PÉRIODIQUES':event.type==='recoil'?'CONTRECOUP':event.type==='ghoul'?'GOULE':event.critical?'CRITIQUE !':affinityLabel;return <span key={event.id} className={`combat-float ${event.type} affinity-${event.affinity||'neutral'} ${event.critical?'critical':''}`} style={{'--float-index':index}}><b>{event.type==='heal'||event.type==='shield'?'+':''}{event.amount}</b><small>{label}</small></span>})}</div>}
+// Preference partagee avec l'ecran d'invocation et les Parametres :
+// `azerune-summon-preferences-v1`. Un joueur qui coupe les animations quelque
+// part les coupe partout, et le stockage peut echouer sans casser le combat.
+const COMBAT_PREF_KEY='azerune-summon-preferences-v1';
+export const combatPrefs=()=>{try{return JSON.parse(localStorage.getItem(COMBAT_PREF_KEY)||'null')||{}}catch{return{}}};
+/**
+ * Le systeme dit-il « reduire les animations » ?
+ *
+ * Sur telephone c'est frequent — l'economie d'energie l'active toute seule sur
+ * Android, et c'est un reglage d'accessibilite courant sur iOS. On le respecte
+ * comme valeur PAR DEFAUT du bouton, jamais comme un verrou : un joueur qui
+ * rallume les effets doit les voir. Le CSS ne cache plus rien de lui-meme.
+ */
+export const systemeReduitLesAnimations=()=>{
+  try{return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)}catch{return false}};
+/** Effets actifs au chargement : choix explicite du joueur, sinon le systeme. */
+export const vfxParDefaut=()=>{
+  const reglage=combatPrefs().reducedAnimations;
+  return typeof reglage==='boolean'?!reglage:!systemeReduitLesAnimations();};
+export const writeCombatPref=reduced=>{try{localStorage.setItem(COMBAT_PREF_KEY,JSON.stringify({...combatPrefs(),reducedAnimations:reduced}));return true}catch{return false}};
+/**
+ * Vitesse du mode AUTO. Une boucle quotidienne de seize combats se regarde plus
+ * qu'elle ne se joue : on laisse le joueur choisir son rythme. Le delai de base
+ * reste celui d'origine, les paliers le divisent.
+ */
+export const COMBAT_SPEEDS=[1,2,3];
+export const AUTO_BASE_DELAY=560;
+export const autoDelay=speed=>Math.round(AUTO_BASE_DELAY/(COMBAT_SPEEDS.includes(speed)?speed:1));
+/**
+ * Delai du tour ennemi. Il etait fige a 480 ms : en x3 l'escouade jouait trois
+ * fois plus vite que l'adversaire et le combat avancait par saccades. Un
+ * plancher de 150 ms garde le tour ennemi lisible.
+ */
+export const ENEMY_BASE_DELAY=480;
+export const enemyDelay=speed=>Math.max(150,Math.round(ENEMY_BASE_DELAY/(COMBAT_SPEEDS.includes(speed)?speed:1)));
+export const readCombatSpeed=()=>{const value=Number(combatPrefs().speed);return COMBAT_SPEEDS.includes(value)?value:1};
+export const writeCombatSpeed=speed=>{try{localStorage.setItem(COMBAT_PREF_KEY,JSON.stringify({...combatPrefs(),speed:COMBAT_SPEEDS.includes(speed)?speed:1}));return true}catch{return false}};
+
+export function Unit({unit,active,selected,automatic,onClick,events=[],enemies=[],allies=[],vfxEnabled=true}){
+  // Ce preambule faisait 4 000 caracteres : 24 identifiants de champion codes
+  // en dur et 27 variables `isNomDuChampion`, toutes recalculees a chaque
+  // rendu et pour chaque unite, qu'elles servent ou non. Chaque champion
+  // declare desormais sa ressource lui-meme dans `data/ressourcesChampions`.
+  const shieldMax=Math.max(unit.maxShield||0,unit.shield||0,1),element=elementMeta(unit.element),
+    ghoulTurns=Math.max(0,unit.mechanic?.ghoulTurns||0),
+    ghoulDamage=Math.max(0,unit.mechanic?.ghoulDamage||Math.round((unit.atk||0)*.28)),
+    ressource=unit.side==='ally'?ressourceAffichee(unit,{allies,enemies},championIdentity(unit)):null;
+  return <div className={`unit-summon-stack ${ghoulTurns?'has-summon':''}`}>{ghoulTurns>0&&<aside className="ghoul-summon-card"><span>💀</span><div><b>Goule de Nashoba</b><small>{ghoulTurns} attaque{ghoulTurns>1?'s':''} restante{ghoulTurns>1?'s':''} · {ghoulDamage} dégâts prévus</small></div></aside>}<button disabled={unit.dead} onClick={onClick} className={`unit battle-unit compact-unit ${active?'active':''} ${selected?'target-selected':''} ${automatic?'auto-target':''} ${events.some(event=>event.critical)?'impact-shake':''} ${events.length?'vfx-hit':''} ${unit.shield>0?'shielded':''}`} style={{'--element-color':element.color}}>{active&&<span className="turn-label">TOUR</span>}{unit.side==='ally'&&unit.currentLevel>0&&<span className="unit-level" title={`Niveau ${unit.currentLevel}`}>{unit.currentLevel}</span>}<SpellVfx events={events} enabled={vfxEnabled}/><EventFloat events={events}/><div className="unit-identity"><b className="emoji">{unit.dead?'☠️':unit.icon}</b><div><strong>{unit.name}</strong><span className="mini-element">{element.icon} {element.name}</span></div></div><div className="unit-bars"><div><span>PV {Math.ceil(unit.hp)}/{unit.maxHp}</span><Bar v={unit.hp} max={unit.maxHp}/></div>{unit.shield>0&&<div className="mini-shield"><span>🔷 {unit.shield}</span><Bar v={unit.shield} max={shieldMax} color="#38bdf8"/></div>}<div><span>Jauge {Math.round(unit.atb)} % · VIT {unit.currentSpd}</span><Bar v={unit.atb} max={100} color="#22d3ee"/></div></div><EffectList unit={unit}/>{unit.side==='ally'&&ressource&&<div className={classeRessource(ressource)}><span>{ressource.titre}</span><b>{ressource.detail}</b>{ressource.extra&&<small>{ressource.extra}</small>}</div>}</button></div>}
+export function SkillTooltip({actor,skill,index,relation,unlocked,onGuide,defense=0,difficulte=null}){
+ const info=skillMechanic(skill),level=actor.skillLevels?.[index]||1;
+ const profil=skillDamageProfile(actor,index,actor,actor.skillLevels||{},{defense,resonanceIV:(actor.resonanceLevel||0)>=4});
+ const pourcent=valeur=>`${Math.round(valeur*100)} %`;
+ const cd=profil?.cooldown?`${profil.cooldown} tour${profil.cooldown>1?'s':''}`:'Aucune';
+ return <div className="skill-tooltip"><div className="skill-tooltip-title"><span>{unlocked?skill.icon:'🔒'}</span><div><b>{skill.name}</b><small>Niveau {level}/{skillMaxLevel(index)}</small></div></div><p>{unlocked?skill.description:'Débloquée lorsque ce champion naturel 3★ évolue en 4★.'}</p>{unlocked&&<><dl><div><dt>Élément</dt><dd>{elementMeta(actor.element).icon} {elementMeta(actor.element).name}</dd></div><div><dt>Cible</dt><dd>{TARGET_LABEL[skill.target]||skill.target}</dd></div><div><dt>Recharge</dt><dd>{cd}</dd></div></dl>
+ {profil&&(profil.damage||profil.heals)&&<section className="tooltip-scaling"><small>{profil.heals&&!profil.damage?'PUISSANCE DE SOIN':'CALCUL DES DÉGÂTS'}</small>
+   <div className="scaling-formula"><b>{pourcent(profil.ratio)}</b><span>{/^[AEIOUY]/.test(profil.statLabel)?'d’':'de '}{profil.statLabel}</span><strong>{profil.statValue.toLocaleString('fr-FR')}</strong></div>
+   {profil.maxPower>0&&<em className="scaling-mastery">dont +{pourcent(profil.maxPower)} de maîtrise (niveau {profil.level})</em>}
+   {profil.damage&&defense>0&&<div className="scaling-expected"><span>Contre {defense} de Défense</span><b>≈ {profil.expected.toLocaleString('fr-FR')}</b><i>{profil.expectedCrit.toLocaleString('fr-FR')} en critique</i></div>}
+   {profil.damage&&<p className="scaling-note">Mitigation 100 / (100 + DÉF × 3) · variance ±8 % · critique ×1,5</p>}
+ </section>}
+ {profil?.conditionals?.length>0&&<section className="tooltip-conditionals"><small>BONUS CONDITIONNELS</small>
+   {profil.conditionals.map((bonus,rang)=><div key={rang}><b>{bonusLabel(bonus)}</b><span>{bonus.when}</span></div>)}
+ </section>}
+ {(profil?.effectRate>0||profil?.duration>0)&&<section className="tooltip-mastery"><small>APPORT DE LA MAÎTRISE</small><b>{[profil.effectRate>0?`Chance d’effet +${pourcent(profil.effectRate)}`:null,profil.duration>0?`Durée +${profil.duration} tour${profil.duration>1?'s':''}`:null].filter(Boolean).join(' · ')}</b></section>}
+ <section><small>STATISTIQUES CLÉS</small><b>{info.scaling.join(' · ')}</b></section><section><small>CONSEIL</small><p>{info.gear}</p></section><section className={`tooltip-affinity affinity-${relation.key}`}><small>AFFINITÉ</small><b>{relation.icon} {relation.label}</b><p>{relation.detail}</p><em>{detailAffinite(affinity('Feu','Nature',difficulte))} — inefficace ×{affinity('Nature','Feu',difficulte).damage.toFixed(2).replace('.',',')}</em></section><button type="button" className="tooltip-guide-button" onClick={event=>{event.stopPropagation();onGuide?.(actor)}}>ⓘ Guide du champion</button></>}</div>}
+
+
+function LootItemDetails({item,label='Butin'}){
+ const[open,setOpen]=useState(false);
+ useEffect(()=>{if(!open)return;const close=event=>event.key==='Escape'&&setOpen(false);window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[open]);
+ if(!item)return null;
+ const quality=QUALITIES[item.quality]||{name:item.quality||'Inconnue',color:'#94a3b8'},set=SETS[item.setId],mainValue=effectiveMainValue(item),substats=effectiveSubstats(item),level=Math.max(0,Number(item.level)||0);
+ return <span className={`result-loot-inspector quality-${item.quality||'normal'} ${open?'open':''}`} style={{'--loot-quality':quality.color}}>
+  <button type="button" className="result-loot-trigger" onClick={event=>{event.stopPropagation();setOpen(value=>!value)}} aria-expanded={open} aria-label={`Afficher les détails de ${item.name}`}>
+   <span className="result-loot-trigger-main"><b>{item.icon} {item.name}</b><small>{quality.name} · {item.stars||0}★ · iLvl {item.itemLevel||0}</small></span>
+   <strong>{open?'Masquer':'Voir les détails'}</strong>
+  </button>
+  <span className="result-loot-tooltip" role="tooltip" onClick={event=>event.stopPropagation()}>
+   <span className="result-loot-tooltip-head"><b>{item.icon} {item.name}</b><button type="button" onClick={()=>setOpen(false)} aria-label="Fermer">✕</button></span>
+   <span className="result-loot-rank"><strong style={{color:quality.color}}>{quality.name}</strong><em>{'★'.repeat(Math.max(0,Number(item.stars)||0))} · Niveau d’objet {item.itemLevel||0} · Forge +{level}</em></span>
+   <span className="result-loot-set"><small>SET</small><b>{set?.icon||'◆'} {set?.name||item.setName||item.setId||'Set inconnu'}</b><em>{set?.bonus||'Bonus de set indisponible'}</em></span>
+   <span className="result-loot-stat main"><small>STATISTIQUE PRINCIPALE</small><b>{STAT_LABELS[item.mainStat]||item.mainStat||'Statistique'} +{formatItemValue(mainValue)}</b></span>
+   <span className="result-loot-substats"><small>SOUS-STATISTIQUES</small>{Object.keys(substats).length?Object.entries(substats).map(([stat,value])=><b key={stat}>{STAT_LABELS[stat]||stat} +{formatItemValue(value)}</b>):<em>Aucune sous-statistique</em>}</span>
+   <span className="result-loot-source"><small>{label}</small><em>{item.source||'Origine non précisée'}</em></span>
+  </span>
+ </span>;
+}
+
+export default function BattlePage({setPage}){
+ const{HEROES,team,stats,progress,getProgress,skillLevels,grantXp,activeMission,battleSession,updateBattleSession,finishCampaignMission,finishRaidMission,finishExpeditionMission,finishMythicMission,finishWorldBossMission,finishDefiMission,recordBattleResult,abandonBattle,teamPower,campaignXp,grantSummonerXp,summonerProfile,summonerXpRequired,getUniqueWeaponForHero,autoSkillPriorities,prepareNextMission,expeditionProgress,raidProgress,mythicProgress}=useGame();
+ const[battle,setBattleState]=useState(()=>battleSession?.battle||null),[target,setTargetState]=useState(()=>battleSession?.target||null),[error,setError]=useState(''),[missionReward,setMissionRewardState]=useState(()=>battleSession?.missionReward||null),[keyboardSkill,setKeyboardSkill]=useState(null),[affinityOpen,setAffinityOpen]=useState(false),[guideHero,setGuideHero]=useState(null),[reportOpen,setReportOpen]=useState(false),[abandonConfirm,setAbandonConfirm]=useState(false),[visualEvents,setVisualEvents]=useState([]),[vfxEnabled,setVfxEnabled]=useState(vfxParDefaut);
+ // Couper les effets ecrit la MEME preference que les Paramètres et le rituel
+ // d'invocation : un seul reglage, deux endroits pour le basculer.
+ //
+ // L'ecriture se fait HORS de l'updater de setState : React peut rejouer un
+ // updater pendant un rendu, et un effet de bord a cet endroit declenche
+ // l'avertissement « Cannot update a component while rendering another ».
+ const toggleVfx=()=>{const next=!vfxEnabled;writeCombatPref(!next);setVfxEnabled(next)};
+ const[speed,setSpeed]=useState(()=>readCombatSpeed());
+ // Le watchdog pouvait relancer le combat sur le MEME acteur : `battle.turn`
+ // ne changeait pas, donc l'effet AUTO — qui n'en depend que par cette cle —
+ // ne se rejouait jamais et son minuteur restait orphelin. Ce compteur donne
+ // au watchdog un moyen de forcer la relance.
+ const[relanceAuto,setRelanceAuto]=useState(0);
+ const cycleSpeed=()=>setSpeed(courante=>{const suivante=COMBAT_SPEEDS[(COMBAT_SPEEDS.indexOf(courante)+1)%COMBAT_SPEEDS.length];writeCombatSpeed(suivante);return suivante});const[mission]=useState(()=>battleSession?.mission||activeMission);const enemyActionLock=useRef(false),enemyTurnStartedAt=useRef(0),enemyTurnKey=useRef(null),autoActionLock=useRef(false),autoGeneration=useRef(0),rewardFinalizeLock=useRef(false),battleRef=useRef(battle),battleHeartbeat=useRef({key:'',changedAt:Date.now(),recoveries:0});
+ useEffect(()=>{if(!affinityOpen)return;const close=event=>event.key==='Escape'&&setAffinityOpen(false);window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[affinityOpen]);
+ // `battleRef` — deja declaree plus haut et tenue a jour par l'effet de
+ // surveillance — porte le dernier combat COMMITE. Elle remplace la lecture de
+ // `current` a l'interieur des updaters : React peut rejouer un updater pendant
+ // un rendu, et le moteur de combat n'y survit pas — l'action serait recalculee,
+ // avec ses tirages aleatoires, puis jetee.
+ const setBattle=value=>setBattleState(value);const setTarget=value=>setTargetState(value);const setMissionReward=value=>setMissionRewardState(value);
+ useEffect(()=>{if(!battleSession)return;updateBattleSession({battle,target,missionReward})},[battle,target,missionReward]);
+ const start=()=>{rewardFinalizeLock.current=false;enemyActionLock.current=false;autoActionLock.current=false;enemyTurnKey.current=null;autoGeneration.current+=1;setReportOpen(false);setVisualEvents([]);const battleHeroes=HEROES.map(hero=>({...hero,currentStars:getProgress(hero).stars,currentLevel:getProgress(hero).level,skillLevels:skillLevels[hero.id]||{},empreinteSkills:empreinteBonuses(hero,getProgress(hero).empreintes).skills,cleDeVoute:bonusDeCle(hero.id,getProgress(hero).empreintes),uniqueWeapon:getUniqueWeaponForHero(hero)}));setBattle(createBattle(battleSession?.team||team,battleHeroes,stats,optionsDeCombat(mission)));setTarget(null);setError('');setMissionReward(null);setKeyboardSkill(null)};
+ useEffect(()=>{if(mission&&!battle)start()},[]);
+ useEffect(()=>{battleRef.current=battle;const key=battle?`${battle.turn||'none'}|${battle.winner||'none'}|${battle.eventSeq||0}|${battle.wave||1}|${battle.log?.[0]||''}`:'empty';if(battleHeartbeat.current.key!==key)battleHeartbeat.current={...battleHeartbeat.current,key,changedAt:Date.now()};},[battle]);
+ useEffect(()=>{if(!battle||battle.winner||battle.turn)return;setBattle(current=>{if(!current||current.winner||current.turn)return current;try{return nextTurn(current)}catch(error){console.error('Relance du tour interrompue',error);return{...current,turn:null,autoMode:false,log:['Watchdog : calcul du prochain tour interrompu, nouvelle tentative.',...(current.log||[])].slice(0,16)}}})},[battle?.turn,battle?.winner,battle?.eventSeq]);
+ useEffect(()=>{
+   const fingerprint=value=>value?`${value.turn||'none'}|${value.winner||'none'}|${value.eventSeq||0}|${value.wave||1}|${value.log?.[0]||''}`:'empty';
+   const recover=(source='timer')=>{
+     const snapshot=battleRef.current;if(!snapshot||snapshot.winner)return;
+     const turn=snapshot.turn,enemyTurn=String(turn||'').startsWith('e'),actor=turn?[...(snapshot.allies||[]),...(snapshot.enemies||[])].find(unit=>unit.id===turn&&!unit.dead):null;
+     const invalid=Boolean(turn&&!actor),automaticAlly=Boolean(turn&&!enemyTurn&&snapshot.autoMode),elapsed=Date.now()-battleHeartbeat.current.changedAt;
+     const stale=!turn?elapsed>1400:invalid?elapsed>700:enemyTurn?elapsed>2600:automaticAlly?elapsed>2600:false;
+     if(!stale)return;
+     enemyActionLock.current=false;autoActionLock.current=false;enemyTurnKey.current=null;autoGeneration.current+=1;
+     setRelanceAuto(valeur=>valeur+1);
+     setBattle(current=>{
+       if(!current||current.winner)return current;
+       const currentTurn=current.turn,currentEnemy=String(currentTurn||'').startsWith('e'),currentActor=currentTurn?[...(current.allies||[]),...(current.enemies||[])].find(unit=>unit.id===currentTurn&&!unit.dead):null;
+       const canRecover=!currentTurn||!currentActor||currentEnemy||current.autoMode;if(!canRecover)return current;
+       const reset={...current,turn:null,log:[`Watchdog : boucle de combat relancée automatiquement (${source}).`,...(current.log||[])].slice(0,16)};
+       try{return nextTurn(reset)}catch(error){console.error('Watchdog de combat interrompu',error);return{...reset,autoMode:false,log:['Watchdog : erreur isolée, AUTO désactivé et tour réinitialisé.',...(reset.log||[])].slice(0,16)}}
+     });
+     battleHeartbeat.current={key:fingerprint(snapshot),changedAt:Date.now(),recoveries:battleHeartbeat.current.recoveries+1};
+   };
+   const timer=window.setInterval(()=>recover('temporisation'),750),resume=()=>{if(document.visibilityState==='visible')recover('reprise')};
+   window.addEventListener('focus',resume);document.addEventListener('visibilitychange',resume);
+   return()=>{window.clearInterval(timer);window.removeEventListener('focus',resume);document.removeEventListener('visibilitychange',resume)};
+ },[]);
+ useEffect(()=>{
+  const turn=battle?.turn;
+  if(!battle||battle.winner||!String(turn).startsWith('e')){enemyActionLock.current=false;enemyTurnKey.current=null;return;}
+  const turnKey=String(turn);
+  if(enemyTurnKey.current!==turnKey){enemyTurnKey.current=turnKey;enemyTurnStartedAt.current=Date.now();enemyActionLock.current=false;}
+  let disposed=false;
+  const runEnemyAction=(source='normal')=>{
+    if(disposed||enemyActionLock.current)return;
+    enemyActionLock.current=true;
+    setBattle(current=>{
+      if(disposed||!current||current.winner||current.turn!==turn||!String(current.turn).startsWith('e'))return current;
+      const actingEnemy=current.enemies.find(unit=>unit.id===turn&&!unit.dead);
+      if(!actingEnemy)return{...current,turn:null,log:[`Watchdog : tour ennemi invalide réinitialisé.`,...(current.log||[])].slice(0,16)};
+      try{
+        const next=enemyAction(current);
+        if(!next||next===current||next.turn===current.turn)return{...current,turn:null,log:[`Watchdog : ${actingEnemy.name} a été débloqué.`,...(current.log||[])].slice(0,16)};
+        return next;
+      }catch(error){
+        console.error('Action ennemie interrompue',error);
+        return{...current,turn:null,log:[`Watchdog : action de ${actingEnemy.name} interrompue puis réinitialisée.`,...(current.log||[])].slice(0,16)};
+      }
+    });
+    window.setTimeout(()=>{enemyActionLock.current=false},80);
+  };
+  // Le tour ennemi restait fige a 480 ms quelle que soit la vitesse : en x3 un
+  // allie agissait toutes les 187 ms et l'ennemi mettait toujours une demi-
+  // seconde. Le combat avancait par a-coups. Les deux suivent le meme reglage.
+  const normalTimer=window.setTimeout(()=>runEnemyAction('normal'),enemyDelay(speed));
+  const watchdogTimer=window.setTimeout(()=>{enemyActionLock.current=false;runEnemyAction('watchdog')},1600);
+  const resume=()=>{if(document.visibilityState==='visible'&&Date.now()-enemyTurnStartedAt.current>700){enemyActionLock.current=false;runEnemyAction('watchdog')}};
+  document.addEventListener('visibilitychange',resume);window.addEventListener('focus',resume);
+  return()=>{disposed=true;window.clearTimeout(normalTimer);window.clearTimeout(watchdogTimer);document.removeEventListener('visibilitychange',resume);window.removeEventListener('focus',resume)};
+ },[battle?.turn,battle?.winner,speed]);
+ const toggleAuto=()=>{autoGeneration.current+=1;autoActionLock.current=false;enemyActionLock.current=false;setBattle(current=>{if(!current||current.winner)return current;const enabling=!current.autoMode;let next={...current,autoMode:enabling};if(enabling&&!next.turn){try{next=nextTurn(next)}catch(error){console.error('Activation AUTO interrompue',error);return{...next,autoMode:false,turn:null,log:['AUTO indisponible : initialisation du premier tour impossible.',...(next.log||[])].slice(0,16)}}}return next});setError('');setKeyboardSkill(null)};
+ useEffect(()=>{
+   const turn=battle?.turn;if(battle?.autoMode&&!battle?.winner&&!turn){
+     autoActionLock.current=false;
+     const courant=battleRef.current;
+     if(!courant?.autoMode||courant.winner||courant.turn)return;
+     try{setBattle(nextTurn(courant))}
+     catch(error){console.error('Boucle AUTO initiale interrompue',error);
+       setBattle({...courant,autoMode:false,turn:null,log:['AUTO désactivé : impossible de déterminer le premier acteur.',...(courant.log||[])].slice(0,16)})}
+     return;}const active=battle?.autoMode&&!battle?.winner&&turn&&!String(turn).startsWith('e');
+   if(!active){autoActionLock.current=false;return;}
+   const generation=autoGeneration.current;let disposed=false;let timer=0;
+   // Cette garde faisait un `return` sec. Or si elle refusait le tour, aucune
+   // action n'etait jouee, donc `battle.turn` restait identique, donc l'effet
+   // ne se rejouait pas : la boucle mourait sur place, AUTO affiche « ACTIF »
+   // et un allie fige a 100 % de jauge. Mesure : six gels sur huit combats en
+   // vitesse x2. On repousse desormais de 90 ms au lieu de renoncer.
+   const jouer=()=>{
+     if(disposed)return;
+     if(generation!==autoGeneration.current||autoActionLock.current){timer=window.setTimeout(jouer,90);return}
+     autoActionLock.current=true;
+     const courant=battleRef.current;
+     // Les memes gardes qu'avant, mais lues sur l'etat commite plutot que dans
+     // un updater : l'action du moteur n'est jouee qu'une fois, et
+     // `progress('skills')` — un setState de GameProvider — ne part plus
+     // pendant le rendu de cette page.
+     if(!disposed&&generation===autoGeneration.current&&courant?.autoMode&&!courant.winner&&courant.turn===turn){
+       try{
+         const result=performAutoAction(courant,autoSkillPriorities);
+         if(result.error)setBattle({...courant,autoMode:false,log:[`AUTO interrompu : ${result.error}`,...(courant.log||[])].slice(0,16)});
+         else{progress('skills');setBattle(result.battle)}
+       }catch(error){console.error('Action AUTO interrompue',error);
+         setBattle({...courant,autoMode:false,turn:null,log:['AUTO interrompu par sécurité.',...(courant.log||[])].slice(0,16)})}
+     }window.setTimeout(()=>{autoActionLock.current=false},100)};
+   timer=window.setTimeout(jouer,autoDelay(speed));
+   return()=>{disposed=true;window.clearTimeout(timer)};
+ },[battle?.turn,battle?.winner,battle?.autoMode,autoSkillPriorities,speed,relanceAuto]);
+ // Combat plein ecran : le bandeau de profil, les monnaies et la navigation
+ // s'effacent tant qu'un combat tourne. Mesure avant : 170 px de profil et
+ // 82 px de navigation sur 932, soit 27 % de l'ecran occupes par des
+ // informations sans usage au milieu d'un tour — plus le risque de quitter un
+ // combat d'une tape sur la navigation.
+ //
+ // C'est la PAGE qui le declare, pas la mise en page : `battleInProgress` du
+ // contexte lit `battleSession.battle`, or `setBattle` de cet ecran n'ecrit
+ // que dans l'etat local et ne synchronise jamais la session. Il vaut donc
+ // faux pendant tout le combat. Corriger la synchronisation toucherait a la
+ // reprise de combat sauvegardee : c'est un autre chantier, consigne dans le
+ // rapport.
+ useEffect(()=>{
+   const actif=Boolean(battle&&!battle.winner);
+   document.body.classList.toggle('combat-plein-ecran',actif);
+   return()=>document.body.classList.remove('combat-plein-ecran');
+ },[Boolean(battle),battle?.winner]);
+ useEffect(()=>{
+   const incoming=battle?.lastEvents||[];if(!incoming.length)return;
+   setVisualEvents(current=>{const known=new Set(current.map(event=>event.id));return[...current,...incoming.filter(event=>!known.has(event.id))].slice(-12)});
+   const timer=setTimeout(()=>setVisualEvents(current=>current.filter(event=>!incoming.some(next=>next.id===event.id))),1150);
+   return()=>clearTimeout(timer);
+ },[battle?.eventSeq]);
+ useEffect(()=>{if(battle?.winner==='ally'&&battle?.mythic&&battle.wave<battle.totalWaves){setBattle(value=>advanceMythicWave(value));setTarget(null)}},[battle?.winner,battle?.wave]);
+ useEffect(()=>{if(battle?.winner&&!battle.rewarded&&!rewardFinalizeLock.current&&!(battle.mythic&&battle.winner==='ally'&&battle.wave<battle.totalWaves)){rewardFinalizeLock.current=true;setBattle(value=>value?{...value,rewarded:true}:value);recordBattleResult?.(battle,mission,Boolean(battle.autoMode));progress('battle');const summonerXp=battle.winner==='ally'?(mission?.mythic?55:mission?.expedition?20:mission?35:25):10;grantSummonerXp(summonerXp);if(battle.winner==='ally'){const baseXp=mission?.mythic?Math.round(140+mission.mythicLevel*12):mission?.expedition?0:mission?.raid?Math.round(90*mission.scale):mission?0:240,xpResult=baseXp?campaignXp(baseXp,teamPower(battleSession?.team||team),mission?.recommended||1):{xp:0,factor:1},xp=xpResult.xp;if(xp)grantXp(battleSession?.team||team,xp);if(mission){const dead=battle.allies.filter(unit=>unit.dead).length,stars=dead===0?3:dead===1?2:1,rewards=mission.defi?finishDefiMission(mission,battle):mission.worldBoss?finishWorldBossMission(mission):mission.mythic?finishMythicMission(mission,battle):mission.expedition?finishExpeditionMission(mission):mission.raid?finishRaidMission(mission,stars,battle):finishCampaignMission(mission,stars,battleSession?.team||team);setMissionReward({stars,rewards,championXp:mission.expedition&&rewards.rewardType==='xp'?rewards.amount:(rewards.championXp??xp),summonerXp,xpFactor:rewards.xpFactor??xpResult.factor})}}
+  // Le Défi de la semaine s'enregistre même sur une défaite : le score est la
+  // part de points de vie arrachés, pour qu'un joueur de début de campagne
+  // puisse se comparer à ses amis sans avoir à gagner.
+  else if(mission?.defi){const rewards=finishDefiMission(mission,battle);
+   setMissionReward({stars:0,rewards,championXp:0,summonerXp,xpFactor:1});}
+ }},[battle?.winner,battle?.rewarded]);
+ const actor=battle?.allies?.find(unit=>unit.id===battle.turn),livingEnemies=(battle?.enemies||[]).filter(unit=>!unit.dead),selectedEnemy=livingEnemies.find(unit=>unit.id===target),autoEnemy=livingEnemies[0],effectiveEnemy=selectedEnemy||autoEnemy;
+ const eventsByTarget=visualEvents.reduce((groups,event)=>({...groups,[event.targetId]:[...(groups[event.targetId]||[]),event]}),{});
+ const skillUnlocked=(unit,index)=>index<2||unit.rarity>=4||unit.currentStars>=4;
+ const skillAffinity=skill=>{if(!actor||!['enemy','allEnemies'].includes(skill.target))return{key:'ally',label:'SANS EFFET',detail:'Soin, bouclier ou amélioration alliée',icon:'◆'};if(skill.target==='allEnemies'){const counts=areaAffinity(actor.element,livingEnemies);return{key:'area',label:`${counts.effective} efficace · ${counts.neutral} neutre · ${counts.weak} inefficace`,detail:'Calculée séparément pour chaque cible',icon:'◈'}};if(!effectiveEnemy)return{key:'neutral',label:'AUCUNE CIBLE',detail:'Aucun ennemi vivant',icon:'●'};const relation=affinity(actor.element,effectiveEnemy.element,battle?.difficulte);return{...relation,detail:detailAffinite(relation)}};
+ const cast=index=>{const skill=actor?.skills[index],unlocked=actor&&skillUnlocked(actor,index);if(!unlocked||actor.cooldowns[index]>0)return;const result=castSkill(battle,index,target||effectiveEnemy?.id);if(result.error)return setError(result.error);progress('skills');setError('');setTarget(null);setKeyboardSkill(null);setBattle(result.battle)};
+ const selectedSkillIndex=keyboardSkill;
+ const selectedSkill=actor?.skills?.[selectedSkillIndex];
+ const isSingleEnemySkill=selectedSkill?.target==='enemy';
+ const isSingleAllySkill=selectedSkill?.target==='ally';
+ const keyboardTargets=isSingleAllySkill?(battle?.allies||[]).filter(unit=>!unit.dead&&(selectedSkill?.effect!=='guardianLink'||unit.id!==actor?.id)):(battle?.enemies||[]).filter(unit=>!unit.dead);
+ const cycleTarget=direction=>{
+   if(!actor||!selectedSkill||(!isSingleEnemySkill&&!isSingleAllySkill)||!keyboardTargets.length)return;
+   const currentIndex=keyboardTargets.findIndex(unit=>unit.id===target),fallback=direction>0?-1:0;
+   const nextIndex=(currentIndex<0?fallback:currentIndex)+direction;
+   const normalized=(nextIndex+keyboardTargets.length)%keyboardTargets.length;
+   setTarget(keyboardTargets[normalized].id);
+ };
+ useEffect(()=>{
+   const onKeyDown=event=>{
+     const tag=document.activeElement?.tagName?.toLowerCase();
+     if(['input','textarea','select'].includes(tag)||document.activeElement?.isContentEditable)return;
+     if(!battle||battle.winner||!actor||affinityOpen)return;
+     const key=event.key.toLowerCase();
+     if(['1','2','3'].includes(key)){
+       event.preventDefault();const index=Number(key)-1,skill=actor.skills[index];if(!skill)return;
+       const unlocked=skillUnlocked(actor,index),cooldown=actor.cooldowns[index]||0;
+       if(!unlocked){setError(`Compétence ${index+1} verrouillée : évolution 4★ requise.`);return;}
+       if(cooldown>0){setError(`${skill.name} est en recharge : ${cooldown} tour(s).`);return;}
+       if(keyboardSkill===index){cast(index);return;}
+       setKeyboardSkill(index);setError('');
+       if(skill.target==='enemy'&&!battle.enemies.some(unit=>unit.id===target&&!unit.dead))setTarget(battle.enemies.find(unit=>!unit.dead)?.id||null);
+       if(skill.target==='ally'&&!battle.allies.some(unit=>unit.id===target&&!unit.dead&&(skill.effect!=='guardianLink'||unit.id!==actor.id))){const weakest=[...battle.allies].filter(unit=>!unit.dead&&(skill.effect!=='guardianLink'||unit.id!==actor.id)).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];setTarget(weakest?.id||null);}
+       return;
+     }
+     if(key==='q'||key==='d'){
+       if(selectedSkillIndex==null)return;
+       if(!isSingleEnemySkill&&!isSingleAllySkill)return;
+       event.preventDefault();cycleTarget(key==='d'?1:-1);return;
+     }
+     if((key==='enter'||key===' ')&&keyboardSkill!=null){event.preventDefault();cast(keyboardSkill);}
+     if(key==='escape'&&keyboardSkill!=null){setKeyboardSkill(null);setError('');}
+   };
+   window.addEventListener('keydown',onKeyDown);return()=>window.removeEventListener('keydown',onKeyDown);
+ },[battle,actor,target,keyboardSkill,affinityOpen]);
+ if(!battle)return <section className="hero"><div>{mission?mission.icon:'⚔️'}</div><h2>{mission?`${mission.continentName} · ${mission.name}`:'Arène des Échos'}</h2><p>{mission?`${mission.difficultyName} · Puissance recommandée ${mission.recommended}`:'Prépare ton escouade.'}</p><button onClick={start}>Lancer le combat</button></section>;
+ const activityInfo=mission?.worldBoss?{page:'worldboss',label:'Retour aux Adversaires légendaires'}:mission?.mythic?{page:'mythic',label:'Retour au Mythic+'}:mission?.raid?{page:'raids',label:'Retour aux Raids'}:mission?.expedition?{page:'expeditions',label:'Retour aux Expéditions'}:mission?{page:'campaign',label:'Retour à la Campagne'}:{page:'home',label:'Retour à l’accueil'};
+ const replayBattle=()=>start();
+ const returnToActivity=()=>{sessionStorage.setItem('azerune-page',activityInfo.page);abandonBattle();setPage?.(activityInfo.page)};
+ const nextMission=(()=>{
+   if(!mission||battle?.winner!=='ally'||!battle?.rewarded||!missionReward)return null;
+   if(mission.worldBoss)return null;
+   if(mission.mythic){const next=Number(mission.mythicLevel)+1;if(next>30||(mythicProgress?.completed||0)<Number(mission.mythicLevel))return null;return createMythicMission(next)}
+   if(mission.raid){const next=Number(mission.raidLevel)+1;if(next>10||(raidProgress?.completed?.[mission.raidId]||0)<Number(mission.raidLevel))return null;return createRaidMission(mission.raidId,next)}
+   if(mission.expedition){const next=Number(mission.expeditionLevel)+1;if(next>10||(expeditionProgress?.completed?.[mission.expeditionId]||0)<Number(mission.expeditionLevel))return null;return createExpeditionMission(mission.expeditionId,next)}
+   const continent=CONTINENTS.find(value=>value.id===mission.continentId),stageIndex=continent?.stages.findIndex(value=>String(value.id)===String(mission.stageId))??-1;if(!continent||stageIndex<0||stageIndex>=continent.stages.length-1)return null;const difficulty=DIFFICULTIES.find(value=>value.id===mission.difficultyId);return difficulty?createMission(difficulty,continent,continent.stages[stageIndex+1]):null;
+ })();
+ const startNextMission=()=>{if(!nextMission)return;const members=battleSession?.team||team,result=prepareNextMission(nextMission,members);if(!result?.ok)return setError(result?.message||'Mission suivante indisponible.');sessionStorage.setItem('azerune-page',activityInfo.page);setPage?.(activityInfo.page)};
+ const recent=(battle.log||[]).slice(0,5);
+ const formatCombatValue=value=>Math.max(0,Math.round(value||0)).toLocaleString('fr-FR');
+ const combatReport=battle.allies.map(unit=>({unit,stats:{damage:0,healing:0,mitigation:0,...(battle.combatStats?.[unit.id]||{})}}));
+ const combatTotals=combatReport.reduce((total,row)=>({damage:total.damage+row.stats.damage,healing:total.healing+row.stats.healing,mitigation:total.mitigation+row.stats.mitigation}),{damage:0,healing:0,mitigation:0});
+ const leader=key=>[...combatReport].sort((a,b)=>b.stats[key]-a.stats[key])[0];
+ return <section className={`battle-screen-compact ${battle.autoMode?'auto-mode-active':''} ${vfxEnabled?'':'no-vfx'} ${battle.allies.length>=4?'battle-format-4v4':''}`}><div className="battle-hud">
+    <div className="hud-mission"><small>{mission?.mythic?'MYTHIC+':mission?.raid?'RAID':mission?.expedition?'EXPÉDITION':mission?.worldBoss?'BOSS DE MONDE':mission?.defi?'DÉFI DE LA SEMAINE':mission?'CAMPAGNE':'ENTRAÎNEMENT'}</small><b>{mission?.name||'Combat libre'}</b>
+      {battle.regle&&<em title={battle.regle.summary}>{battle.regle.icon} {battle.regle.name}</em>}</div>
+    <div className="hud-commandes">
+      <button type="button" className={`hud-bouton ${battle.autoMode?'actif':''}`} onClick={toggleAuto}
+        aria-pressed={Boolean(battle.autoMode)} title="Combat automatique" aria-label="Combat automatique">
+        <span>{battle.autoMode?'⏸':'▶'}</span><small>AUTO</small></button>
+      <button type="button" className="hud-bouton" onClick={cycleSpeed} title="Vitesse du combat automatique" aria-label="Vitesse du combat automatique">
+        <span>⏩</span><small>x{speed}</small></button>
+      <button type="button" className={`hud-bouton ${vfxEnabled?'actif':''}`} onClick={toggleVfx}
+        aria-pressed={vfxEnabled} title="Effets visuels des sorts" aria-label="Effets visuels des sorts">
+        <span>✨</span><small>{vfxEnabled?'EFFETS':'COUPÉS'}</small></button>
+      <button type="button" className="hud-bouton" onClick={()=>setAffinityOpen(true)}
+        aria-expanded={affinityOpen} title="Forces et faiblesses" aria-label="Forces et faiblesses">
+        <span>⚖️</span><small>AFFINITÉS</small></button>
+      <button type="button" className="hud-bouton hud-quitter" onClick={()=>setAbandonConfirm(true)}
+        title="Quitter le combat" aria-label="Quitter le combat"><span>✕</span><small>QUITTER</small></button>
+    </div>
+  </div>
+  {battle.mythic&&<div className="mythic-wave-bar"><b>🗝️ Mythic+ {mission.mythicLevel}</b><span>Vague {battle.wave}/{battle.totalWaves}</span><span className={`mythic-sand ${mythicCollapsed(battle.mythicState)?'collapsed':mythicSandLeft(battle.mythicState)<=15?'low':''}`}>{mythicCollapsed(battle.mythicState)?`💥 Effondrement +${mythicOvertime(battle.mythicState)}`:`⌛ ${mythicSandLeft(battle.mythicState)} tours`}</span><em>{mission.affixes.length?mission.affixes.map(a=>`${a.icon} ${a.name}`).join(' · '):'Aucun affixe'}</em></div>}
+  {mission?.raid&&battle.raidState&&<div className={`raid-mechanic-bar compact-raid-bar ${battle.raidState.charges>=battle.raidState.maxCharges-2?'danger':''}`}><div><small>🔥 CŒUR INCANDESCENT</small><b>{battle.raidState.charges}/{battle.raidState.maxCharges}</b></div><div className="raid-charge-track"><i style={{width:`${Math.min(100,battle.raidState.charges/battle.raidState.maxCharges*100)}%`}}/></div><p>{battle.raidState.failedMechanic?'Éruption déclenchée':battle.raidState.emberRespawnAt!=null?`Élémentaire vaincu · retour dans ${Math.max(0,battle.raidState.emberRespawnAt-battle.raidState.championActions)} action(s)`:battle.raidState.charges>=Math.ceil(battle.raidState.maxCharges*.6)?'PRIORITÉ : détruis l’Élémentaire':'La mort de l’Élémentaire retire 4 charges'}</p></div>}
+  <div className="battle-main-grid"><main className="battle-arena-compact"><div className="battle-side enemy-side compact-side"><h3>Ennemis <small>{livingEnemies.length}/{battle.enemies.length}</small></h3><div className="grid units compact-units">{battle.enemies.map(unit=><Unit key={unit.id} unit={unit} active={battle.turn===unit.id} selected={target===unit.id} automatic={!selectedEnemy&&autoEnemy?.id===unit.id} events={eventsByTarget[unit.id]||[]} vfxEnabled={vfxEnabled} onClick={()=>setTarget(unit.id)}/>)}</div></div><div className="battle-side ally-side compact-side"><h3>Escouade <small>{battle.allies.filter(unit=>!unit.dead).length}/{battle.allies.length}</small></h3><div className="grid units compact-units">{battle.allies.map(unit=><Unit key={unit.id} unit={unit} active={battle.turn===unit.id} selected={target===unit.id} events={eventsByTarget[unit.id]||[]} vfxEnabled={vfxEnabled} enemies={battle.enemies} allies={battle.allies} onClick={()=>setTarget(unit.id)}/>)}</div></div></main>
+  <aside className="recent-log" aria-label="Journal de combat"><h3>JOURNAL DE COMBAT</h3>{recent.map((line,index)=><p key={index}>› {line}</p>)}</aside></div>
+  {abandonConfirm&&<div className="battle-result-backdrop" onClick={()=>setAbandonConfirm(false)}>
+     <div className="battle-result battle-abandon" role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}>
+       <h2>Quitter le combat ?</h2>
+       <p>La progression de ce combat sera perdue et les récompenses ne seront pas versées.</p>
+       <div className="battle-result-actions">
+         <button className="secondary" onClick={()=>setAbandonConfirm(false)}>Continuer le combat</button>
+         <button className="quest-claim-button" onClick={returnToActivity}>{activityInfo.label}</button>
+       </div></div></div>}
+   {battle.winner?<div className="battle-result-backdrop"><div className="battle-result battle-result-modal" role="dialog" aria-modal="true"><div className="result-heading"><div><h2>{battle.winner==='ally'?'VICTOIRE':'DÉFAITE'}</h2>{missionReward&&<span className="result-stars">{'★'.repeat(missionReward.stars)}{'☆'.repeat(3-missionReward.stars)}</span>}</div></div>{missionReward?<div className="mission-result compact-result"><p className="result-summary">{missionReward.rewards?.farm?`Mission rejouée · record ${missionReward.rewards.previousStars||missionReward.stars}★`:missionReward.stars===3?'Victoire parfaite.':missionReward.stars===2?'Victoire avec une perte.':'Victoire difficile.'}</p><div className="reward-grid">{mission?.expedition?<div className="reward-line"><small>Expédition</small><b>{missionReward.rewards.rewarded?`+${missionReward.rewards.amount} ${missionReward.rewards.rewardType}`:'Entraînement'}</b></div>:<><div className="reward-line"><small>{missionReward.rewards?.farm?'Or de farm':'Ressources'}</small><b>🪙 +{missionReward.rewards.gold||0}{!missionReward.rewards?.farm&&<> · 💎 +{missionReward.rewards.gems||0}</>}</b></div><div className="reward-line xp-line"><small>Expérience</small><b>👥 +{missionReward.championXp}</b><b>🔮 +{missionReward.summonerXp}</b></div></>}{missionReward.rewards?.farm&&<div className={`reward-line farm-loot-line ${missionReward.rewards.loot?'found':'missed'}`}><small>Butin répétable</small>{missionReward.rewards.loot?<LootItemDetails item={missionReward.rewards.loot} label="Butin répétable"/>:<b>Aucun équipement trouvé</b>}</div>}{missionReward.rewards?.mythicTier&&<div className={`reward-line mythic-tier-line tier-${missionReward.rewards.mythicTier.key}`}><small>SABLIER D’AZERUNE</small><b>{missionReward.rewards.mythicTier.icon} {missionReward.rewards.mythicTier.label}</b><span>{missionReward.rewards.mythicTier.turns} tours / {missionReward.rewards.mythicTier.budget} · butin ×{missionReward.rewards.mythicTier.rewardFactor}</span></div>}{missionReward.rewards?.uniqueRelic?.ok&&<div className="reward-line unique-relic-drop"><small>RELIQUE UNIQUE DÉCOUVERTE</small><b>{missionReward.rewards.uniqueRelic.relic.icon} {missionReward.rewards.uniqueRelic.relic.name}</b><span>Placée dans l’Inventaire.</span></div>}{missionReward.rewards?.progressionGift&&(()=>{const gift=missionReward.rewards.progressionGift,isFireproof=gift.setId==='fireproof'&&mission?.continentId==='coeur-ignifuge';return <div className="reward-line progression-gift"><small>{isFireproof?'PRÉPARATION CŒUR-MONDE':'ÉQUIPEMENT PÉDAGOGIQUE'}</small><b>{gift.icon} {gift.name}</b><span>{isFireproof?'Pièce Ignifuge garantie':'Récompense de première victoire'}</span></div>})()}{missionReward.rewards.loot&&!missionReward.rewards?.farm&&<div className={`reward-line quality-${missionReward.rewards.loot.quality}`}><small>Butin</small><LootItemDetails item={missionReward.rewards.loot}/></div>}</div></div>:<p className="reward-finalizing">{battle.winner==='ally'&&mission?'Calcul des récompenses en cours…':battle.winner==='ally'?'+240 XP pour chaque champion.':'Aucune récompense.'}</p>}<div className={`battle-result-actions ${nextMission&&battle.winner==='ally'?'has-next':''}`}><button className="combat-report-button" onClick={()=>setReportOpen(true)}>📖 Rapport</button><button className="secondary" onClick={replayBattle}>Rejouer</button><button className="secondary" onClick={returnToActivity}>{activityInfo.label}</button>{battle.winner==='ally'&&nextMission&&<button className="next-mission-button" onClick={startNextMission}>{mission.mythic||mission.raid||mission.expedition?'Niveau suivant':'Mission suivante'} →</button>}</div></div></div>:actor?<div className="battle-command-dock"><div className="dock-title"><div><small>TOUR DE</small><b>{actor.icon} {actor.name}</b></div><span className="keyboard-target-hint">{selectedSkill?.target==='ally'?`Q ← Allié : ${battle.allies.find(unit=>unit.id===target&&!unit.dead)?.name||'auto'} → D`:selectedSkill?.target==='enemy'?`Q ← Cible : ${effectiveEnemy?effectiveEnemy.name:'aucune'} → D`:`Cible : ${effectiveEnemy?effectiveEnemy.name:'aucune'}`}</span></div><div className="keyboard-help"><span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Sort</span><span><kbd>Q</kbd><kbd>D</kbd> Cible</span><span><kbd>Entrée</kbd> Lancer</span></div><div className="compact-skills">{actor.skills.map((skill,index)=>{const unlocked=skillUnlocked(actor,index),relation=skillAffinity(skill),cooldown=actor.cooldowns[index]||0;return <div key={skill.name} className={`compact-skill-wrap ${keyboardSkill===index?'keyboard-selected':''}`}><button className={`compact-skill affinity-${relation.key} ${!unlocked?'locked-skill':''}`} disabled={!unlocked||cooldown>0} onClick={event=>{event.stopPropagation();cast(index)}}><span className="skill-key-badge">{index+1}</span><b>{unlocked?skill.icon:'🔒'}</b><strong>{skill.name}</strong><em>{!unlocked?'4★ requis':cooldown?`${cooldown} CD`:'Disponible'}</em></button><SkillTooltip actor={actor} skill={skill} index={index} relation={relation} unlocked={unlocked} onGuide={setGuideHero} defense={effectiveEnemy?.def||0} difficulte={battle?.difficulte||null}/></div>})}</div></div>:<p className="enemy-thinking">L’ennemi prépare son action...</p>}
+  {reportOpen&&battle.winner&&<div className="combat-report-backdrop" role="presentation" onClick={()=>setReportOpen(false)}><section className="combat-report-modal" role="dialog" aria-modal="true" aria-labelledby="combat-report-title" onClick={event=>event.stopPropagation()}><header><div><small>FIN DU COMBAT</small><h2 id="combat-report-title">📖 Rapport de combat</h2></div><button onClick={()=>setReportOpen(false)} aria-label="Fermer">✕</button></header><div className="combat-report-leaders"><span>⚔️ <small>Meilleurs dégâts</small><b>{leader('damage')?.unit.name} · {formatCombatValue(leader('damage')?.stats.damage)}</b></span><span>💚 <small>Meilleurs soins</small><b>{leader('healing')?.unit.name} · {formatCombatValue(leader('healing')?.stats.healing)}</b></span><span>🛡️ <small>Meilleure mitigation</small><b>{leader('mitigation')?.unit.name} · {formatCombatValue(leader('mitigation')?.stats.mitigation)}</b></span></div><div className="combat-report-grid">{combatReport.map(({unit,stats})=><article key={unit.id}><div className="combat-report-identity"><span>{unit.icon}</span><div><b>{unit.name}</b><small>{unit.role}</small></div></div><dl><div><dt>⚔️ Dégâts</dt><dd>{formatCombatValue(stats.damage)}</dd></div><div><dt>💚 Soins</dt><dd>{formatCombatValue(stats.healing)}</dd></div><div><dt>🛡️ Mitigation</dt><dd>{formatCombatValue(stats.mitigation)}</dd></div></dl><details><summary>Détails</summary><p>Dégâts critiques : <b>{formatCombatValue(stats.criticalDamage)}</b></p><p>Dégâts périodiques : <b>{formatCombatValue(stats.dotDamage)}</b></p><p>Invocation : <b>{formatCombatValue(stats.summonDamage)}</b></p><p>Arme unique : <b>{formatCombatValue(stats.weaponDamage)}</b></p><p>Soins directs : <b>{formatCombatValue(stats.directHealing)}</b></p><p>Soins périodiques : <b>{formatCombatValue(stats.periodicHealing)}</b></p><p>Vol de vie : <b>{formatCombatValue(stats.lifestealHealing)}</b></p><p>Boucliers absorbés : <b>{formatCombatValue(stats.shieldMitigation)}</b></p><p>Redirection : <b>{formatCombatValue(stats.redirectMitigation)}</b></p><p>Réduction personnelle : <b>{formatCombatValue(stats.personalMitigation)}</b></p></details></article>)}</div><footer><span>⚔️ {formatCombatValue(combatTotals.damage)}</span><span>💚 {formatCombatValue(combatTotals.healing)}</span><span>🛡️ {formatCombatValue(combatTotals.mitigation)}</span></footer></section></div>}
+  {error&&<p className="error battle-error">{error}</p>}
+  {affinityOpen&&<div className="affinity-modal-backdrop" role="presentation" onClick={()=>setAffinityOpen(false)}><aside className="affinity-popover affinity-popover-safe" role="dialog" aria-modal="true" aria-labelledby="affinity-title" onClick={event=>event.stopPropagation()}><div className="affinity-popover-heading"><h3 id="affinity-title">FORCES ET FAIBLESSES</h3><button type="button" onClick={()=>setAffinityOpen(false)} aria-label="Fermer">✕</button></div><div className="affinity-cycle"><span>🔥 Feu</span><b>›</b><span>🌿 Nature</span><b>›</b><span>💧 Eau</span><b>›</b><span>🔥 Feu</span></div><div className="affinity-cycle"><span>🔮 Arcane</span><b>›</b><span>🌑 Ombre</span><b>›</b><span>✨ Lumière</span><b>›</b><span>🔮 Arcane</span></div><div className="affinity-explanations"><small><b className="effective-text">▲ Efficace</b><span>{detailAffinite(affinity('Feu','Nature',battle?.difficulte))}</span></small><small><b>● Neutre</b><span>Dégâts ×1,00</span></small><small><b className="weak-text">▼ Inefficace</b><span>{detailAffinite(affinity('Nature','Feu',battle?.difficulte))}</span></small></div></aside></div>}
+ </section>;
+}

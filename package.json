@@ -1,12 +1,21 @@
 {
   "name": "chroniques-azerune",
   "private": true,
-  "version": "1.18.1",
+  "version": "1.84.0",
   "type": "module",
   "scripts": {
+    "predev": "node outils/verifier-deps.mjs",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "mesures": "vitest run --config vitest.mesures.config.js",
+    "sprites": "node outils/generer-sprites.mjs",
+    "decouper": "node outils/decouper-feuille.mjs",
+    "importer": "node outils/importer-champion.mjs",
+    "verifier-deps": "node outils/verifier-deps.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
@@ -15,13 +24,17 @@
     "@capacitor/share": "^8.0.1",
     "@capawesome/capacitor-file-picker": "^8.0.4",
     "lucide-react": "^0.468.0",
+    "pixi.js": "^8.20.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.39.5",
+    "globals": "^17.12.0",
     "typescript": "^7.0.2",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^2.1.9"
   }
 }

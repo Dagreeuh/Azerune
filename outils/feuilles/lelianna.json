@@ -1,0 +1,82 @@
+{
+  "champion": "Lelianna",
+  "heroId": 12,
+  "source": "assets-source/lelianna.png",
+  "hauteurCible": 160,
+  "animations": [
+    {
+      "nom": "repos",
+      "rangee": 0,
+      "xMin": 400
+    },
+    {
+      "nom": "marche",
+      "rangee": 1
+    },
+    {
+      "nom": "attaque",
+      "rangee": 2,
+      "xMax": 1200
+    },
+    {
+      "nom": "soin",
+      "rangee": 3
+    },
+    {
+      "nom": "mort",
+      "rangee": 5,
+      "xMin": 600,
+      "minLargeur": 90
+    },
+    {
+      "nom": "portrait",
+      "rangee": 5,
+      "xMax": 600
+    },
+    {
+      "nom": "effets",
+      "rangee": 4,
+      "minLargeur": 60,
+      "echelle": 1
+    }
+  ],
+  "sorts": [
+    {
+      "anim": "attaque",
+      "effets": [
+        {
+          "source": "effets",
+          "index": 1,
+          "ou": "projectile"
+        }
+      ]
+    },
+    {
+      "anim": "soin",
+      "effets": [
+        {
+          "source": "effets",
+          "index": 2,
+          "ou": "cible"
+        }
+      ]
+    },
+    {
+      "anim": "attaque",
+      "coups": 3,
+      "effets": [
+        {
+          "source": "effets",
+          "index": 4,
+          "ou": "lanceur"
+        },
+        {
+          "source": "effets",
+          "index": 0,
+          "ou": "cible"
+        }
+      ]
+    }
+  ],
+  "attente": 3
+}

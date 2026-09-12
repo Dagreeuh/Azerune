@@ -1,0 +1,12 @@
+{
+ "12": {
+  "nom": "lelianna",
+  "fichier": "/sprites/champions/lelianna.png",
+  "description": "/sprites/champions/lelianna.json"
+ },
+ "15": {
+  "nom": "hicho",
+  "fichier": "/sprites/champions/hicho.png",
+  "description": "/sprites/champions/hicho.json"
+ }
+}
