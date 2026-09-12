@@ -2118,3 +2118,97 @@ mythique ni des défis, qui déclarent leurs éléments séparément.
 
 Aucune donnée n'a été modifiée. Redistribuer les éléments change le jeu — les
 options ne se valent pas et la décision appartient au joueur.
+
+### 1.81.0 (suite) — Redistribution des éléments
+
+Décision du joueur : garder l'identité de chaque zone, mais faire varier les
+éléments à l'intérieur. Appliqué.
+
+Chaque zone porte son élément dominant sur **quatre paliers sur sept, gardien
+compris** ; deux paliers portent un second élément, un dernier palier un
+troisième. Les tables sont écrites en toutes lettres dans `PALIERS_ELEMENTS`
+plutôt que dérivées d'un motif : elles se relisent, et un test vérifie la
+répartition.
+
+| Zone | Paliers 1 → 7 |
+|---|---|
+| Valebrume | Nat Nat **Eau** Nat **Omb** **Eau** Nat |
+| Forges de Khaz-Drum | Feu Feu **Arc** Feu **Omb** **Arc** Feu |
+| Bastion de Pierre | Nat Nat **Arc** Nat **Eau** **Arc** Nat |
+| Sanctuaire de l'Œil Clair | Lum Lum **Arc** Lum **Eau** **Arc** Lum |
+| Arène des Lames | Feu Feu **Omb** Feu **Eau** **Omb** Feu |
+| Cimes du Vent | Arc Arc **Eau** Arc **Nat** **Eau** Arc |
+| Temple Inébranlable | Lum Lum **Eau** Lum **Nat** **Eau** Lum |
+| Crypte Sanglante | Omb Omb **Eau** Omb **Arc** **Eau** Omb |
+| Rempart du Dernier Serment | Lum Lum **Omb** Lum **Eau** **Omb** Lum |
+| Cœur Ignifugé | Feu Feu **Arc** Feu **Eau** **Arc** Feu |
+
+### Ce que ça change, mesuré
+
+| | Feu | Lumière | Nature | Arcane | Ombre | Eau |
+|---|---|---|---|---|---|---|
+| Avant | 30 % | 30 % | 20 % | 10 % | 10 % | **0 %** |
+| Après | 17 % | 17 % | 14 % | 19 % | 14 % | **19 %** |
+
+Avantage net par élément de champion, sur l'ensemble de la campagne :
+
+| Élément | Champions | Avant | Après |
+|---|---|---|---|
+| Feu | 5 | +20 pts | −4 pts |
+| Ombre | 5 | +20 pts | −1 pt |
+| Eau | 5 | +10 pts | +3 pts |
+| Lumière | 4 | 0 pt | +4 pts |
+| Arcane | 5 | −20 pts | −3 pts |
+| **Nature** | **8** | **−30 pts** | **+1 pt** |
+
+L'amplitude entre le champion le mieux et le moins bien servi passe de
+**50 points à 8 points**. Les huit champions Nature — le groupe le plus
+nombreux du roster — cessent d'être structurellement les pires.
+
+### Ce que ça change en jeu
+
+Au palier 5 de la Crypte Sanglante, désormais Arcane alors que le reste de la
+zone est Ombre, au point de bascule de difficulté :
+
+| Élément du champion | Relation | Victoires |
+|---|---|---|
+| Lumière | EFFICACE | **20/20** |
+| Feu · Nature · Eau · Arcane · Ombre | NEUTRE / INEFFICACE | **0/20** |
+
+**Une seule équipe ne traverse plus une zone entière.** C'est l'effet
+recherché, et c'est aussi un durcissement réel : un joueur au roster étroit
+rencontrera des murs là où il n'en avait pas. La contrepartie est que
+composer son équipe redevient une décision, sept fois par zone au lieu d'une.
+
+### Précaution de lecture
+
+Dans le tableau du régime serré, la colonne « écart d'actions » ne veut rien
+dire pour les lignes qui perdent : une défaite met fin au combat aussi sûrement
+qu'une victoire, et un combat perdu plus vite affiche donc moins d'actions.
+Seule la colonne « victoires » est interprétable là.
+
+### Une erreur d'outillage, attrapée par l'exécution
+
+Mon remplacement automatique a transformé `elementDuPalier(id,n,element)` en
+un appel qui se référençait lui-même — cinq substitutions au lieu des quatre
+attendues. Le `vite build` est passé sans rien voir : il ne fait qu'assembler,
+il n'exécute pas le module. C'est la mesure, qui charge vraiment les données,
+qui a renvoyé `Cannot access 'elementPalier' before initialization`.
+**Compiler n'est pas exécuter** — et j'avais remarqué le compte anormal sans
+en tirer les conséquences avant d'y être forcé.
+
+### Couverture
+
+`tests/campagne.elements.test.js` : 8 tests, **6 mutants sur 6 tués**. Sont
+verrouillés : les six éléments présents, aucun au-dessus de 25 % ni sous 10 %,
+la dominante de chaque zone sur au moins quatre paliers, le gardien portant
+l'élément de sa zone, au moins deux éléments par zone, un seul élément par
+palier, et l'amplitude d'avantage net bornée à 8 points.
+
+Suite complète : **1 781 tests**, 83 fichiers.
+
+### Ce qui reste du chantier
+
+L'étape 4 du plan — faire passer les 28 écritures directes `.debuffs.X=` par
+`debuff()` — n'est pas entamée. C'est la même racine : une règle centrale
+existe, la moitié du code ne passe pas par elle.

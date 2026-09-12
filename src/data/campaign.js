@@ -106,8 +106,39 @@ const ZONES=[
  ['rempart-endurance','Rempart du Dernier Serment','🔷','49-54',['Protection','Endurance'],['protection','endurance'],'Lumière',['Gardien d’égide','Prêtre du rempart','Automate protecteur'],'Aegor, Bouclier des Âges','🛡️'],
  ['coeur-ignifuge','Cœur Ignifugé','🧯','55-60',['Ignifuge'],['fireproof'],'Feu',['Gardien ignifugé','Alchimiste des cendres','Drake de braise'],'Pyraxis, Épreuve du Cœur-Monde','🐲']
 ];
+// Élément par palier — la variété À L'INTÉRIEUR d'une zone.
+//
+// Avant : une zone = un élément, pour ses 21 combats. Le joueur composait son
+// équipe une fois en entrant et n'avait plus aucune décision à prendre ensuite.
+// Pire : aucun ennemi de campagne n'était de l'élément Eau, si bien que les
+// huit champions Nature du roster — le groupe le plus nombreux — ne pouvaient
+// être efficaces NULLE PART, Nature ne battant que l'Eau.
+//
+// Chaque zone garde son élément dominant sur quatre paliers sur sept, gardien
+// compris : l'identité du lieu ne bouge pas. Deux paliers portent un second
+// élément, un dernier palier un troisième. Les tables sont écrites en toutes
+// lettres plutôt que dérivées d'un motif : elles se relisent, et un test
+// vérifie que la répartition globale reste équilibrée.
+//
+// Mesuré dans Audit/mesures/affinite-campagne.test.js.
+const PALIERS_ELEMENTS={
+ 'valebrume':          ['Nature','Nature','Eau','Nature','Ombre','Eau','Nature'],
+ 'khazdrum':           ['Feu','Feu','Arcane','Feu','Ombre','Arcane','Feu'],
+ 'bastion-pierre':     ['Nature','Nature','Arcane','Nature','Eau','Arcane','Nature'],
+ 'oeil-clair':         ['Lumière','Lumière','Arcane','Lumière','Eau','Arcane','Lumière'],
+ 'arene-lames':        ['Feu','Feu','Ombre','Feu','Eau','Ombre','Feu'],
+ 'cimes-vent':         ['Arcane','Arcane','Eau','Arcane','Nature','Eau','Arcane'],
+ 'temple-inebranlable':['Lumière','Lumière','Eau','Lumière','Nature','Eau','Lumière'],
+ 'crypte-sanglante':   ['Ombre','Ombre','Eau','Ombre','Arcane','Eau','Ombre'],
+ 'rempart-endurance':  ['Lumière','Lumière','Ombre','Lumière','Eau','Ombre','Lumière'],
+ 'coeur-ignifuge':     ['Feu','Feu','Arcane','Feu','Eau','Arcane','Feu']
+};
+/** L'élément d'un palier ; à défaut, celui de la zone. */
+export const elementDuPalier=(zoneId,stageId,defaut=null)=>
+  (PALIERS_ELEMENTS[zoneId]||[])[Number(stageId)-1]||defaut;
+
 const slots=['Casque','Épaules','Torse','Jambières','Bottes','Arme','Toutes les pièces'];
-export const CONTINENTS=ZONES.map((z,zoneIndex)=>{const[id,name,icon,level,setNames,setIds,element,mobs,bossName,bossIcon]=z,base=165+zoneIndex*22,atk=24+zoneIndex*3.3,def=9+zoneIndex*1.45,spd=94+zoneIndex*.7,power=.68+zoneIndex*.075;const stages=[1,2,3,4,5,6,7].map(n=>{const boss=n===7,mult=1+(n-1)*.052;const enemies=boss?[enemy(bossName,bossIcon,Math.round(base*2.05),Math.round(atk*1.28),Math.round(def*1.38),Math.round(spd+4),15+zoneIndex,10+zoneIndex,element),enemy(mobs[1],['🧙','👻','🗿'][zoneIndex%3],Math.round(base*1.05),Math.round(atk*.96),Math.round(def*1.05),Math.round(spd+8),15,10,element),enemy(mobs[2],['🐺','🦇','🐉'][zoneIndex%3],Math.round(base*.98),Math.round(atk*1.04),Math.round(def*.9),Math.round(spd+13),15,10,element)]:mobs.map((mob,index)=>enemy(`${mob} ${n}`,['⚔️','🛡️','🧙'][index],Math.round(base*mult*(1+(index-1)*.08)),Math.round(atk*mult*(1+(index-1)*.06)),Math.round(def*mult*(1+(index-1)*.08)),Math.round(spd+index*8),15+Math.floor(zoneIndex/3),10+Math.floor(zoneIndex/4),element));return stage(String(n),boss?`Gardien de ${name}`:[`Approche de ${name}`,`Passage de ${name}`,`Profondeurs de ${name}`,`Sanctuaire de ${name}`,`Avant-poste de ${name}`,`Arsenal de ${name}`][n-1],boss?bossIcon:['🚪','🛤️','🏛️','⚔️','🥾','🗡️'][n-1],power+(n-1)*.035,enemies,boss,slots[n-1])});return{id,name,icon,level,description:zoneIndex<3?`Progression guidée : ${setNames.join(' et ')} sans farm obligatoire.`:zoneIndex<7?`Spécialisation progressive autour de ${setNames.join(' et ')}.`:zoneIndex<9?`Optimisation avancée : ${setNames.join(' et ')}.`:`Préparation finale au Raid avec ${setNames.join(' et ')}.`,mechanic:CAMPAIGN_MECHANICS[id],setId:setIds[0],setIds,raidPreparation:setIds.includes('fireproof'),stages}});
+export const CONTINENTS=ZONES.map((z,zoneIndex)=>{const[id,name,icon,level,setNames,setIds,element,mobs,bossName,bossIcon]=z,base=165+zoneIndex*22,atk=24+zoneIndex*3.3,def=9+zoneIndex*1.45,spd=94+zoneIndex*.7,power=.68+zoneIndex*.075;const stages=[1,2,3,4,5,6,7].map(n=>{const boss=n===7,mult=1+(n-1)*.052;const elementPalier=elementDuPalier(id,n,element);const enemies=boss?[enemy(bossName,bossIcon,Math.round(base*2.05),Math.round(atk*1.28),Math.round(def*1.38),Math.round(spd+4),15+zoneIndex,10+zoneIndex,elementPalier),enemy(mobs[1],['🧙','👻','🗿'][zoneIndex%3],Math.round(base*1.05),Math.round(atk*.96),Math.round(def*1.05),Math.round(spd+8),15,10,elementPalier),enemy(mobs[2],['🐺','🦇','🐉'][zoneIndex%3],Math.round(base*.98),Math.round(atk*1.04),Math.round(def*.9),Math.round(spd+13),15,10,elementPalier)]:mobs.map((mob,index)=>enemy(`${mob} ${n}`,['⚔️','🛡️','🧙'][index],Math.round(base*mult*(1+(index-1)*.08)),Math.round(atk*mult*(1+(index-1)*.06)),Math.round(def*mult*(1+(index-1)*.08)),Math.round(spd+index*8),15+Math.floor(zoneIndex/3),10+Math.floor(zoneIndex/4),elementPalier));return stage(String(n),boss?`Gardien de ${name}`:[`Approche de ${name}`,`Passage de ${name}`,`Profondeurs de ${name}`,`Sanctuaire de ${name}`,`Avant-poste de ${name}`,`Arsenal de ${name}`][n-1],boss?bossIcon:['🚪','🛤️','🏛️','⚔️','🥾','🗡️'][n-1],power+(n-1)*.035,enemies,boss,slots[n-1])});return{id,name,icon,level,description:zoneIndex<3?`Progression guidée : ${setNames.join(' et ')} sans farm obligatoire.`:zoneIndex<7?`Spécialisation progressive autour de ${setNames.join(' et ')}.`:zoneIndex<9?`Optimisation avancée : ${setNames.join(' et ')}.`:`Préparation finale au Raid avec ${setNames.join(' et ')}.`,mechanic:CAMPAIGN_MECHANICS[id],setId:setIds[0],setIds,raidPreparation:setIds.includes('fireproof'),stages}});
 export const missionKey=(difficultyId,continentId,stageId)=>`${difficultyId}:${continentId}:${stageId}`;
 export const allMissionKeys=difficultyId=>CONTINENTS.flatMap(continent=>continent.stages.map(item=>missionKey(difficultyId,continent.id,item.id)));
 export const milestoneKey=(difficultyId,stars)=>`${difficultyId}:${stars}`;

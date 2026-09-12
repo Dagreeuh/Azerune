@@ -31,15 +31,15 @@ const ennemisDeCampagne=()=>CONTINENTS.flatMap(continent=>
 
 it('1 · ce que le joueur affronte',()=>{
   const tous=ennemisDeCampagne();
-  const parZone=new Map();
-  tous.forEach(u=>{
-    if(!parZone.has(u.zone))parZone.set(u.zone,new Set());
-    parZone.get(u.zone).add(u.element);
-  });
   console.log('\n=== 1 · Éléments des ennemis de campagne ===');
-  console.log('Une zone = un seul élément, pour ses 21 combats :');
-  [...parZone].forEach(([zone,els])=>
-    console.log(`  ${zone.padEnd(30)} ${[...els].join(', ')}`));
+  console.log('Élément de chacun des 7 paliers, zone par zone :');
+  CONTINENTS.forEach(continent=>{
+    const suite=continent.stages.map(stage=>{
+      const m=createMission(DIFFICULTIES[0],continent,stage);
+      return normalizeElement(m.enemies[0].element).slice(0,3);
+    });
+    console.log(`  ${continent.name.padEnd(30)} ${suite.join(' ')}`);
+  });
 
   const compte={};
   tous.forEach(u=>{compte[u.element]=(compte[u.element]||0)+1});
@@ -92,7 +92,9 @@ it('3 · ce que ça coûte vraiment, en combat',()=>{
   const zones=[CONTINENTS[0],CONTINENTS[1],CONTINENTS[7]];
 
   zones.forEach(continent=>{
-    const stage=continent.stages[3];
+    // Palier 5 : c'est celui qui porte le TROISIÈME élément de la zone. On
+    // mesure donc la variété interne, pas la couleur dominante.
+    const stage=continent.stages[4];
     const mission=createMission(DIFFICULTIES[0],continent,stage);
     const cible=normalizeElement(mission.enemies[0].element);
     console.log(`\n=== 3 · ${continent.name} — ennemis ${cible} ===`);
