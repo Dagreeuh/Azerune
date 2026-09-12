@@ -2380,3 +2380,71 @@ subsiste dans le moteur**, et il n'existe que deux écritures indexées, toutes
 deux dans un helper nommé.
 
 Suite complète : **1 805 tests**, 85 fichiers.
+
+### 1.82.1 — Le défaut signalé n'existait pas. Un autre, si.
+
+Chantier ouvert : la synchronisation `battleSession`, que j'avais consignée en
+1.77 comme suit — *« `setBattle` n'écrit que l'état local et ne synchronise
+jamais la session : `battleInProgress` et la carte COMBAT EN COURS sont
+inertes. »*
+
+**C'était faux.** `BattlePage` porte depuis longtemps un effet de
+synchronisation :
+
+```js
+useEffect(()=>{if(!battleSession)return;updateBattleSession({battle,target,missionReward})},[battle,target,missionReward]);
+```
+
+Vérifié en jouant le parcours complet dans un navigateur — lancer une mission
+de campagne, démarrer le combat, recharger la page, revenir à l'accueil. La
+carte s'affiche, renseignée et vivante :
+
+> ⚔️ COMBAT EN COURS · Approche de Valebrume · Tour : Korga · Équipe 3/3 ·
+> Ennemis 3/3 · [Reprendre] [Abandonner]
+
+C'est la **quatrième fois** de cet audit qu'une conclusion tirée de la lecture
+du source est démentie par l'exécution. Les trois précédentes : « la campagne
+ne déclare aucun élément » (1.81.0), le compte de substitutions ignoré parce
+que `vite build` passait (1.81.0), et la Traque qui plantait sous Volonté de
+fer (1.82.0). La règle est désormais sans exception : **lire le code sert à
+formuler une hypothèse, jamais à conclure.**
+
+### Ce que l'enquête a réellement trouvé
+
+**J'avais cassé l'écran de combat en entier.**
+
+En 1.81.1, en faisant dériver l'affichage d'affinité du moteur, j'ai écrit
+`battle?.difficulte` **dans `SkillTooltip`** — un composant défini *avant* la
+déclaration de `battle`, donc hors de sa portée. Toute ouverture de combat
+levait `battle is not defined` : aucune unité, aucun bouton, écran vide.
+
+Ce qui n'a rien vu :
+
+- **`vite build`**, parce que le JSX est valide et qu'un identifiant absent ne
+  se voit qu'à l'exécution ;
+- **les 1 805 tests**, parce qu'**aucun ne rendait cette page**.
+
+Ce qui l'a vu : jouer une partie.
+
+Corrigé en passant la difficulté par une prop, seul moyen propre de la faire
+descendre dans un composant défini au-dessus.
+
+### Le garde-fou ajouté
+
+`tests/battlepage.rendu.test.js` rend réellement `SkillTooltip` — désormais
+exporté — pour les trois difficultés, et vérifie qu'il annonce bien les valeurs
+du mode joué (×1,14 en Normal, ×1,30 en Hardcore). 7 tests, **3 mutants sur 3
+tués**, dont la faute d'origine reproduite à l'identique.
+
+**Le trou reste partiellement ouvert et je l'écris** : ce test ne couvre que ce
+composant-là. Aucune autre page du jeu n'est rendue par la suite de tests. Une
+faute du même genre ailleurs passerait encore.
+
+### Ce que la carte fait, et ne fait pas
+
+Précision utile, découverte en la testant : elle ne sert **pas** à naviguer
+pendant un combat — le plein écran masque la navigation, et quitter perd la
+progression, comme la confirmation l'annonce honnêtement. Elle sert à
+**reprendre après avoir fermé l'application**, et elle le fait.
+
+Suite complète : **1 812 tests**, 86 fichiers.
