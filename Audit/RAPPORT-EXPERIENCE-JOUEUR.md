@@ -2448,3 +2448,67 @@ progression, comme la confirmation l'annonce honnêtement. Elle sert à
 **reprendre après avoir fermé l'application**, et elle le fait.
 
 Suite complète : **1 812 tests**, 86 fichiers.
+
+---
+
+## 1.83.0 — Rendre impossible le défaut que j'ai livré
+
+Suite directe de 1.82.1 : j'avais cassé l'écran de combat en entier avec une
+variable employée hors de sa portée, et **rien** ne l'avait vu — ni `vite
+build`, ni 1 805 tests. Ce chantier ferme ce trou.
+
+### Premier essai : rendre toutes les pages
+
+`tests/pages.rendu.test.js` rend les **18 pages** du jeu dans leur vrai
+contexte (`GameProvider`), et vérifie qu'aucune ne lève d'erreur. Elles passent
+toutes : aucune autre page ne portait le défaut.
+
+**Mais ce test n'aurait PAS attrapé ma faute, et je l'ai vérifié.** En
+réintroduisant l'erreur exacte, il reste vert : `SkillTooltip` ne se rend que
+sur survol d'une compétence, et la page se rend sans combat en cours. Il
+attrape les plantages au chargement d'une page — pas les composants rendus
+conditionnellement, c'est-à-dire précisément l'endroit où mon défaut vivait.
+
+Je le garde quand même : il couvre une vraie classe de pannes. Mais il ne
+suffit pas, et le prétendre serait pire que rien.
+
+### Ce qui attrape réellement le défaut
+
+Le projet n'avait **aucun linter**. Or `battle is not defined` est exactement
+ce que la règle `no-undef` détecte — statiquement, sur tout le code, y compris
+les chemins que personne ne rend jamais.
+
+ESLint est ajouté avec **une seule règle activée**. Ce n'est pas un chantier de
+style : ajouter des règles de mise en forme ici ferait du bruit et ferait
+perdre de vue le seul défaut qu'on veut rendre impossible.
+
+Vérification, faute réintroduite à l'identique :
+
+| Outil | Verdict |
+|---|---|
+| `vite build` | **passe** — le JSX est valide |
+| `tests/pages.rendu.test.js` | **passe** — le composant ne se rend pas |
+| Suite complète (1 831 tests) | échoue, grâce au test de rendu dédié écrit en 1.82.1 |
+| **`npx eslint`** | **`92:340 error 'battle' is not defined no-undef`** |
+
+Ligne et colonne exactes, en 3 secondes, sans exécuter quoi que ce soit.
+
+**Sur le code actuel : zéro violation.** Aucun autre défaut latent de cette
+classe.
+
+### Le linter tourne avec les tests
+
+`tests/lint.test.js` lance ESLint dans la suite. Sans cela il ne servirait que
+les jours où l'on y pense — et c'est justement un jour où je n'y pensais pas
+que le défaut est passé. `npm run lint` reste disponible séparément.
+
+### Ce que ça ne couvre toujours pas
+
+- Les effets (`useEffect`) ne sont pas exécutés par `renderToStaticMarkup` :
+  une faute qui n'existe que dans un effet passe encore.
+- `no-undef` ne voit pas une propriété absente d'un objet qui existe
+  (`battle.difficult` au lieu de `battle.difficulte` passerait).
+- Aucune interaction n'est simulée : cliquer, survoler, ouvrir une modale
+  restent hors de portée de la suite.
+
+Suite complète : **1 831 tests**, 88 fichiers.

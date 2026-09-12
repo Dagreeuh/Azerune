@@ -32,6 +32,7 @@ npm run verifier-deps
 | `npm run build` | construit la version de production |
 | `npm test` | la suite complète |
 | `npm run test:watch` | les tests en continu |
+| `npm run lint` | analyse statique — attrape les variables employées hors de leur portée |
 | `npm run mesures` | harnais de mesure sans assertion (équilibrage) |
 
 ### Sprites et feuilles de personnage
