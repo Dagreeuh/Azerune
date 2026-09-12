@@ -1,7 +1,7 @@
 {
   "name": "chroniques-azerune",
   "private": true,
-  "version": "1.81.1",
+  "version": "1.82.0",
   "type": "module",
   "scripts": {
     "predev": "node outils/verifier-deps.mjs",

@@ -132,8 +132,10 @@ describe('les ressources portées par l’ennemi se lisent sur l’ennemi',()=>{
   it('les clés de malus lues sont celles que le moteur pose',()=>{
     // Une cle mal orthographiee afficherait « Aucune cible » pour toujours,
     // sans erreur ni message.
-    expect(moteur).toMatch(/debuffs\.virulence=\{/);
-    expect(moteur).toMatch(/debuffs\.frost=\{/);
+    // Les malus ne sont plus ecrits en direct : ils passent par les ecrivains
+    // centraux du moteur. On verifie donc la cle telle qu'elle leur est passee.
+    expect(moteur).toMatch(/poserDebuff\([^;]*'virulence'/);
+    expect(moteur).toMatch(/poserDebuff\([^;]*'frost'/);
   });
 
   it('le plafond et le seuil affichés sont ceux du moteur',()=>{

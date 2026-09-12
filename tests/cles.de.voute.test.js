@@ -138,11 +138,12 @@ describe('les dix archétypes font réellement quelque chose',()=>{
   });
 
   it('Contagion couvre les malus écrits en direct, pas seulement ceux qui passent par debuff()',()=>{
-    // La moitie des poses de malus du moteur n'appellent pas `debuff()` — dont
-    // toutes les afflictions signature. Le Givre en fait partie : une accroche
-    // sur `debuff()` seule ne l'aurait jamais propagé.
+    // Toutes les poses de malus ne passent pas par `debuff()` : les afflictions
+    // garanties — dont le Givre — empruntent `poserDebuff()`, qui applique les
+    // regles sans jet de resistance. Une accroche sur `debuff()` seule ne les
+    // propagerait donc jamais.
     const moteur=fs.readFileSync(fileURLToPath(new URL('../src/battle/engine.js',import.meta.url)),'utf8');
-    expect(moteur,'le Givre passerait maintenant par debuff()').toContain("x.debuffs.frost={turns:3+mastery.duration");
+    expect(moteur,'le Givre passerait maintenant par debuff()').toMatch(/poserDebuff\([^;]*'frost'/);
     const b=lancer(poser([33,20,19],cle('contagion')),33,0,poser([33,20,19],null).enemies[0].id);
     expect(b.enemies.filter(e=>e.debuffs?.frost)).toHaveLength(2);
   });

@@ -2282,3 +2282,101 @@ combat, les cinq lectures d'affinité du moteur, et l'absence de tout
 multiplicateur écrit en dur dans l'interface.
 
 Suite complète : **1 794 tests**, 84 fichiers.
+
+---
+
+## 1.82.0 — Un seul chemin pour poser une altération
+
+Dernière étape du chantier ouvert avec le joueur : les 28 écritures directes
+`target.debuffs.X = …` qui contournaient la fonction centrale.
+
+### Ce qu'elles sautaient, et ce que ça coûtait au joueur
+
+```js
+debuffChance = base + maîtrise + Précision(attaquant)/100 − Résistance(cible)/100
+```
+
+Toute écriture directe sautait ce calcul — ainsi que la règle **Volonté de
+fer** et la durée de maîtrise. Conséquence directe et invisible :
+
+- **La Résistance du joueur ne le protégeait de rien.** Les mécaniques de zone
+  (Gel persistant, Érosion du Vide, Marque d'exécution, Embrasement…) tombaient
+  à coup sûr. Il existe pourtant des sets d'équipement entiers dédiés à la
+  Résistance.
+- **Volonté de fer, règle de mission, ne s'appliquait qu'à la moitié des
+  altérations.**
+
+Mesuré sur **36 vrais combats** : **386 altérations posées, aucune** n'est
+passée par le jet. Ni la Résistance ni la Précision n'ont servi une seule fois.
+
+### Ce qui a été fait
+
+Un **seul point d'écriture** dans le moteur, `ecrireDebuff`, et trois entrées
+qui expriment l'intention :
+
+| Entrée | Pour quoi | Ce qu'elle applique |
+|---|---|---|
+| `tryDebuff` | une affliction qu'on peut résister | jet de résistance, Précision, Résistance, maîtrise |
+| `poserDebuff` | une désignation, une conséquence, un proc d'arme | Volonté de fer, source et attaque du poseur |
+| `majDebuff` | un compteur de piles sur une altération déjà posée | rien d'autre — ni durée, ni source |
+
+La distinction n'est pas cosmétique : une **désignation** qui échoue casse le
+champion qui en dépend (tout le kit de Kaelen s'accroche à sa Traque), tandis
+qu'une **affliction** qui ne peut pas échouer rend la Résistance inutile. Les
+deux existent, aucune n'échappe aux règles.
+
+`majDebuff` ne retouche jamais la durée : les écritures de Pourriture
+recalculaient `5+mastery.duration` **juste après** que `debuff()` l'ait écrit —
+deux sources de vérité pour une même durée, qui dérivent dès que l'une change.
+
+### Ce que ça change pour le joueur
+
+Altérations subies par l'équipe sur 12 combats, selon sa Résistance :
+
+| Résistance | 0 | 15 | 30 | 45 | 60 | 75 |
+|---|---|---|---|---|---|---|
+| Altérations subies | 42 | 39 | 37 | 31 | 30 | **19** |
+
+**Le changement ne coûte rien à qui ignore la Résistance** — à 0, la chance
+reste plafonnée à 95 %, donc presque tout tombe comme avant — **et récompense
+enfin celui qui investit** : moitié moins d'altérations à 75.
+
+### Une 29ᵉ écriture, que j'avais manquée
+
+Mon décompte initial disait 28. Il en manquait une : la clé de voûte
+**Contagion** recopie une altération sur un voisin par `voisin.debuffs[cle]=`,
+une écriture *indexée* que mon motif de recherche ne voyait pas. Elle passe
+désormais par le chemin garanti, en conservant la source d'origine — ce qui
+compte pour un poison dont les dégâts dépendent de l'attaque du poseur.
+
+C'est un test qui l'a trouvée : j'avais écrit « une seule écriture indexée dans
+tout le moteur », il y en avait trois.
+
+### Un bug que j'ai introduit, et que 1 805 tests n'ont pas vu
+
+En appliquant enfin Volonté de fer à la Traque de Kaelen, la désignation peut
+désormais échouer. Or le journal lisait `chosen.debuffs.hunt.turns` **en
+supposant la réussite** : le combat plantait.
+
+Aucun test ne couvrait la règle ET la Traque ensemble. C'est la **mesure** —
+qui joue de vrais combats — qui a levé l'erreur, pas la suite. Leçon déjà
+rencontrée en 1.81.0 avec `vite build` : **exécuter n'est pas compiler, et une
+suite verte n'est pas une preuve de couverture.**
+
+### Deux tests existants ont réagi, correctement
+
+Ils figeaient le **texte source** des anciennes écritures directes. Leurs
+assertions de comportement passaient toujours ; seules les assertions
+textuelles ont dû suivre le nouveau chemin. Leur intention — « une clé mal
+orthographiée afficherait *Aucune cible* pour toujours, sans erreur » — est
+conservée telle quelle.
+
+### Couverture
+
+`tests/debuffs.chemin.unique.test.js` : 11 tests, **8 mutants sur 8 tués** (7
+sur 8 à la première passe, le survivant étant la Contagion ci-dessus). La
+garantie structurelle est testée directement : **aucune écriture directe ne
+subsiste dans le moteur**, et il n'existe que deux écritures indexées, toutes
+deux dans un helper nommé.
+
+Suite complète : **1 805 tests**, 85 fichiers.

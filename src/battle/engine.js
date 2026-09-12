@@ -61,9 +61,69 @@ const DEBUFF_LABELS={atkDown:'Attaque réduite',defDown:'Défense réduite',slow
 const ACCURACY_DOWN_FACTOR=.65;
 const effectiveAccuracy=unit=>(unit?.accuracy||0)*(unit?.debuffs?.accuracyDown?ACCURACY_DOWN_FACTOR:1);
 const debuffChance=(actor,target,baseChance,mastery=0)=>clamp(baseChance+mastery+effectiveAccuracy(actor)/100-(target.resistance||0)/100,.15,.95);
+/**
+ * Volonte de fer : la regle protege les ennemis. Elle n'etait verifiee que
+ * dans `debuff()`, donc uniquement sur le chemin des competences a jet — les
+ * 28 ecritures directes passaient au travers sans rien signaler.
+ */
+const volonteDeFer=(battle,target,resisted)=>{
+  if(battle?.regle?.id!=='resistance'||target?.side!=='enemy')return false;
+  resisted?.push(`${target.name} resiste : Volonte de fer.`);
+  return true;
+};
+
+/**
+ * SEUL endroit du moteur qui ecrit dans `target.debuffs`.
+ *
+ * Tout y passe, et c'est le but : `source` et `sourceAtk` sont donc toujours
+ * renseignes. Les ecritures directes les omettaient souvent — un `burn` sans
+ * `sourceAtk` ne sait pas combien il doit infliger.
+ */
+const ecrireDebuff=(actor,target,key,turns,extra)=>{
+  target.debuffs[key]={turns,source:actor.id,sourceAtk:actor.atk,...(extra||{})};
+  return true;
+};
+
+/**
+ * Pose GARANTIE : aucun jet de resistance, mais les regles s'appliquent.
+ *
+ * Reservee a ce qui ne se resiste pas — une designation (la Traque de Kaelen,
+ * dont tout le reste du kit depend), une consequence d'alterations deja posees
+ * (reactions alchimiques), un effet d'arme unique. Une designation qui echoue
+ * casserait le champion ; une affliction qui ne peut pas echouer rend la
+ * Resistance inutile. Les deux chemins existent, aucun n'echappe aux regles.
+ */
+/**
+ * Met a jour une alteration DEJA posee — un compteur de piles, un cumul.
+ *
+ * Ce n'est pas une application : ni jet, ni Volonte de fer. Et surtout on ne
+ * retouche NI la duree NI la source, que l'application a deja fixees ; les
+ * reecrire ici les ferait deriver le jour ou `debuff()` changera. C'est
+ * exactement ce que faisaient les ecritures directes de Pourriture, qui
+ * recalculaient `5+mastery.duration` juste apres que `debuff()` l'ait ecrit.
+ */
+const majDebuff=(target,key,extra)=>{
+  const actuel=target?.debuffs?.[key];
+  if(!actuel)return false;
+  target.debuffs[key]={...actuel,...extra};
+  return true;
+};
+
+const poserDebuff=(battle,actor,target,key,turns,extra,resisted)=>
+  volonteDeFer(battle,target,resisted)?false:ecrireDebuff(actor,target,key,turns,extra);
+
+/**
+ * Chance de base des mecaniques de zone, appliquees par les ennemis.
+ *
+ * Elles tombaient a coup sur : la Resistance du joueur — et les sets qui la
+ * donnent — ne servaient a rien contre elles. Base elevee pour que la
+ * mecanique reste la signature de la zone, mais franchissable en investissant.
+ */
+const CHANCE_MECANIQUE_ZONE=.90;
+
 const tryDebuff=(actor,target,key,turns,baseChance,mastery,resisted)=>{
   const chance=debuffChance(actor,target,baseChance,mastery);
-  if(Math.random()<=chance){target.debuffs[key]={turns,source:actor.id,sourceAtk:actor.atk};return true;}
+  if(Math.random()<=chance)return ecrireDebuff(actor,target,key,turns);
   resisted.push(`${target.name} résiste à ${DEBUFF_LABELS[key]||key} (${Math.round(chance*100)} %).`);
   return false;
 };
@@ -114,7 +174,7 @@ export function nextTurn(battle){
   if(unit.debuffs.poison){const stacks=Math.max(1,unit.debuffs.virulence?.stacks||1),amount=Math.round(pvReference(unit)*.06*(1+.12*(stacks-1)));dot+=amount;periodic.push(`Poison ${amount}`);}
   if(unit.debuffs.burn){const amount=Math.round(bossDotAmount(unit,unit.debuffs.burn,.05,1.15)*(unit.setEffects?.includes('fireproofSet')?.75:1));dot+=amount;periodic.push(`Brûlure ${amount}`);}
   if(unit.debuffs.bleed){const amount=bossDotAmount(unit,unit.debuffs.bleed,.045,1.05);dot+=amount;periodic.push(`Saignement ${amount}`);}   if(unit.debuffs.affliction){const stacks=Math.min(5,unit.debuffs.affliction.stacks||1),amount=Math.round(pvReference(unit)*.012*stacks);dot+=amount;periodic.push(`Affliction ${amount}`);afflictionSpreads=stacks>=5;}
-  if(unit.debuffs.agony){const stacks=Math.min(5,unit.debuffs.agony.stacks||1),amount=Math.round(pvReference(unit)*(.018+.009*stacks));dot+=amount;periodic.push(`Agonie ${amount}`);unit.debuffs.agony={...unit.debuffs.agony,stacks:Math.min(5,stacks+1)};}
+  if(unit.debuffs.agony){const stacks=Math.min(5,unit.debuffs.agony.stacks||1),amount=Math.round(pvReference(unit)*(.018+.009*stacks));dot+=amount;periodic.push(`Agonie ${amount}`);majDebuff(unit,'agony',{stacks:Math.min(5,stacks+1)});}
   if(unit.debuffs.corruption){const amount=bossDotAmount(unit,unit.debuffs.corruption,.035,.95);dot+=amount;periodic.push(`Corruption ${amount}`);}
   // La Plaie detonne au moment ou elle expire, avant que `decay` ne l'efface.
   if(unit.debuffs.temporalWound&&unit.debuffs.temporalWound.turns<=1){
@@ -267,7 +327,7 @@ export function enemyAction(battle){
     const relation=affinity(actor.element,target.element,battle.difficulte);
     let damage=Math.max(6,Math.round(attackPower*multiplier*100/(100+defense*3)*variance*(actor.bossUnit?(actor.campaignUnit?({easy:1.04,normal:1.08,hard:1.13,hardcore:1.18}[actor.campaignDifficulty]||1.08):1.12):1)*(critical?1.5:1)*relation.damage)),personalMitigation=0;if(target.id===25&&target.mechanic?.mode==='high'){const reduced=Math.max(1,Math.round(damage*.82));personalMitigation=damage-reduced;damage=reduced;}
     const absorbed=Math.min(target.shield,damage),shieldSource=target.buffs?.shield?.source;if(personalMitigation)battle=addCombatStat(battle,target.id,{mitigation:personalMitigation,personalMitigation});if(absorbed&&shieldSource)battle=addCombatStat(battle,shieldSource,{mitigation:absorbed,shieldMitigation:absorbed});damage-=absorbed;
-    target.hp=Math.max(0,target.hp-damage);target.shield=Math.max(0,target.shield-absorbed);target.dead=target.hp<=0;if(battle.mythic&&battle.affixState?.ids?.includes('necrotic')&&damage>0)target.debuffs.necrotic={turns:2,stacks:Math.min(5,(target.debuffs.necrotic?.stacks||0)+1)};if(battle.mythic&&battle.affixState?.ids?.includes('afflicted')&&damage>0)target.debuffs.affliction={turns:99,stacks:Math.min(5,(target.debuffs.affliction?.stacks||0)+1)};
+    target.hp=Math.max(0,target.hp-damage);target.shield=Math.max(0,target.shield-absorbed);target.dead=target.hp<=0;if(battle.mythic&&battle.affixState?.ids?.includes('necrotic')&&damage>0)poserDebuff(battle,actor,target,'necrotic',2,{stacks:Math.min(5,(target.debuffs.necrotic?.stacks||0)+1)},resisted);if(battle.mythic&&battle.affixState?.ids?.includes('afflicted')&&damage>0)poserDebuff(battle,actor,target,'affliction',99,{stacks:Math.min(5,(target.debuffs.affliction?.stacks||0)+1)},resisted);
     const guardianId=target.buffs.guardianLink?.source,guardian=allies.find(unit=>unit.id===guardianId&&!unit.dead);
     if(guardian&&damage>0){const redirected=Math.min(guardian.hp-1,Math.round(damage*.30));guardian.hp=Math.max(1,guardian.hp-redirected);target.hp=Math.min(target.maxHp,target.hp+redirected);damage-=redirected;battle=addCombatStat(battle,guardian.id,{damageTaken:redirected,mitigation:redirected,redirectMitigation:redirected});actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}-${guardian.id}`,sourceId:actor.id,targetId:guardian.id,amount:redirected,type:'damage',affinity:'neutral',critical:false});}
     const aurelis=allies.find(unit=>unit.id===23&&!unit.dead&&unit.mechanic?.active),needsRescue=target.hp>0&&target.hp/target.maxHp<=.25&&(target.shield||0)<=0;
@@ -311,19 +371,19 @@ export function enemyAction(battle){
     const z=actor.campaignZone;let result;
     if(z==='crypte-sanglante'){result=hit(victim,1.08);const life=Math.round(result.damage*.35);self.hp=Math.min(self.maxHp,self.hp+life);actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}`,sourceId:actor.id,targetId:actor.id,amount:life,type:'heal',affinity:'neutral',critical:false});text=`${actor.name} assouvit sa Soif carmine : ${result.damage} dégâts et ${life} PV récupérés.`;}
     else if(z==='cimes-vent'){choices.forEach(t=>t.atb=Math.max(0,t.atb-12));enemies.filter(e=>!e.dead).forEach(e=>e.atb=Math.min(100,e.atb+10));result=hit(victim,.78);text=`${actor.name} inverse les courants : ${result.damage} dégâts et jauges déplacées.`;}
-    else if(z==='arene-lames'){victim.debuffs.mark={turns:2};result=hit(victim,victim.hp/victim.maxHp<=.35?1.55:1.18);text=`${actor.name} pose une Marque d’exécution : ${result.damage} dégâts.`;}
-    else if(z==='netherys'){victim.debuffs.healingDown={turns:2};result=hit(victim,1+.04*Math.min(8,turnCount));text=`${actor.name} propage l’Érosion du Vide : ${result.damage} dégâts, soins réduits.`;}
-    else if(z==='couronne-givree'){victim.debuffs.slow={turns:2};victim.debuffs.healingDown={turns:2};result=hit(victim,.95);text=`${actor.name} applique Gel persistant : ${result.damage} dégâts.`;}
-    else if(z==='fournaise-incendiaire'||z==='coeur-ignifuge'){victim.debuffs.burn={turns:3,source:actor.id,sourceAtk:actor.atk};if(z==='coeur-ignifuge')victim.debuffs.healingDown={turns:2};result=hit(victim,1.02);text=`${actor.name} embrase ${victim.name} : ${result.damage} dégâts.`;}
+    else if(z==='arene-lames'){tryDebuff(actor,victim,'mark',2,CHANCE_MECANIQUE_ZONE,0,resisted);result=hit(victim,victim.hp/victim.maxHp<=.35?1.55:1.18);text=`${actor.name} pose une Marque d’exécution : ${result.damage} dégâts.`;}
+    else if(z==='netherys'){tryDebuff(actor,victim,'healingDown',2,CHANCE_MECANIQUE_ZONE,0,resisted);result=hit(victim,1+.04*Math.min(8,turnCount));text=`${actor.name} propage l’Érosion du Vide : ${result.damage} dégâts, soins réduits.`;}
+    else if(z==='couronne-givree'){tryDebuff(actor,victim,'slow',2,CHANCE_MECANIQUE_ZONE,0,resisted);tryDebuff(actor,victim,'healingDown',2,CHANCE_MECANIQUE_ZONE,0,resisted);result=hit(victim,.95);text=`${actor.name} applique Gel persistant : ${result.damage} dégâts.`;}
+    else if(z==='fournaise-incendiaire'||z==='coeur-ignifuge'){tryDebuff(actor,victim,'burn',3,CHANCE_MECANIQUE_ZONE,0,resisted);if(z==='coeur-ignifuge')tryDebuff(actor,victim,'healingDown',2,CHANCE_MECANIQUE_ZONE,0,resisted);result=hit(victim,1.02);text=`${actor.name} embrase ${victim.name} : ${result.damage} dégâts.`;}
     else if(z==='trone-volcan'){const enfureur=self.hp/self.maxHp<=.4;if(enfureur){self.buffs.atkUp={turns:3};self.buffs.speedUp={turns:3}}result=hit(victim,enfureur?1.42:1.05);text=`${actor.name} libère sa Furie volcanique : ${result.damage} dégâts.`;}
     else if(z==='chambre-echos'){self.buffs.atkUp={turns:2};result=hit(victim,1.12);text=`${actor.name} renvoie un Écho vengeur : ${result.damage} dégâts.`;}
     else if(z==='khazdrum'){self.buffs.atkUp={turns:2};result=hit(victim,1+.06*Math.min(5,turnCount));text=`${actor.name} monte en Surchauffe : ${result.damage} dégâts.`;}
-    else if(z==='oeil-clair'){victim.debuffs.accuracyDown={turns:2};result=hit(victim,.92);text=`${actor.name} brouille la vision : ${result.damage} dégâts et Précision réduite.`;}
+    else if(z==='oeil-clair'){tryDebuff(actor,victim,'accuracyDown',2,CHANCE_MECANIQUE_ZONE,0,resisted);result=hit(victim,.92);text=`${actor.name} brouille la vision : ${result.damage} dégâts et Précision réduite.`;}
     else{result=hit(victim,1.12);text=`${actor.name} exploite la mécanique de ${actor.campaignMechanic?.name||'la zone'} : ${result.damage} dégâts.`;}
     cooldowns[0]=3;
   }else if(actor.bossUnit&&cooldowns[1]===0&&turnCount%3===0){
     let total=0;
-    const tier=actor.campaignMechanicTier||1,campaignMajor=actor.campaignUnit?({normal:.68,hard:.80,hardcore:.94}[actor.campaignDifficulty]||.68):.72;choices.filter(target=>!target.dead).forEach(target=>{const result=hit(target,campaignMajor);total+=result.damage;tryDebuff(actor,target,'slow',tier>=2?2:1,tier>=3?.72:tier>=2?.62:.52,0,resisted);if(tier>=3&&['netherys','couronne-givree','coeur-ignifuge'].includes(actor.campaignZone))target.debuffs.healingDown={turns:2};});
+    const tier=actor.campaignMechanicTier||1,campaignMajor=actor.campaignUnit?({normal:.68,hard:.80,hardcore:.94}[actor.campaignDifficulty]||.68):.72;choices.filter(target=>!target.dead).forEach(target=>{const result=hit(target,campaignMajor);total+=result.damage;tryDebuff(actor,target,'slow',tier>=2?2:1,tier>=3?.72:tier>=2?.62:.52,0,resisted);if(tier>=3&&['netherys','couronne-givree','coeur-ignifuge'].includes(actor.campaignZone))tryDebuff(actor,target,'healingDown',2,CHANCE_MECANIQUE_ZONE,0,resisted);});
     const healRate=actor.campaignUnit?({normal:.08,hard:.11,hardcore:.14}[actor.campaignDifficulty]||.08):.12,heal=Math.round(pvReference(actor)*healRate);const self=enemies.find(unit=>unit.id===actor.id);self.hp=Math.min(self.maxHp,self.hp+heal);self.buffs.defUp={turns:tier>=2?2:1};if(tier>=3)self.buffs.atkUp={turns:2};
     cooldowns[1]=4;text=`${actor.name} déchaîne son pouvoir majeur : ${total} dégâts de zone, ralentissement et ${heal} PV récupérés.`;
   }else if(cooldowns[0]===0&&turnCount%2===0){
@@ -601,7 +661,7 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
     if(vampirisme&&damage>0&&actor.hp<actor.maxHp){
       const rendu=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*vampirisme)));
       actor.hp+=rendu;healingTotal+=rendu;event(actor,rendu,'heal',{sourceType:'vampirisme'});}
-    /* Plaie temporelle (Aszhal) : une part des degats infliges a cet ennemi par un allie qu'Aszhal a ameliore est mise de cote, puis rendue d'un coup a l'expiration. On reaffecte l'objet au lieu de le muter : une copie superficielle partagerait la meme reference entre deux unites. */const plaie=target.debuffs?.temporalWound;if(plaie&&damage>0&&actor.buffs?.damageUp?.source===plaie.source)target.debuffs.temporalWound={...plaie,stored:(plaie.stored||0)+Math.round(damage*(plaie.share||0))};if(damage>0&&actor.setEffects?.includes('lifestealSet')&&actor.hp<actor.maxHp){const life=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*.25)));actor.hp+=life;healingTotal+=life;event(actor,life,'heal',{sourceType:'lifesteal'});}const hunter=allies.find(unit=>unit.mechanic?.targetId===target.id&&unit.mechanic?.active&&!unit.dead);if(hunter&&hunter.id!==actor.id)hunter.atb=Math.min(100,hunter.atb+(Number(hunter.resonanceLevel||0)>=4?15:12));event(target,damage,'damage',{affinity:relation.key,critical});return{damage,critical,relation,absorbed}};
+    /* Plaie temporelle (Aszhal) : une part des degats infliges a cet ennemi par un allie qu'Aszhal a ameliore est mise de cote, puis rendue d'un coup a l'expiration. On reaffecte l'objet au lieu de le muter : une copie superficielle partagerait la meme reference entre deux unites. */const plaie=target.debuffs?.temporalWound;if(plaie&&damage>0&&actor.buffs?.damageUp?.source===plaie.source)majDebuff(target,'temporalWound',{stored:(plaie.stored||0)+Math.round(damage*(plaie.share||0))});if(damage>0&&actor.setEffects?.includes('lifestealSet')&&actor.hp<actor.maxHp){const life=Math.min(actor.maxHp-actor.hp,Math.max(1,Math.round(damage*.25)));actor.hp+=life;healingTotal+=life;event(actor,life,'heal',{sourceType:'lifesteal'});}const hunter=allies.find(unit=>unit.mechanic?.targetId===target.id&&unit.mechanic?.active&&!unit.dead);if(hunter&&hunter.id!==actor.id)hunter.atb=Math.min(100,hunter.atb+(Number(hunter.resonanceLevel||0)>=4?15:12));event(target,damage,'damage',{affinity:relation.key,critical});return{damage,critical,relation,absorbed}};
   const targets=skill.target==='allEnemies'?enemies.filter(unit=>!unit.dead):skill.target==='enemy'?[chosen]:[];
   const e=skill.effect,m=actor.mechanic||(actor.mechanic={value:0,max:5}),resonanceIV=Number(actor.resonanceLevel||0)>=4;const vexilInstabilityBefore=actor.id===24?Math.max(0,Math.min(5,Number(m.value)||0)):0;const ghoulTurns=Math.max(0,m.ghoulTurns||0),offensiveSkill=['enemy','allEnemies'].includes(skill.target),ghoulTarget=chosen?.side==='enemy'&&!chosen.dead?chosen:enemies.find(unit=>!unit.dead);if(ghoulTurns>0&&offensiveSkill&&ghoulTarget){const ghoulDamage=Math.round(actor.atk*.28);ghoulTarget.hp=Math.max(0,ghoulTarget.hp-ghoulDamage);ghoulTarget.dead=ghoulTarget.hp<=0;if(ghoulTarget.dead){ghoulTarget.atb=0;ghoulTarget.shield=0;}damageTotal+=ghoulDamage;event(ghoulTarget,ghoulDamage,'ghoul',{sourceType:'ghoul'});m.ghoulTurns=Math.max(0,ghoulTurns-1);m.value=m.ghoulTurns;m.active=m.ghoulTurns>0;if(m.ghoulTurns>0)actor.buffs.ghoul={turns:m.ghoulTurns+1,source:actor.id,damage:ghoulDamage};else delete actor.buffs.ghoul;logs.push(`💀 La Goule de ${actor.name} frappe ${ghoulTarget.name} : ${ghoulDamage} dégâts.`);}
   // Generic damage first, with unique modifiers.
@@ -617,7 +677,7 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
   if(e==='furyStrike'&&damageTotal>0){const rendu=heal(actor,Math.round(damageTotal*(resonanceIV?.26:.20))/COMBAT_TEMPO);if(rendu)logs.push(`${actor.name} se repaît du sang versé : ${rendu} PV récupérés.`);}
   if(e==='furyRecklessness'){actor.buffs.atkUp={turns:3+mastery.duration};const cout=Math.max(1,Math.round(pvReference(actor)*.08));actor.hp=Math.max(1,actor.hp-cout);event(actor,cout,'recoil');logs.push(`Témérité : Attaque augmentée, ${cout} PV sacrifiés.`);}
   // Givre (Sivrane) : cumule et ralentit, puis se brise en etourdissement.
-  if(e==='frostBolt'||e==='frostNova')targets.filter(x=>!x.dead).forEach(x=>{x.debuffs.frost={turns:3+mastery.duration,stacks:Math.min(5,(x.debuffs.frost?.stacks||0)+1),source:actor.id};debuff(x,'slow',2,.55);});
+  if(e==='frostBolt'||e==='frostNova')targets.filter(x=>!x.dead).forEach(x=>{poserDebuff(battle,actor,x,'frost',3+mastery.duration,{stacks:Math.min(5,(x.debuffs.frost?.stacks||0)+1)},resisted);debuff(x,'slow',2,.55);});
   if(e==='frostShatter'){const cumuls=chosen.debuffs.frost?.stacks||0;if(cumuls){delete chosen.debuffs.frost;if(cumuls>=3)debuff(chosen,'stun',1,resonanceIV?1:.85);logs.push(`Fracture glaciale : ${cumuls} cumul(s) de Givre brisé(s)${cumuls>=3?` — ${chosen.name} est figé`:''}.`);}}
   // Brumes (Yunmei) : la seconde source de purification du jeu.
   // Paume de brume frappait ET soignait a chaque coup, sans recharge : le seul
@@ -645,14 +705,14 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
   // Tout tient sur une ligne comme les autres effets du fichier : la derivation
   // des listes d'Empreintes lit des lignes, et un bloc multi-ligne la rendrait
   // aveugle a `mastery.duration` et `mastery.power`.
-  if(e==='breathOfEons'){const autres=allies.filter(x=>!x.dead&&x.id!==actor.id).length,part=(resonanceIV?.20:.15)*(autres>2?2/autres:1),marques=enemies.filter(x=>!x.dead);allies.filter(x=>!x.dead).forEach(x=>{x.buffs.damageUp={turns:2+mastery.duration,power:(resonanceIV?.16:.12)+(mastery.power||0),source:actor.id,label:'Souffle des éons'};x.atb=Math.min(99,(x.atb||0)+(resonanceIV?14:8));});marques.forEach(x=>{x.debuffs.temporalWound={turns:3+mastery.duration,source:actor.id,share:part,stored:0};});logs.push(`Souffle des éons : ${marques.length} Plaie${marques.length>1?'s':''} temporelle${marques.length>1?'s':''} · ${Math.round(part*100)} % des dégâts alliés amplifiés seront rendus.`);}
+  if(e==='breathOfEons'){const autres=allies.filter(x=>!x.dead&&x.id!==actor.id).length,part=(resonanceIV?.20:.15)*(autres>2?2/autres:1),marques=enemies.filter(x=>!x.dead);allies.filter(x=>!x.dead).forEach(x=>{x.buffs.damageUp={turns:2+mastery.duration,power:(resonanceIV?.16:.12)+(mastery.power||0),source:actor.id,label:'Souffle des éons'};x.atb=Math.min(99,(x.atb||0)+(resonanceIV?14:8));});marques.forEach(x=>{poserDebuff(battle,actor,x,'temporalWound',3+mastery.duration,{share:part,stored:0},resisted);});logs.push(`Souffle des éons : ${marques.length} Plaie${marques.length>1?'s':''} temporelle${marques.length>1?'s':''} · ${Math.round(part*100)} % des dégâts alliés amplifiés seront rendus.`);}
   // Incantation prolongee (Nyxaris) : charger coute un tour — le Sablier compte.
   if(e==='empowerCharge'){m.value=Math.min(3,(m.value||0)+1);retain=Math.max(retain,resonanceIV?26:18);logs.push(`Incantation prolongée : ${m.value}/3 Charge(s).`);}
   if(e==='disintegrate'||e==='eternitySurge'){const charges=m.value||0;m.value=0;if(charges)logs.push(`${charges} Charge(s) libérée(s).`);}
 
   if(e==='guardianLink'){allies.forEach(x=>{if(x.id!==chosen.id&&x.buffs?.guardianLink?.source===actor.id)delete x.buffs.guardianLink});const maxTurns=3+mastery.duration;actor.mechanic={...m,targetId:chosen.id,active:true};chosen.buffs.guardianLink={turns:maxTurns,maxTurns,source:actor.id,transfer:.30};retain=Math.max(retain,Math.round((mastery.effectRate||0)*100));chosen.atb=Math.min(100,(chosen.atb||0)+Math.round((mastery.power||0)*100));logs.push(`${chosen.name} est lié à Thorgar : 30 % des dégâts seront transférés pendant ${maxTurns} tour(s).`);}
   if(e==='guardianStrike'&&m.targetId){const linked=allies.find(x=>x.id===m.targetId&&!x.dead&&x.buffs?.guardianLink?.source===actor.id);if(linked){const link=linked.buffs.guardianLink,maximum=link.maxTurns||3;link.turns=Math.min(maximum,link.turns+1);logs.push(`Heurt runique prolonge le Serment de ${linked.name} : ${link.turns} tour(s) restant(s).`);}else{m.active=false;m.targetId=null;}}if(e==='guardianWall')allies.filter(x=>!x.dead).forEach(x=>shield(x,x.maxHp*(x.id===m.targetId?(resonanceIV?.31:.28):(resonanceIV?.20:.18))*(1+mastery.power)));
-  if(e==='huntMark'){enemies.forEach(target=>{if(target.id!==chosen.id&&target.debuffs?.hunt?.source===actor.id)delete target.debuffs.hunt;if(target.id!==chosen.id&&target.debuffs?.mark?.source===actor.id)delete target.debuffs.mark});chosen.debuffs.hunt={turns:4+mastery.duration,source:actor.id};chosen.debuffs.mark={turns:4+mastery.duration,source:actor.id};m.targetId=chosen.id;m.active=true;logs.push(`${chosen.name} devient la proie de Kaelen pendant ${chosen.debuffs.hunt.turns} tour(s) et subit 20 % de dégâts supplémentaires.`);}
+  if(e==='huntMark'){enemies.forEach(target=>{if(target.id!==chosen.id&&target.debuffs?.hunt?.source===actor.id)delete target.debuffs.hunt;if(target.id!==chosen.id&&target.debuffs?.mark?.source===actor.id)delete target.debuffs.mark});const traque=poserDebuff(battle,actor,chosen,'hunt',4+mastery.duration,null,resisted);poserDebuff(battle,actor,chosen,'mark',4+mastery.duration,null,resisted);m.targetId=traque?chosen.id:null;m.active=traque;logs.push(traque?`${chosen.name} devient la proie de Kaelen pendant ${chosen.debuffs.hunt.turns} tour(s) et subit 20 % de dégâts supplémentaires.`:`${chosen.name} résiste à la Traque : Volonté de fer.`);}
   if(['huntStrike','huntFinish'].includes(e)&&chosen.id===m.targetId)retain=22;
   if(e.startsWith('bladeDance')){const step=index+1;m.danceSteps=[...new Set([...(m.danceSteps||[]),step])];m.value=m.danceSteps.length;m.lastSkill=step;if(m.danceSteps.length>=3){m.value=0;m.danceSteps=[];retain=resonanceIV?115:100;logs.push(resonanceIV?'Danse complète : Vaeloria rejoue immédiatement avec 15 % de jauge conservée.':'Danse complète : Vaeloria rejoue immédiatement.');}}
   if(e==='bladeDanceDrain')chosen.atb=Math.max(0,chosen.atb-(resonanceIV?27:22));
@@ -662,11 +722,11 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
   if(e==='herbalThorn')debuff(chosen,'atkDown',2,.75);
   if(e==='healingSeed'){chosen.buffs.healingSeed={turns:4+mastery.duration,source:actor.id,power:Math.round(pvReference(actor)*(resonanceIV?.23:.2)*(1+mastery.power))};m.value=allies.filter(x=>x.buffs?.healingSeed?.source===actor.id).length;m.active=m.value>0;}
   if(e==='seedBloom'){allies.filter(x=>!x.dead).forEach(x=>{if(x.buffs.healingSeed){heal(x,x.buffs.healingSeed.power);cleanseUnit(x,1);delete x.buffs.healingSeed;}x.buffs.regen={turns:2+mastery.duration};});m.value=0;m.active=false;}
-  if(e==='shieldExpose'){chosen.debuffs.exposed={turns:2+mastery.duration,source:actor.id};const applied=debuff(chosen,'defDown',2,.80);logs.push(applied?`${chosen.name} est Exposé et subit Défense réduite.`:`${chosen.name} est Exposé, mais résiste à Défense réduite.`);}
+  if(e==='shieldExpose'){poserDebuff(battle,actor,chosen,'exposed',2+mastery.duration,null,resisted);const applied=debuff(chosen,'defDown',2,.80);logs.push(applied?`${chosen.name} est Exposé et subit Défense réduite.`:`${chosen.name} est Exposé, mais résiste à Défense réduite.`);}
   if(e==='refluxStrike'){const removed=Math.min(18,chosen.atb);chosen.atb-=removed;m.value=Math.min(60,(m.value||0)+Math.round(removed*(resonanceIV?1.2:1)));}
   if(e==='refluxDrain'){const removed=Math.min(32,chosen.atb);chosen.atb-=removed;debuff(chosen,'slow',2,.8);m.value=Math.min(60,(m.value||0)+removed);}
   if(e==='refluxRelease'){const stored=m.value||0,boost=stored>0?Math.max(1,Math.round(stored/Math.max(1,allies.filter(x=>!x.dead).length)*(1+mastery.power))):0;allies.filter(x=>!x.dead).forEach(x=>x.atb=Math.min(100,x.atb+boost));logs.push(`Marée redistribuée partage ${stored} Reflux : ${boost} % de jauge par allié.`);m.value=0;}
-  if(e==='virulentPoison')targets.forEach(t=>{const old=t.debuffs.virulence?.stacks||0;if(debuff(t,'poison',3,.85)){t.debuffs.virulence={turns:4+mastery.duration,stacks:Math.min(5,old+(resonanceIV?3:2))};}});if(e==='virulentSpread'){const source=[...enemies].filter(t=>t.debuffs?.virulence).sort((a,b)=>(b.debuffs.virulence.stacks||0)-(a.debuffs.virulence.stacks||0))[0],spread=Math.max(1,Math.floor((source?.debuffs?.virulence?.stacks||0)/2));targets.forEach(t=>{if(!source||t.id===source.id)return;if(debuff(t,'poison',3,.8))t.debuffs.virulence={turns:4+mastery.duration,stacks:Math.max(t.debuffs.virulence?.stacks||0,spread)};});logs.push(source?`Virulence de ${source.name} propagée à ${spread} cumul(s).`:'Aucune Virulence à propager.');}
+  if(e==='virulentPoison')targets.forEach(t=>{const old=t.debuffs.virulence?.stacks||0;if(debuff(t,'poison',3,.85)){poserDebuff(battle,actor,t,'virulence',4+mastery.duration,{stacks:Math.min(5,old+(resonanceIV?3:2))},resisted);}});if(e==='virulentSpread'){const source=[...enemies].filter(t=>t.debuffs?.virulence).sort((a,b)=>(b.debuffs.virulence.stacks||0)-(a.debuffs.virulence.stacks||0))[0],spread=Math.max(1,Math.floor((source?.debuffs?.virulence?.stacks||0)/2));targets.forEach(t=>{if(!source||t.id===source.id)return;if(debuff(t,'poison',3,.8))poserDebuff(battle,actor,t,'virulence',4+mastery.duration,{stacks:Math.max(t.debuffs.virulence?.stacks||0,spread)},resisted);});logs.push(source?`Virulence de ${source.name} propagée à ${spread} cumul(s).`:'Aucune Virulence à propager.');}
   if(e==='aegisStrike'){const low=[...allies].filter(x=>!x.dead).sort((a,b)=>(a.shield||0)-(b.shield||0))[0];if(low)shield(low,actor.maxHp*.08);}
   if(e==='rescueShield'){shield(chosen,chosen.maxHp*(resonanceIV?.38:.32)*(1+mastery.power));m.active=true;m.targetId=chosen.id;}
   if(e==='rescueSanctuary'){allies.filter(x=>!x.dead).forEach(x=>shield(x,x.maxHp*.16*(1+mastery.power)));m.active=true;m.targetId=null;}
@@ -685,7 +745,7 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
   if(e==='condemnStrip'){const protectedBuffs=new Set(['guardianLink','timeAnchor','ghoul','livingGarden','healingTotem']);const removable=Object.keys(chosen.buffs||{}).filter(key=>!protectedBuffs.has(key));removable.forEach(key=>delete chosen.buffs[key]);const gained=removable.length;m.value=Math.min(6,(m.value||0)+gained);m.active=m.value>0;logs.push(gained?`Dissipation sacrée retire ${gained} amélioration(s) : Condamnation ${m.value}/6.`:'Dissipation sacrée ne trouve aucune amélioration dissipable.');}
   if(e==='condemnStrike'&&(m.value||0)>0)logs.push(`Sentence radieuse est renforcée par ${m.value} charge(s) de Condamnation.`);
   if(e==='condemnJudgment'){const spent=m.value||0;if(spent)logs.push(`Jugement de l’Aube consume ${spent} charge(s) de Condamnation sur toute la zone.`);m.value=resonanceIV&&spent>0?1:0;m.active=m.value>0;if(m.value)logs.push('Résonance IV : 1 charge de Condamnation est conservée.');}
-  const alchemyReaction=t=>{const poison=Boolean(t.debuffs.poison),burn=Boolean(t.debuffs.burn),bleed=Boolean(t.debuffs.bleed),count=[poison,burn,bleed].filter(Boolean).length;if(count<2)return;if(poison&&bleed){const burst=Math.round(pvReference(t)*(count===3?.10:.06)*(resonanceIV?1.15:1)*(1+mastery.power));t.hp=Math.max(0,t.hp-burst);t.dead=t.hp<=0;damageTotal+=burst;event(t,burst,'damage');logs.push(`🧪 Réaction hémotoxique sur ${t.name} : ${burst} dégâts immédiats.`);}if(poison&&burn){t.debuffs.healingDown={turns:(count===3?3:2)+(resonanceIV?1:0)};logs.push(`🧪 Réaction caustique : soins reçus réduits sur ${t.name}.`);}if(burn&&bleed){t.debuffs.defDown={turns:(count===3?3:2)+(resonanceIV?1:0)};logs.push(`🧪 Réaction thermique : Défense réduite sur ${t.name}.`);}if(count===3){t.debuffs.slow={turns:resonanceIV?3:2};logs.push(`☣️ Catalyse parfaite sur ${t.name} : les afflictions sont conservées.`);}};
+  const alchemyReaction=t=>{const poison=Boolean(t.debuffs.poison),burn=Boolean(t.debuffs.burn),bleed=Boolean(t.debuffs.bleed),count=[poison,burn,bleed].filter(Boolean).length;if(count<2)return;if(poison&&bleed){const burst=Math.round(pvReference(t)*(count===3?.10:.06)*(resonanceIV?1.15:1)*(1+mastery.power));t.hp=Math.max(0,t.hp-burst);t.dead=t.hp<=0;damageTotal+=burst;event(t,burst,'damage');logs.push(`🧪 Réaction hémotoxique sur ${t.name} : ${burst} dégâts immédiats.`);}if(poison&&burn){poserDebuff(battle,actor,t,'healingDown',(count===3?3:2)+(resonanceIV?1:0),null,resisted);logs.push(`🧪 Réaction caustique : soins reçus réduits sur ${t.name}.`);}if(burn&&bleed){poserDebuff(battle,actor,t,'defDown',(count===3?3:2)+(resonanceIV?1:0),null,resisted);logs.push(`🧪 Réaction thermique : Défense réduite sur ${t.name}.`);}if(count===3){poserDebuff(battle,actor,t,'slow',resonanceIV?3:2,null,resisted);logs.push(`☣️ Catalyse parfaite sur ${t.name} : les afflictions sont conservées.`);}};
   if(e==='alchemyPoison')targets.forEach(t=>{debuff(t,'poison',3,.8);alchemyReaction(t)});
   if(e==='alchemyMix')targets.forEach(t=>{debuff(t,'poison',3,.8);debuff(t,'bleed',3,.8);alchemyReaction(t)});
   if(e==='alchemyCatalyst')targets.forEach(alchemyReaction);
@@ -740,10 +800,10 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
   // de seulement la subir.
   if(e==='healingTotem'){m.active=true;m.type='healingTotem';m.value=3+mastery.duration;allies.filter(x=>!x.dead).forEach(x=>{x.buffs.healingTotem={turns:m.value,source:actor.id};x.buffs.atkUp={turns:m.value};heal(x,x.maxHp*.1)});}
   if(e==='totemTide'){allies.filter(x=>!x.dead).forEach(x=>{heal(x,x.maxHp*(resonanceIV?.38:.32)*(1+mastery.power));x.buffs.speedUp={turns:2+mastery.duration};if(m.active&&x.buffs?.healingTotem?.source===actor.id)x.buffs.healingTotem.turns+=2;});if(m.active){m.value=Math.max(0,...allies.map(x=>x.buffs?.healingTotem?.source===actor.id?x.buffs.healingTotem.turns:0));logs.push(`Totem prolongé à ${m.value} tour(s).`);}}
-  if(e==='festeringStrike'){const previous=chosen.debuffs.festering?.stacks||0;if(debuff(chosen,'festering',5,1)){chosen.debuffs.festering={...chosen.debuffs.festering,turns:5+mastery.duration,stacks:Math.min(6,previous+2)};logs.push(`Blessures purulentes : ${chosen.debuffs.festering.stacks}/6 sur ${chosen.name}.`);}}
-  if(e==='festeringSpread')targets.forEach(t=>{const previous=t.debuffs.festering?.stacks||0;if(debuff(t,'festering',4,.85)){t.debuffs.festering={...t.debuffs.festering,turns:4+mastery.duration,stacks:Math.min(6,previous+1)};logs.push(`Blessures purulentes : ${t.debuffs.festering.stacks}/6 sur ${t.name}.`);}});
+  if(e==='festeringStrike'){const previous=chosen.debuffs.festering?.stacks||0;if(debuff(chosen,'festering',5,1)){majDebuff(chosen,'festering',{stacks:Math.min(6,previous+2)});logs.push(`Blessures purulentes : ${chosen.debuffs.festering.stacks}/6 sur ${chosen.name}.`);}}
+  if(e==='festeringSpread')targets.forEach(t=>{const previous=t.debuffs.festering?.stacks||0;if(debuff(t,'festering',4,.85)){majDebuff(t,'festering',{stacks:Math.min(6,previous+1)});logs.push(`Blessures purulentes : ${t.debuffs.festering.stacks}/6 sur ${t.name}.`);}});
   if(e==='apocalypse'){const stacks=chosen.debuffs.festering?.stacks||0;delete chosen.debuffs.festering;const duration=Math.max(1,Math.min(resonanceIV?5:4,stacks+(resonanceIV?1:0)));m.value=duration;m.ghoulTurns=duration;m.active=true;m.ghoulDamage=Math.round(actor.atk*.28);actor.buffs.ghoul={turns:duration+1,source:actor.id,damage:m.ghoulDamage};if(stacks){const extra=Math.round(actor.atk*.3*stacks);chosen.hp=Math.max(0,chosen.hp-extra);chosen.dead=chosen.hp<=0;if(chosen.dead){chosen.atb=0;chosen.shield=0;}damageTotal+=extra;event(chosen,extra,'damage');logs.push(`Apocalypse consomme ${stacks} Blessure(s) purulente(s) et invoque la Goule pour ${duration} attaque(s).`);}else logs.push('Apocalypse invoque la Goule pour 1 attaque, sans Blessure purulente consommée.');}
-  if(e==='agony'&&debuff(chosen,'agony',4,.85))chosen.debuffs.agony={...chosen.debuffs.agony,stacks:1};
+  if(e==='agony'&&debuff(chosen,'agony',4,.85))majDebuff(chosen,'agony',{stacks:1});
   if(e==='corruption')targets.forEach(t=>debuff(t,'corruption',4,.8));
   if(e==='rapture')targets.forEach(t=>{let burst=0;if(t.debuffs.agony){const stacks=Math.min(5,t.debuffs.agony.stacks||1);burst+=Math.round(pvReference(t)*(.018+.009*stacks));}if(t.debuffs.corruption)burst+=Math.round(t.maxHp*.035);if(t.debuffs.poison){const virulence=Math.max(1,t.debuffs.virulence?.stacks||1);burst+=Math.round(t.maxHp*.06*(1+.12*(virulence-1)));}if(t.debuffs.burn)burst+=Math.round(t.maxHp*.05*(t.setEffects?.includes('fireproofSet')?.75:1));if(t.debuffs.bleed)burst+=Math.round(t.maxHp*.045);burst=Math.round(burst*(1+mastery.power)*(resonanceIV?1.12:1));if(burst){t.hp=Math.max(0,t.hp-burst);t.dead=t.hp<=0;if(t.dead){t.atb=0;t.shield=0;}damageTotal+=burst;event(t,burst,'dot');logs.push(`🕯️ Extase déclenche ${burst} dégâts périodiques sur ${t.name} sans consommer les afflictions.`);}});
   if(e==='soulCleaveBuilder')m.value=Math.min(5,(m.value||0)+1);
@@ -769,10 +829,10 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
       logs.push(`✦ ${astres.uniqueWeapon.name} : l’alignement protecteur accorde ${egide} de bouclier à chaque allié.`);
     }
   }
-  if(actor.uniqueWeapon&&damageTotal>0){actor.weaponCharge=(actor.weaponCharge||0)+1;const trigger=actor.uniqueWeapon.uniqueId==='heartworld'?5:4;if(actor.weaponCharge>=trigger&&chosen&&!chosen.dead){const bonus=Math.round(actor.atk*(actor.uniqueWeapon.uniqueId==='eclipse'?.58:.42));chosen.hp=Math.max(0,chosen.hp-bonus);chosen.dead=chosen.hp<=0;damageTotal+=bonus;event(chosen,bonus,'damage',{affinity:'neutral',weapon:true});if(actor.uniqueWeapon.uniqueId==='heartworld')chosen.debuffs.burn={turns:2,source:actor.id,sourceAtk:actor.atk};if(actor.uniqueWeapon.uniqueId==='stormprince')chosen.atb=Math.max(0,chosen.atb-15);if(actor.uniqueWeapon.uniqueId==='plague'&&Object.keys(chosen.debuffs||{}).length)chosen.debuffs.healingDown={turns:2};if(actor.uniqueWeapon.uniqueId==='sepulchral'){
+  if(actor.uniqueWeapon&&damageTotal>0){actor.weaponCharge=(actor.weaponCharge||0)+1;const trigger=actor.uniqueWeapon.uniqueId==='heartworld'?5:4;if(actor.weaponCharge>=trigger&&chosen&&!chosen.dead){const bonus=Math.round(actor.atk*(actor.uniqueWeapon.uniqueId==='eclipse'?.58:.42));chosen.hp=Math.max(0,chosen.hp-bonus);chosen.dead=chosen.hp<=0;damageTotal+=bonus;event(chosen,bonus,'damage',{affinity:'neutral',weapon:true});if(actor.uniqueWeapon.uniqueId==='heartworld')poserDebuff(battle,actor,chosen,'burn',2,null,resisted);if(actor.uniqueWeapon.uniqueId==='stormprince')chosen.atb=Math.max(0,chosen.atb-15);if(actor.uniqueWeapon.uniqueId==='plague'&&Object.keys(chosen.debuffs||{}).length)poserDebuff(battle,actor,chosen,'healingDown',2,null,resisted);if(actor.uniqueWeapon.uniqueId==='sepulchral'){
       // La chronique fait choisir entre lame purifiée et lame corrompue. Seule
       // la corrompue existait : choisir la purification ne donnait rien.
-      if(actor.uniqueWeapon.orientation==='corrupted')chosen.debuffs.corruption={turns:3,source:actor.id,sourceAtk:actor.atk};
+      if(actor.uniqueWeapon.orientation==='corrupted')poserDebuff(battle,actor,chosen,'corruption',3,null,resisted);
       else{const proteger=allies.filter(x=>!x.dead).sort((a,b)=>a.hp/a.maxHp-b.hp/b.maxHp)[0];
         if(proteger){const retires=cleanseUnit(proteger,1);
           heal(proteger,proteger.maxHp*.08);
@@ -798,7 +858,7 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
     aPropager.forEach(([cle,valeur])=>{
       enemies.filter(x=>!x.dead&&!x.debuffs?.[cle])
         .slice(0,Math.max(0,Math.round(contagion)))
-        .forEach(voisin=>{voisin.debuffs[cle]={...valeur};propages.push(`${DEBUFF_LABELS[cle]||cle} sur ${voisin.name}`)});
+        .forEach(voisin=>{if(poserDebuff(battle,actor,voisin,cle,valeur?.turns,valeur,resisted))propages.push(`${DEBUFF_LABELS[cle]||cle} sur ${voisin.name}`)});
     });
     if(propages.length)logs.push(`${actor.cleDeVoute?.nom||'Contagion'} : ${propages.join(', ')}.`);
   }

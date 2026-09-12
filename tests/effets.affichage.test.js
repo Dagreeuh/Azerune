@@ -45,8 +45,10 @@ describe('Précision réduite',()=>{
     return acteur.debuffs.accuracyDown?'reduite':'pleine';
   }
 
-  it('la zone Œil-Clair applique bien le malus',()=>{
-    expect(moteur).toContain("victim.debuffs.accuracyDown={turns:2}");
+  it('la zone Œil-Clair applique bien le malus, et par le jet de résistance',()=>{
+    // Le malus tombait a coup sur : la Resistance du joueur n'y pouvait rien.
+    // Il passe desormais par `tryDebuff`, donc par debuffChance().
+    expect(moteur).toContain("tryDebuff(actor,victim,'accuracyDown',2,CHANCE_MECANIQUE_ZONE");
   });
 
   it('le malus est reellement lu par le calcul de chance',()=>{
