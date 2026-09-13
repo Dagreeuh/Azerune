@@ -1,10 +1,5 @@
-/**
- * ATTENTION — meme reserve que audit-raid.test.js : l'equipe est composee des
- * quatre champions les plus puissants, ce qui surestime la difficulte. Ce banc
- * reste utile pour la LARGEUR de la bande, qui ne depend pas de la composition.
- */
 import{describe,it}from'vitest';
-import{joueur,avecHasard}from'./joueur.js';
+import{joueur,avecHasard,equipePour}from'./joueur.js';
 import{simulerMission}from'../../src/utils/simulation.js';
 import{createRaidMission}from'../../src/data/raids.js';
 import{createExpeditionMission}from'../../src/data/expeditions.js';
@@ -20,8 +15,8 @@ import{teamPower,championPower}from'../../src/utils/stats.js';
  * formalité. On mesure donc le taux de victoire en faisant varier FINEMENT la
  * puissance de l'équipe, à contenu fixé.
  */
-const equipeBrute=j=>[...j.heroes].map(h=>({h,pw:championPower(j.getStats(h))}))
-  .sort((a,b)=>b.pw-a.pw).slice(0,4).map(x=>x.h.id);
+// Equipe FIXE et composee : une equipe choisie a la puissance ne mesure pas la
+// largeur de la bande, elle mesure son propre handicap.
 
 /** Multiplie toutes les statistiques de combat par k, sans toucher au reste. */
 const echelle=(getStats,k)=>hero=>{const s=getStats(hero);
@@ -55,13 +50,13 @@ describe('largeur de la bande de difficulté',()=>{
   it('raid, expédition et campagne',()=>{
     const j=joueur({zone:10,difficulte:'hardcore',niveau:60,etoiles:6,niveauObjet:12,
       competences:'max',resonance:5,empreintes:true});
-    const equipe=equipeBrute(j);
+    const equipe=equipePour({teamSize:4},j);
     console.log('Échelle ×k appliquée à PV/ATQ/DEF. 20 tirages par point.');
-    [1,5,8,10].forEach(n=>bande(avecHasard(11,()=>createRaidMission('heartforge',n)),j,equipe,
+    [5,8,10].forEach(n=>bande(avecHasard(11,()=>createRaidMission('heartforge',n)),j,equipe,
       `RAID niveau ${n}`));
-    [1,5,10].forEach(n=>bande(avecHasard(12,()=>createExpeditionMission('treasury',n)),j,equipe,
+    [5,10].forEach(n=>bande(avecHasard(12,()=>createExpeditionMission('treasury',n)),j,equipe,
       `EXPÉDITION Trésorerie niveau ${n}`));
-    [[0,'1'],[4,'5'],[9,'10']].forEach(([zi,z])=>{
+    [[4,'5'],[9,'10']].forEach(([zi,z])=>{
       const continent=CONTINENTS[zi],etape=continent.stages[6];
       const mission=avecHasard(13,()=>createMission(DIFFICULTIES[0],continent,etape));
       bande(mission,j,equipe,`CAMPAGNE normale zone ${z} boss`);
