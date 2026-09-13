@@ -502,9 +502,27 @@ export function chooseAutoEnemyTarget(battle,actor,skill){
   return enemies.map((enemy,index)=>({enemy,value:score(enemy,index)})).sort((a,b)=>a.value-b.value)[0]?.enemy||enemies[0];
 }
 
+/**
+ * Sorts qui exigent un AUTRE allie que le lanceur.
+ *
+ * `castSkill` refuse deja ces sorts si la cible est le lanceur — mais le
+ * pilote automatique, lui, pouvait parfaitement designer le lanceur : il trie
+ * les allies par points de vie, et le lanceur est un allie comme un autre.
+ * Thorgar gaspillait ainsi 7 a 18 tours sur 40, sans aucun message visible
+ * pour le joueur : son tour passait, simplement.
+ *
+ * La liste vit ICI, a cote du choix de cible, et non a cote du refus : c'est
+ * le choix qui doit eviter l'impasse, le refus n'est qu'un dernier rempart.
+ */
+const AUTO_AUTRE_ALLIE=new Set(['guardianLink']);
+
 export function chooseAutoAllyTarget(battle,actor,skill){
-  const allies=livingLeft(battle?.allies);if(!allies.length)return null;
+  const vivants=livingLeft(battle?.allies);if(!vivants.length)return null;
   const effect=skill?.effect;
+  // Retirer le lanceur AVANT le tri : le garder puis le rejeter apres coup
+  // reviendrait a choisir une cible impossible et a perdre le tour.
+  const allies=AUTO_AUTRE_ALLIE.has(effect)?vivants.filter(unit=>unit.id!==actor?.id):vivants;
+  if(!allies.length)return null;
   return [...allies].sort((a,b)=>{
     let sa=0,sb=0;
     if(effect==='healingSeed'){sa+=a.buffs?.healingSeed?500:0;sb+=b.buffs?.healingSeed?500:0;}
