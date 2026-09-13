@@ -13,8 +13,12 @@ export const RAID_DAILY_ATTEMPTS=5;
  * « il te manque un soigneur ». Cette table annonce donc ce que demande une
  * equipe correctement composee, et la fenetre de preparation affiche desormais
  * les manques de composition a cote.
+ *
+ * Valeurs revues une seconde fois apres le correctif du seuil d'Eruption : le
+ * quatrieme champion n'etant plus une punition, une equipe de quatre franchit
+ * les memes niveaux avec moins de puissance qu'avant.
  */
-export const RAID_POWER=[4200,4500,4900,5100,5600,6500,7500,8500,10200,11500];
+export const RAID_POWER=[3400,3700,4300,5100,5400,6200,7000,7900,8800,10200];
 
 const mechanics=[
   ['Cœur incandescent','Rhazakar gagne une charge à chaque action de champion.'],

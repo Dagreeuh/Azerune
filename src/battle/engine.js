@@ -131,6 +131,28 @@ const tryDebuff=(actor,target,key,turns,baseChance,mastery,resisted)=>{
 export const winner=(allies,enemies)=>enemies.every(unit=>unit.dead)?'ally':allies.every(unit=>unit.dead)?'enemy':null;
 export function advanceMythicWave(battle){if(!battle?.mythic||battle.winner!=='ally'||battle.wave>=battle.totalWaves)return battle;const nextWave=battle.wave+1,enemies=makeEnemies(battle.waves[nextWave-1],1,nextWave),allies=battle.allies.map(unit=>({...unit,atb:Math.min(25,Number(unit.atb)||0),buffs:{...unit.buffs},debuffs:{...unit.debuffs}}));return{...battle,allies,enemies,wave:nextWave,winner:null,turn:null,affixState:{...(battle.affixState||{}),deathsThisWave:0,revived:false},lastEvents:[],log:[`Vague ${nextWave}/${battle.totalWaves} : de nouveaux ennemis apparaissent.`,...(battle.log||[])].slice(0,16)}}
 
+/**
+ * Seuil d'Eruption, proportionnel a la taille de l'equipe.
+ *
+ * Le Coeur incandescent gagne une charge A CHAQUE ACTION DE CHAMPION. Une
+ * equipe de quatre agit donc un tiers plus souvent qu'une equipe de trois et
+ * declenche l'Eruption un tiers plus tot. Mesure, au niveau 10 : le trio
+ * gagnait 47 fois sur 60, et l'ajout d'un quatrieme champion faisait tomber ce
+ * chiffre entre 7 et 18 selon le renfort choisi.
+ *
+ * Autrement dit : le Raid est annonce 4v4, et jouer a quatre etait une
+ * punition allant jusqu'a 85 % du taux de victoire. Le quatrieme emplacement
+ * existait pour etre laisse vide.
+ *
+ * La mecanique annoncee ne change pas — une charge par action, la tension
+ * reste la meme. C'est le SEUIL qui suit desormais le nombre de champions
+ * amenes, de sorte que l'Eruption arrive au meme rythme quelle que soit la
+ * taille du groupe. Le trio reste la reference : il garde exactement le
+ * comportement qu'il avait.
+ */
+export const seuilEruption=(eruptionAt,champions)=>
+  Math.max(3,Math.round(eruptionAt*Math.max(1,Math.min(4,champions||3))/3));
+
 export function createBattle(team,heroes,getStats,options={}){
   const rawEnemySource=options.enemies||ENEMIES,affixes=options.affixIds||[];const enemySource=rawEnemySource.map(enemy=>{const boss=Boolean(enemy.bossUnit),fortified=affixes.includes('fortified')&&!boss,tyrannical=affixes.includes('tyrannical')&&boss;return{...enemy,hp:Math.round(enemy.hp*(fortified?1.20:tyrannical?1.25:1)),atk:Math.round(enemy.atk*(fortified?1.12:tyrannical?1.15:1)),resistance:(enemy.resistance||15)+(fortified?5:0),accuracy:(enemy.accuracy||10)+(tyrannical?8:0)}});
   const enemyScale=options.enemyScale||1;
@@ -155,7 +177,7 @@ export function createBattle(team,heroes,getStats,options={}){
             active:depart>0&&plafond>0?true:unite.mechanic.active}};
       }),
     enemies:makeEnemies(enemySource,enemyScale,1).map(unit=>options.regle?.id==='hate'?{...unit,atb:100}:unit).map(unit=>options.tutorialBattle?{...unit,atb:0}:unit),
-    regle:options.regle||null,difficulte:options.difficulte||null,turn:null,winner:null,rewarded:false,combatStats:Object.fromEntries(team.map(id=>[id,emptyCombatStat()])),mythic:options.mythic||null,mythicState:options.mythic?createMythicState(options.mythic.turnBudget):null,wave:1,totalWaves:options.waves?.length||1,waves:options.waves||null,affixState:affixState(options.affixIds),raid:options.raid||null,raidState:options.raid?{charges:0,maxCharges:options.raid.eruptionAt||10,phaseTwo:false,failedMechanic:null,mechanicFailures:0,championActions:0,enrageAt:options.raid.enrageAt||40,enraged:false,enrageTriggeredAt:null,emberRespawnActions:options.raid.emberRespawnActions||7,emberRespawnAt:null,channelAt:options.raid.channelFrom??null,channelActions:options.raid.channelActions||4,channeling:false,channelEndsAt:null,channelsInterrupted:0,channelsCompleted:0}:null,lastEvents:[],eventSeq:0,log:['Le combat commence.']
+    regle:options.regle||null,difficulte:options.difficulte||null,turn:null,winner:null,rewarded:false,combatStats:Object.fromEntries(team.map(id=>[id,emptyCombatStat()])),mythic:options.mythic||null,mythicState:options.mythic?createMythicState(options.mythic.turnBudget):null,wave:1,totalWaves:options.waves?.length||1,waves:options.waves||null,affixState:affixState(options.affixIds),raid:options.raid||null,raidState:options.raid?{charges:0,maxCharges:seuilEruption(options.raid.eruptionAt||10,team.length),phaseTwo:false,failedMechanic:null,mechanicFailures:0,championActions:0,enrageAt:options.raid.enrageAt||40,enraged:false,enrageTriggeredAt:null,emberRespawnActions:options.raid.emberRespawnActions||7,emberRespawnAt:null,channelAt:options.raid.channelFrom??null,channelActions:options.raid.channelActions||4,channeling:false,channelEndsAt:null,channelsInterrupted:0,channelsCompleted:0}:null,lastEvents:[],eventSeq:0,log:['Le combat commence.']
   };
 }
 

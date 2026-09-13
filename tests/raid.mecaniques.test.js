@@ -1,9 +1,10 @@
 import{describe,it,expect}from'vitest';
 import{RAIDS,createRaidMission,raidLevelData,RAID_POWER,NIVEAU_PRETRE,NIVEAU_GARDIEN,CANALISATION_DEPART}from'../src/data/raids';
 import{optionsDeCombat}from'../src/utils/simulation';
-import{createBattle,nextTurn,enemyAction,winner,performAutoAction}from'../src/battle/engine';
+import{createBattle,nextTurn,enemyAction,winner,performAutoAction,seuilEruption}from'../src/battle/engine';
 import{joueur,avecHasard,equipePour}from'../Audit/mesures/joueur';
 import{teamPower}from'../src/utils/stats';
+import{simulerMission}from'../src/utils/simulation';
 
 /**
  * Les mécaniques annoncées du Raid doivent exister, et arriver quand le jeu
@@ -81,5 +82,43 @@ describe('les mécaniques du Raid arrivent quand le jeu l’annonce',()=>{
     const j=joueur({zone:10,difficulte:'normal',niveau:60,etoiles:6,niveauObjet:15,competences:'max'});
     const mission=createRaidMission(RAID,10);
     expect(RAID_POWER[9]).toBeLessThanOrEqual(teamPower(equipePour(mission,j),j.heroes,j.getStats)*1.2);
+  });
+});
+
+/**
+ * Le Raid est annoncé 4v4. Le quatrième champion doit aider, pas punir.
+ *
+ * Le Cœur incandescent gagne une charge à chaque action de champion : une
+ * équipe de quatre agissait un tiers plus souvent et déclenchait l'Éruption un
+ * tiers plus tôt. Mesuré au niveau 10 : le trio gagnait 47 fois sur 60, et
+ * l'ajout d'un quatrième champion faisait tomber ce chiffre entre 7 et 18.
+ * Le quatrième emplacement existait pour être laissé vide.
+ */
+describe('le quatrième champion du Raid n’est plus une punition',()=>{
+  it('le seuil d’Éruption suit la taille de l’équipe',()=>{
+    // Le trio reste la référence : son seuil ne bouge pas.
+    expect(seuilEruption(9,3)).toBe(9);
+    expect(seuilEruption(9,4)).toBeGreaterThan(seuilEruption(9,3));
+    // Rapport proportionnel : l'Éruption arrive au même rythme par tour.
+    expect(seuilEruption(9,4)).toBe(12);
+    // Jamais en dessous d'un plancher jouable, ni au-dessus de quatre.
+    expect(seuilEruption(1,1)).toBeGreaterThanOrEqual(3);
+    expect(seuilEruption(9,9)).toBe(seuilEruption(9,4));
+  });
+
+  it('à armes égales, quatre champions valent mieux que trois',()=>{
+    const j=joueur({zone:9,difficulte:'normal',niveau:50,etoiles:5,niveauObjet:12,competences:'max'});
+    const noyau=['Hicho','Aurelis','Morghast'].map(n=>j.heroes.find(h=>h.name===n).id);
+    // Vexil, et pas n'importe qui : la mesure d'origine le donnait a 37
+    // victoires sur 60 la ou le trio seul en faisait 57. Ignovar, lui, etait
+    // deja neutre — le prendre comme renfort laissait le defaut invisible, et
+    // un mutant qui retire le correctif passait le test.
+    const renfort=j.heroes.find(h=>h.name==='Vexil').id;
+    const mission=avecHasard(11,()=>createRaidMission(RAID,9));
+    const taux=equipe=>[1,2].reduce((s,g)=>s+avecHasard(g*977,()=>simulerMission({mission,
+      team:equipe,heroes:j.heroes,getStats:j.getStats,tirages:20})).victoires,0);
+    const trois=taux(noyau),quatre=taux([...noyau,renfort]);
+    // Le defaut d'origine, en une ligne : le quatrieme faisait PERDRE.
+    expect(quatre).toBeGreaterThanOrEqual(trois);
   });
 });

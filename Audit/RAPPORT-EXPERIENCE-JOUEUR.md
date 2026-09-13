@@ -2758,3 +2758,42 @@ pires que l'actuelle. Le tranchant ne vient pas du dosage mais de la létalité 
 combat lui-même — c'est un chantier de mathématiques de combat, pas de réglage.
 
 Suite complète : **1 853 tests**, 93 fichiers.
+
+### 1.88.0 — Le quatrième emplacement du Raid existait pour rester vide
+
+Suite directe de l'audit : en refaisant le banc d'apport avec un **noyau
+correctement composé** (Hicho, Aurelis, Morghast), un résultat inattendu tombe —
+le trio seul franchit le raid 10, et **ajouter un quatrième champion fait
+reculer l'équipe pour 24 champions sur 29.**
+
+Cause, vérifiée dans le moteur : `raidState.charges += 1` **par action de
+champion**. Quatre champions agissent un tiers plus souvent que trois et
+déclenchent l'Éruption un tiers plus tôt.
+
+| Niveau 10 | Victoires sur 60 |
+|---|---|
+| trio seul | 47 |
+| + Ignovar | 46 |
+| + Vexil | 12 |
+| + Brom | 18 |
+| + Brilith | 18 |
+| + Vharok | **7** |
+
+Le Raid est annoncé 4v4 et jouer à quatre coûtait jusqu'à 85 % du taux de
+victoire.
+
+Correctif : le seuil d'Éruption suit la taille du groupe (`seuilEruption`). La
+mécanique annoncée — une charge par action — ne change pas ; seul le seuil
+s'adapte, de sorte que l'Éruption arrive au même rythme par tour. Le trio garde
+exactement son comportement.
+
+Après correctif, aux niveaux 7-8 : toutes les équipes testées passent de 17-60 à
+**51-60** victoires. `RAID_POWER` est relevée une seconde fois, la carte du raid
+devenant un escalier monotone d'un bout à l'autre de l'échelle.
+
+Une leçon de méthode, encore : le premier test écrit pour garder ce correctif
+prenait **Ignovar** comme quatrième — le seul renfort déjà neutre avant
+correction. Le mutant qui retire le correctif passait le test. Il prend
+désormais Vexil, que la mesure donnait à 37 contre 57 pour le trio seul.
+
+Suite complète : **1 855 tests**, 93 fichiers.
