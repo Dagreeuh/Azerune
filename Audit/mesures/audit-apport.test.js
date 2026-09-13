@@ -27,27 +27,40 @@ import{championPower}from'../../src/utils/stats.js';
  */
 const NOMS_NOYAU=['Hicho','Aurelis','Morghast'];
 
+/**
+ * On ne mesure pas un SEUIL entier : avec dix niveaux de raid pour trente
+ * champions, tout le monde se retrouve sur la meme marche et rien n'est
+ * departage. On fixe la rencontre au point de bascule du noyau seul, et on
+ * compte les victoires sur 100. C'est une regle graduee, pas un couperet.
+ */
 describe('apport de chaque champion a une equipe bien composee',()=>{
-  it('plus haut niveau de raid franchi, quatrieme place tournante',()=>{
-    const j=joueur({zone:9,difficulte:'normal',niveau:50,etoiles:5,niveauObjet:12,competences:'max'});
+  it('victoires sur 100 a la rencontre de bascule',()=>{
+    const j=joueur({zone:5,difficulte:'normal',niveau:30,etoiles:4,niveauObjet:6,competences:3});
     const noyau=NOMS_NOYAU.map(n=>j.heroes.find(h=>h.name===n).id);
-    const missions=Array.from({length:10},(u,i)=>avecHasard(11,()=>createRaidMission('heartforge',i+1)));
-    const taux=(mission,equipe)=>[1,2].reduce((s,g)=>s+avecHasard(g*977,()=>simulerMission({mission,
-      team:equipe,heroes:j.heroes,getStats:j.getStats,tirages:15})).victoires,0);
-    const seuil=equipe=>{let haut=0;for(let n=1;n<=10;n+=1){if(taux(missions[n-1],equipe)>=15)haut=n;else break}return haut};
-    const temoin=seuil(noyau);
-    console.log(`\nNoyau seul (3 champions : ${NOMS_NOYAU.join(', ')}) : raid ${temoin}`);
+    const taux=(mission,equipe)=>[1,2,3,4,5].reduce((s,g)=>s+avecHasard(g*977,()=>
+      simulerMission({mission,team:equipe,heroes:j.heroes,getStats:j.getStats,tirages:20})).victoires,0);
+    // Chercher le niveau ou le noyau seul est le plus indecis : c'est la que le
+    // quatrieme champion se voit.
+    let bascule=1,meilleur=999;
+    for(let n=1;n<=10;n+=1){
+      const m=avecHasard(11,()=>createRaidMission('heartforge',n));
+      const ecart=Math.abs(taux(m,noyau)-50);
+      if(ecart<meilleur){meilleur=ecart;bascule=n;}
+    }
+    const mission=avecHasard(11,()=>createRaidMission('heartforge',bascule));
+    const temoin=taux(mission,noyau);
+    console.log(`\nRencontre de bascule : raid ${bascule}. Noyau seul (${NOMS_NOYAU.join(', ')}) : ${temoin}/100`);
     const lignes=j.heroes.filter(h=>!noyau.includes(h.id)).map(h=>({h,
-      pw:championPower(j.getStats(h)),niveau:seuil([...noyau,h.id])}));
-    lignes.sort((a,b)=>b.niveau-a.niveau||b.pw-a.pw);
-    const tri=[...lignes].map(l=>l.niveau).sort((a,b)=>a-b);
+      pw:championPower(j.getStats(h)),v:taux(mission,[...noyau,h.id])}));
+    lignes.sort((a,b)=>b.v-a.v);
+    const tri=[...lignes].map(l=>l.v).sort((a,b)=>a-b);
     const median=tri[Math.floor(tri.length/2)];
-    console.log(`Mediane du roster : raid ${median}. Apport = seuil - ${temoin} (noyau seul).`);
-    console.log('champion        rar elem     | puissance | raid max | apport');
+    console.log(`Mediane du roster : ${median}/100.`);
+    console.log('champion        rar elem     | puissance | victoires | vs noyau seul');
     lignes.forEach(l=>{
-      const apport=l.niveau-temoin;
-      const marque=l.niveau<median-1?' INUTILE':l.niveau<median?' faible':l.niveau>median+1?' FORT':'';
-      console.log(`${l.h.name.padEnd(15)} ${l.h.rarity}* ${l.h.element.padEnd(8)} | ${String(l.pw).padStart(9)} | ${String(l.niveau).padStart(8)} | ${(apport>0?'+':'')+apport}${marque}`);
+      const d=l.v-temoin;
+      const marque=l.v<median-20?'  TRES FAIBLE':l.v<median-10?'  faible':l.v>median+12?'  FORT':'';
+      console.log(`${l.h.name.padEnd(15)} ${l.h.rarity}* ${l.h.element.padEnd(8)} | ${String(l.pw).padStart(9)} | ${String(l.v).padStart(9)} | ${(d>0?'+':'')+d}${marque}`);
     });
   });
 },{timeout:1800000});

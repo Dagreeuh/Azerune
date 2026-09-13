@@ -2797,3 +2797,68 @@ correction. Le mutant qui retire le correctif passait le test. Il prend
 désormais Vexil, que la mesure donnait à 37 contre 57 pour le trio seul.
 
 Suite complète : **1 855 tests**, 93 fichiers.
+
+### 1.88.1 — Pourquoi le roster est plat : les dégâts ne servent à rien
+
+Dernière étape de l'audit des champions. Deux bancs, croisés, donnent le
+résultat le plus important de tout ce travail.
+
+**Le classement.** `Audit/mesures/audit-classement.test.js` fait tourner la
+quatrième place d'une équipe bien composée sur **quatre rencontres d'éléments
+différents**, chacune ramenée par dichotomie à son point de bascule — une
+rencontre gagnée 60 fois sur 60 ne classe personne. 240 tirages par champion.
+
+Résultat : de **123 à 231** sur 240. Près du simple au double.
+
+**L'inversion de rareté est confirmée.** Thorgar, **3★**, est premier avec 231.
+Brilith et Vélomoteur, **5★**, sont en bas à 133 et 142. La promesse centrale
+d'un jeu à invocations — plus rare, plus fort — est fausse.
+
+**Ce n'est pas une question de statistiques.** Les budgets de base sont plats :
+±5 % autour de la moyenne de chaque rareté, quand les scores varient du simple
+au double. Thorgar a le budget le plus FAIBLE des 3★ (551, −2 %) et le meilleur
+score. Les augmenter n'aurait fait qu'enfler les chiffres de puissance.
+
+**La cause, en croisant avec le banc de kits :**
+
+| Champion | Dégâts/action | Malus | Soin / bouclier | Score d'équipe |
+|---|---|---|---|---|
+| Vélomoteur (5★) | 263 (+87 %) | 0 | 0 | **142** |
+| Brilith (5★) | 236 (+67 %) | 0 | 0 | **133** |
+| Vharok (4★) | 193 (+37 %) | 0 | 0 | **129** |
+| Nyxaris (4★) | 162 (+15 %) | 0 | 0 | **123** |
+| Maerys (4★) | 112 (−21 %) | 49 | 13 buffs | **227** |
+| Mathanae (5★) | 66 (−53 %) | 35 | 450 + 766 | **229** |
+| Thorgar (3★) | 24 (−83 %) | 0 | 952 bouclier | **231** |
+
+**La corrélation est inversée, et presque parfaite : plus un champion inflige
+de dégâts par action, moins il fait gagner son équipe.** Les cinq champions
+sans aucune utilité — ni malus, ni soin, ni bouclier — occupent les cinq
+dernières places. Les trois premiers sont ceux qui en apportent le plus.
+
+C'est la cause unique derrière tout ce que l'audit a trouvé par ailleurs : le
+raid qui exige un soigneur, les vingt-deux champions qui semblaient
+interchangeables, la rareté qui ne veut rien dire. **Les dégâts purs ne
+décident de rien**, parce qu'un combat se gagne en tenant, pas en tuant vite :
+la mitigation `100/(100+DÉF×3)` écrase les dégâts bruts pendant que soins et
+boucliers se calculent sur les PV max de l'allié, que l'ennemi ne réduit pas.
+
+### Ce que je n'ai pas fait, et pourquoi
+
+Je n'ai pas réécrit les sept kits faibles. La mesure dit que ce ne serait pas
+le bon geste : leur problème n'est pas d'être mal écrits, c'est que la catégorie
+entière à laquelle ils appartiennent — les frappeurs purs — n'a pas de valeur
+dans ce moteur. Réécrire sept kits sans toucher à cela reviendrait à les
+convertir tous en soutiens, et à effacer le peu de variété qui reste.
+
+Le geste juste est systémique : **faire compter les dégâts**, ou accepter un jeu
+centré sur le soutien et l'assumer dans la conception des champions. Les deux
+sont défendables, mais c'est un choix de direction, pas un réglage — et il
+touche par construction tous les calibrages posés dans les versions
+précédentes. Il mérite son propre chantier.
+
+Je n'ai pas non plus créé de nouveaux champions. Le roster est déséquilibré
+(**Nature 8, Lumière 4**), mais ajouter des champions avant de savoir ce qu'un
+champion doit faire pour être utile reviendrait à en ajouter d'inutiles.
+
+Suite complète : **1 855 tests**, 93 fichiers. Bancs de mesure : 19 fichiers.
