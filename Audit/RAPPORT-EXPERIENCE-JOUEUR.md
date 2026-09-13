@@ -2931,3 +2931,38 @@ Caelion (166), Yunmei (179)** — trois Arcane sur quatre. Leur écart ne vient
 plus du moteur : c'est la phase 2.
 
 Suite complète : **1 861 tests**, 94 fichiers.
+
+### 1.89.1 — Phase 2 : ce qui se corrige par les chiffres, et ce qui ne s'y corrige pas
+
+Le classement à un seul noyau **punissait les champions qui doublent le rôle du
+noyau** : Yunmei, qui rend 1 863 points de soin par action au banc de kits,
+sortait dernière pour cette seule raison. Le banc fait désormais tourner **trois
+compositions** (avec soin, sans soin, sans bouclier), chacune calibrée
+séparément — une version intermédiaire ne calibrait que sur le premier noyau, et
+les cellules du bas saturaient à zéro, rendant invisible tout renforcement.
+
+Classement corrigé, médiane 71/288. Le fond : **Caelion 6, Aszhal 9,
+Nyxaris 12**, puis Vharok 23, Sylven 26. Les trois derniers sont Arcane.
+
+**Nyxaris se corrige par les chiffres.** Kit de dégât pur, aucun autre levier
+que le paiement des Charges. Porté de +30 % à +50 % par Charge (et +25 % à +40 %
+en zone) : **12 → 33**. Son pilotage automatique était déjà correct — vérifié en
+combat, il dépense à 3,0 Charges de moyenne.
+
+**Aszhal et Caelion ne s'y corrigent pas.** Deux passes successives :
+
+| Essai | Aszhal | Caelion |
+|---|---|---|
+| référence | 9 | 6 |
+| ×2 sur leurs chiffres signature | 10 | 6 |
+| amplification d'équipe entière / tour complet offert | 13 | 6 |
+
+Quadrupler leurs effets ne produit rien de mesurable. Leur kit ne souffre pas
+d'un nombre trop bas : il produit des effets que ce moteur ne récompense pas.
+Vérifié au passage sur la Plaie temporelle d'Aszhal — elle détonne bien, 61 % de
+ce qu'elle stocke est rendu, mais elle ne stocke que **54 points par combat**.
+
+Je m'arrête là plutôt que de leur inventer une identité : les rendre utiles
+demande de décider ce qu'ils sont, pas de tourner un bouton.
+
+Suite complète : **1 865 tests**, 95 fichiers.
