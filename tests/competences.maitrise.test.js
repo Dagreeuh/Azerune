@@ -1,4 +1,5 @@
 import{describe,it,expect}from'vitest';
+import{championsDeCombat}from'../src/utils/combatChampions';
 import fs from'node:fs';
 import{fileURLToPath}from'node:url';
 import{HEROES}from'../src/data/heroes';
@@ -37,25 +38,34 @@ describe('les niveaux de maitrise agissent en combat',()=>{
     expect(degats(null)).toBe(degats({0:1,1:1,2:1}));
   });
 
-  it('l’ecran de combat transmet aussi les Empreintes au moteur',()=>{
-    const page=lire('../src/pages/BattlePage.jsx');
-    const construction=page.match(/const battleHeroes=HEROES\.map\([^;]+\);/);
-    expect(construction[0]).toContain('empreinteSkills');
+  // Ces trois contrats CHERCHAIENT DU TEXTE dans BattlePage.jsx — « la ligne
+  // contient-elle le mot skillLevels ? ». Ils verifiaient une orthographe, pas
+  // un comportement : deplacer le code sans rien changer les cassait, et une
+  // construction fausse mais bien orthographiee les aurait laisses verts.
+  // Ils exercent desormais le constructeur reel.
+  it('le champion qui entre en combat porte ses niveaux de competence',()=>{
+    const heros=HEROES.slice(0,3);
+    const prets=championsDeCombat(heros,{
+      getProgress:()=>({stars:5,level:42,empreintes:[]}),
+      skillLevels:{[heros[0].id]:{0:6,1:5,2:4}}});
+    expect(prets[0].skillLevels).toEqual({0:6,1:5,2:4});
+    expect(prets[1].skillLevels).toEqual({});
   });
 
-  it('l’ecran de combat transmet les niveaux au moteur',()=>{
-    // Le test decisif : sans cette ligne, les deux tests ci-dessus passent
-    // toujours et le joueur combat pourtant au niveau 1 pour l'eternite.
-    const page=lire('../src/pages/BattlePage.jsx');
-    const construction=page.match(/const battleHeroes=HEROES\.map\([^;]+\);/);
-    expect(construction).not.toBeNull();
-    expect(construction[0]).toContain('skillLevels');
+  it('il porte aussi ses Empreintes, ses etoiles et son niveau',()=>{
+    const [pret]=championsDeCombat(HEROES.slice(0,1),{
+      getProgress:()=>({stars:6,level:60,empreintes:[]})});
+    expect(pret.empreinteSkills).toBeDefined();
+    expect(pret.currentStars).toBe(6);
+    // Sans le niveau, le joueur combat au niveau 1 pour l'eternite.
+    expect(pret.currentLevel).toBe(60);
   });
 
-  it('BattlePage reclame skillLevels a useGame',()=>{
+  it('l’ecran de combat n’en construit pas une deuxieme version',()=>{
+    // Une copie finirait par mentir sur un des quatre champs. Un seul appel.
     const page=lire('../src/pages/BattlePage.jsx');
-    const reclames=page.match(/const\{([^}]+)\}=useGame\(\)/)[1].split(',').map(part=>part.trim());
-    expect(reclames).toContain('skillLevels');
+    expect(page).toContain('championsDeCombat()');
+    expect(page).not.toMatch(/battleHeroes=HEROES\.map\(/);
   });
 
   it('le tutoriel transmet aussi les siens',()=>{

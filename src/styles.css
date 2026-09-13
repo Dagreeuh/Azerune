@@ -975,6 +975,12 @@
 .prep-regle{margin-top:.4rem;border:1px solid var(--bord-clair);border-radius:.5rem;padding:.4rem .55rem;background:#1c1207;display:grid;gap:.15rem;}
 .prep-regle b{color:var(--or-clair);font-size:.85rem;}
 .prep-regle small{color:#d6d3d1;font-size:.75rem;}
+/* Manques de composition, dans la fenetre de preparation. Ton d'avertissement
+   et non d'erreur : ce sont des conseils, l'equipe reste jouable. */
+.prep-manques{margin-top:.4rem;border:1px solid #7c5c1a;border-radius:.5rem;padding:.4rem .55rem;background:#1a1408;display:grid;gap:.25rem;}
+.prep-manques b{color:#f0c060;font-size:.8rem;}
+.prep-manques ul{margin:0;padding-left:1rem;display:grid;gap:.15rem;}
+.prep-manques li{color:#d6d3d1;font-size:.74rem;line-height:1.25;}
 .battle-regle{background:#1c1207;border:1px solid var(--bord-clair);border-radius:.4rem;padding:.2rem .45rem;color:var(--or-clair);font-size:.72rem;font-weight:700;}
 
 /* --- Clés de voûte ---------------------------------------------------------

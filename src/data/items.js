@@ -23,9 +23,35 @@ export const SETS={
   endurance:{name:'Endurance',pieces:2,icon:'🧊',bonus:'PV +10 % · Défense +10 %',stats:{hpPct:10,defPct:10}},
   incendiary:{name:'Incendiaire',pieces:4,icon:'🔥',bonus:'25 % de chance d’appliquer Brûlure',effect:'incendiarySet',campaignLate:true},
   volcanicFury:{name:'Furie volcanique',pieces:4,icon:'🌋',bonus:'Attaque +20 % · Dégâts +12 % sous 50 % PV',stats:{atkPct:20},effect:'volcanicFurySet',campaignLate:true},
-  fireproof:{name:'Ignifuge',pieces:2,icon:'🧯',bonus:'Résistance +15 % · Brûlure reçue -25 %',stats:{resistance:15},effect:'fireproofSet',campaignLate:true}
+  // Mesure : dans la Fournaise du Coeur-Monde — le raid de FEU, celui dont
+ // Ignifuge est presente comme la preparation — l'equipement de la zone 10
+ // gagnait moins souvent que celui de la zone 9, qui porte de la simple
+ // Endurance. La Resistance et la reduction de Brulure ne compensaient pas
+ // 10 % de PV et 10 % de Defense. Le set de preparation au raid ne peut pas
+ // etre moins bon que le set generique du palier precedent : il gagne une
+ // part de PV, et son libelle le dit.
+ fireproof:{name:'Ignifuge',pieces:2,icon:'🧯',bonus:'PV +8 % · Résistance +15 % · Brûlure reçue -25 %',stats:{resistance:15,hpPct:8},effect:'fireproofSet',campaignLate:true}
 };
-export const CONTINENT_SETS={valebrume:['vitality','attack'],khazdrum:['attack','critical'],'bastion-pierre':['defense','vitality'],'oeil-clair':['accuracy','resistance'],'arene-lames':['critical','destruction'],'cimes-vent':['speed','accuracy'],'temple-inebranlable':['resistance','endurance'],'crypte-sanglante':['lifesteal','attack'],'rempart-endurance':['protection','endurance'],'coeur-ignifuge':['fireproof']};
+/**
+ * Sets par zone. Deux regles, apprises par la mesure.
+ *
+ * 1. Une zone doit proposer au moins un set COMPLETABLE avec les six pieces
+ *    portees. La crypte sanglante offrait `lifesteal(4) + attack(4)` : douze
+ *    pieces pour six emplacements. Le joueur n'en completait jamais qu'un, et
+ *    la zone valait donc moitie moins que toutes les autres. `attack` y devient
+ *    `critical(2)`, qui tient dans les deux pieces restantes sans rien changer
+ *    a l'identite offensive du lieu.
+ *
+ * 2. La derniere zone ne doit pas equiper moins bien que l'avant-derniere.
+ *    Le Coeur Ignifuge, presente comme la preparation au Raid, n'offrait que
+ *    `fireproof(2)` : mesure, son equipement gagnait MOINS souvent le raid que
+ *    celui de la zone 9 (163 contre 197 victoires sur 200), alors qu'il donne
+ *    2 400 points de puissance de plus. Il gagne `protection(4)`, le set qui
+ *    fait vraiment tenir devant l'Eruption — et qui justifie enfin son nom.
+ *
+ * Detail : Audit/RAPPORT-EXPERIENCE-JOUEUR.md
+ */
+export const CONTINENT_SETS={valebrume:['vitality','attack'],khazdrum:['attack','critical'],'bastion-pierre':['defense','vitality'],'oeil-clair':['accuracy','resistance'],'arene-lames':['critical','destruction'],'cimes-vent':['speed','accuracy'],'temple-inebranlable':['resistance','endurance'],'crypte-sanglante':['lifesteal','critical'],'rempart-endurance':['protection','endurance'],'coeur-ignifuge':['fireproof','protection']};
 export const EXPEDITION_SET_POOLS={treasury:['critical','speed'],sanctuary:['resistance','endurance','counter'],'astral-forge':['attack','critical','destruction'],'ascension-sanctuary':['vitality','defense','protection']};
 export const continentSetDetails=continentId=>(CONTINENT_SETS[continentId]||[]).map(id=>({id,...SETS[id]}));
 export const campaignSetPool=continentId=>[...(CONTINENT_SETS[continentId]||[])];

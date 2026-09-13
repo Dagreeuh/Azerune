@@ -140,9 +140,34 @@ export function joueur({zone=1,difficulte='normal',niveau=10,etoiles=3,niveauObj
  */
 const puissanceDe=(j,hero)=>championPower(j.getStats(hero));
 export const tailleEquipe=mission=>Math.max(1,Math.min(4,Number(mission?.teamSize)||3));
+
+/**
+ * ÉQUIPE FIXE — et c'est le point le plus important de ce fichier.
+ *
+ * Une première version composait l'équipe en prenant « les quatre champions les
+ * plus puissants ». Erreur grossière, et longue à voir : la composition changeait
+ * presque entièrement d'un palier de progression au suivant (zone 9 :
+ * Brom, Ignovar, Korga, Kaelen ; zone 10 : Histéria, Vexil, Thorgar, Brom).
+ * Chaque comparaison « ce joueur est mieux équipé et gagne moins » comparait en
+ * réalité DEUX ÉQUIPES DIFFÉRENTES. Toute non-monotonie observée était suspecte.
+ *
+ * L'équipe est désormais la même partout : un soin, un bouclier, deux frappeurs
+ * — la composition qu'un joueur averti amène, et celle que le banc d'apport
+ * désigne comme la plus utile. Seul l'ÉQUIPEMENT varie d'un palier à l'autre,
+ * ce qui est précisément la question posée.
+ */
+const NOMS_EQUIPE=['Hicho','Aurelis','Morghast','Ignovar'];
+export const equipeFixe=(j,taille=4)=>NOMS_EQUIPE.slice(0,taille)
+  .map(nom=>j.heroes.find(h=>h.name===nom)?.id).filter(id=>id!==undefined);
+
 export const equipePour=(mission,j,champion)=>{
-  const classe=[...j.heroes].map(h=>({h,pw:puissanceDe(j,h)})).sort((a,b)=>b.pw-a.pw);
   const taille=tailleEquipe(mission);
-  if(champion===undefined)return classe.slice(0,taille).map(x=>x.h.id);
-  return[champion,...classe.filter(x=>x.h.id!==champion).slice(0,taille-1).map(x=>x.h.id)];
+  if(champion===undefined)return equipeFixe(j,taille);
+  // Un champion impose : il prend la place du dernier de l'equipe type.
+  return[champion,...equipeFixe(j,taille).filter(id=>id!==champion).slice(0,taille-1)];
 };
+
+/** Ancienne regle, gardee pour montrer ce qu'elle valait. */
+export const equipeParPuissance=(mission,j)=>[...j.heroes]
+  .map(h=>({h,pw:puissanceDe(j,h)})).sort((a,b)=>b.pw-a.pw)
+  .slice(0,tailleEquipe(mission)).map(x=>x.h.id);

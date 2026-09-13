@@ -1,3 +1,12 @@
+/**
+ * ATTENTION — ce banc compose l'equipe avec LES QUATRE CHAMPIONS LES PLUS
+ * PUISSANTS. Mesure ulterieure : cette regle est mauvaise, et c'est elle qui
+ * fait paraitre le raid infaisable. Une equipe composee (un soin, un bouclier,
+ * deux frappeurs) gagne les memes niveaux avec trois fois moins de puissance.
+ * Le banc est conserve tel quel car il montre precisement ce que subit un
+ * joueur qui choisit ses champions au chiffre de puissance. Pour mesurer le
+ * contenu lui-meme, utiliser `equipePour` (equipe fixe et composee).
+ */
 import{describe,it}from'vitest';
 import{joueur,avecHasard}from'./joueur.js';
 import{simulerMission}from'../../src/utils/simulation.js';

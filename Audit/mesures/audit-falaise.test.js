@@ -1,3 +1,8 @@
+/**
+ * ATTENTION — meme reserve que audit-raid.test.js : l'equipe est composee des
+ * quatre champions les plus puissants, ce qui surestime la difficulte. Ce banc
+ * reste utile pour la LARGEUR de la bande, qui ne depend pas de la composition.
+ */
 import{describe,it}from'vitest';
 import{joueur,avecHasard}from'./joueur.js';
 import{simulerMission}from'../../src/utils/simulation.js';

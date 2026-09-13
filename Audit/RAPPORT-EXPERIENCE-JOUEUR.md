@@ -2614,3 +2614,147 @@ disparition du sort qui l'a justifié. Un cinquième test l'interdit ; les trois
 variantes du mutant sont maintenant tuées.
 
 Suite complète : **1 833 tests**, 89 fichiers.
+
+---
+
+## 1.85.0 à 1.87.0 — Audit complet : champions, campagne, expéditions, raid
+
+Demande : vérifier les kits, l'équilibrage, et si le raid est faisable. Je n'ai
+rien conclu en lisant le code. J'ai construit un **modèle de joueur** qui équipe
+vraiment les champions avec le butin que le jeu fait tomber, puis j'ai fait
+jouer les combats par le moteur.
+
+### L'instrument, et les six fois où il a menti
+
+`Audit/mesures/joueur.js` fabrique une équipe à un point donné de la partie :
+niveau, étoiles, résonance, Empreintes, et six pièces produites par
+`generateCampaignItem` — la fonction qui fait tomber le butin en jeu.
+`Audit/mesures/echelle.js` en aligne **21**, du premier combat au plafond.
+
+Avant d'obtenir un résultat croyable, l'instrument s'est trompé six fois. Le
+détail compte, parce que chacune de ces erreurs produisait une conclusion nette
+et fausse :
+
+| Ce que je croyais mesurer | Ce que je mesurais |
+|---|---|
+| l'effet des niveaux de compétence | rien : je passais `HEROES` à la simulation au lieu du roster construit |
+| le kit complet des 3★ | un kit amputé : le moteur lit `currentStars` pour ouvrir la 3ᵉ compétence |
+| la campagne et les expéditions | des équipes de 4 champions, alors qu'elles se jouent à **3** |
+| la puissance requise d'un contenu facile | le plancher de ma méthode : la puissance d'équipe ne descend jamais sous 2 425 |
+| la valeur des sets d'une zone | surtout le niveau d'objet, qui monte avec la zone |
+| l'effet de l'équipement sur la progression | **des équipes différentes** : ma règle « les 4 plus puissants » changeait la composition à chaque palier |
+
+La dernière est la plus coûteuse : elle m'a fait décrire pendant longtemps une
+« progression non monotone » — le joueur de la zone 8 perdant 90 % de ses
+victoires par rapport à celui de la zone 6. Avec une **équipe fixe**, la
+progression est parfaitement monotone. Il n'y avait pas de défaut : il y avait
+ma règle de composition.
+
+### Le résultat principal : la composition vaut trois fois la puissance
+
+C'est la mesure qui recadre tout le reste.
+
+| Équipe (mêmes champions disponibles, même équipement) | Raid franchi |
+|---|---|
+| les 4 champions les plus **puissants** | niveau 4 |
+| un soin, un bouclier, deux frappeurs | **les 10 niveaux** |
+
+La seconde affiche jusqu'à **trois fois moins de puissance** que la première.
+Le banc d'apport le dit autrement : en faisant tourner la quatrième place d'une
+équipe fixe, Hicho (soigneur, **le plus faible en puissance du roster**) fait
+gagner trois niveaux de raid, Aurelis (3★, boucliers) deux — et vingt-deux
+champions sur vingt-neuf ne changent rien du tout.
+
+D'où le défaut d'affichage : la fenêtre de préparation ne montrait que deux
+nombres, la puissance de l'équipe et une puissance recommandée. **Aucun nombre
+ne peut dire « il te manque un soigneur ».** `assessTeamForMission` calculait
+déjà ces manques, mais ne les montrait pas là où l'on compose. C'est fait.
+
+Je n'ai pas réaffiché de probabilité de victoire : « tu gagnes 17 fois sur 20 »
+avait été retiré volontairement, parce que l'annoncer supprime la seule question
+qui fait qu'un combat vaut d'être joué. La décision tient, un test la garde.
+
+### Un tour perdu, invisible (v1.85.0)
+
+Thorgar gaspillait jusqu'à **8 tours sur 40** en combat automatique. Le pilote
+choisissait « Serment du gardien » puis le désignait lui-même : le moteur
+refuse, et le tour passait sans message.
+
+Le tri pénalisait bien le lanceur — mais d'un **poids** (5 000), pas d'un
+interdit. Le score d'un allié comprend `bouclier × 0,4` : au-delà de 12 500 de
+bouclier, il passe devant. Or ces boucliers, c'est le Rempart ancestral de
+Thorgar qui les pose. **Plus il protégeait son équipe, plus il se condamnait** —
+ce qui explique que le défaut n'apparaisse qu'en fin de combat.
+
+### Quatre niveaux d'expédition pour rien (v1.86.0)
+
+Un joueur de la **zone 3** enchaînait les niveaux 7, 8, 9 et 10. L'échelle
+ennemie valait `1+(niveau-1)×0,22`, soit ×2,98 sur dix niveaux, quand la
+puissance du joueur est multipliée par plus de sept sur le même parcours.
+
+L'écran annonçait **16 000** de puissance au niveau 10 ; **5 700** suffisaient.
+L'ancienne table se trompait de **-83 % à +83 %** — dans les deux sens, donc
+jamais utilisable.
+
+`EXPEDITION_SCALE` est désormais une table calibrée de pente constante ×1,30, et
+`EXPEDITION_POWER` est **relevée** : puissance médiane, sur les quatre
+expéditions, de la première équipe simulée qui gagne une fois sur deux.
+
+### Une mécanique de raid qui n'avait jamais eu lieu (v1.87.0)
+
+**Zéro canalisation sur 60 combats.** Ni aboutie, ni interrompue.
+
+La Canalisation du Cœur est pourtant écrite de bout en bout : déclenchement,
+punition (le Cœur déborde, Rhazakar se soigne), et jusqu'à une règle de pilotage
+automatique qui fait passer l'étourdissement en priorité absolue. Elle a sa
+propre note de version. Tout cela dormait à cause d'un seul nombre : **le Prêtre
+meurt à la 1,8ᵉ action de champion, et la canalisation démarrait à la 8ᵉ.**
+
+Abaisser le seuil ne suffisait pas — à 3 actions, il est déjà mort. Il fallait
+qu'il *tienne*. Ses PV sont doublés et le seuil descend à 5. La mécanique se
+déclenche maintenant dans 20 combats sur 20, et amener un contrôle **double le
+taux de victoire** aux niveaux 7 à 9.
+
+Deux autres écarts entre ce que le jeu annonce et ce qu'il fait :
+
+| Élément | Annoncé | Réel avant | Maintenant |
+|---|---|---|---|
+| Prêtre des flammes | niveau 4 | niveau 3 | niveau 4 |
+| Gardien de lave | niveau 7 | niveau 6 | niveau 7 |
+
+Le « mur » que j'avais mesuré entre les niveaux 5 et 6 — cinq paliers de
+progression bloqués d'un coup — **était ce Gardien en avance d'un niveau.**
+
+`RAID_POWER` est recalée sur la mesure : elle demandait jusqu'à 30 100 au
+niveau 10, il en faut 10 200 avec une équipe composée. Écart : **+93 % à
++198 %**.
+
+### Deux zones qui équipaient mal
+
+- **Crypte sanglante (zone 8)** proposait `Vol de vie(4) + Attaque(4)` : douze
+  pièces pour six emplacements, donc **jamais plus d'un set complet**. Attaque y
+  devient Critique(2), qui tient dans les deux pièces restantes.
+- **Cœur Ignifuge (zone 10)**, présenté comme la préparation au Raid, n'offrait
+  qu'`Ignifuge(2)`. Il gagne `Protection(4)`. Et le set Ignifuge lui-même gagne
+  8 % de PV : dans le raid de **feu** dont il est censé être la préparation, il
+  équipait moins bien que de l'Endurance générique.
+
+### Ce que je n'ai pas fait, et pourquoi
+
+**Le raid n'utilise que 40 % de la progression.** Avec une équipe composée, un
+joueur de la zone 10 franchit les dix niveaux ; tout ce qui vient après — la
+campagne difficile, le hardcore, la résonance — n'a plus d'objet face à lui.
+Le calibrage mesuré demanderait de multiplier la difficulté par **3,6 à 13,5**.
+
+Je ne l'ai pas appliqué. Ce chiffre est calibré sur **une** composition ; le
+caler dessus murerait toutes les autres, et l'écart entre « équipe composée » et
+« équipe choisie à la puissance » est d'un facteur trois. Décider quelle
+composition sert de référence est un choix de conception, pas un nombre que je
+peux trancher seul. La mesure est dans `Audit/mesures/calibrer-raid.test.js`.
+
+**Le tranchant reste.** Chaque niveau de raid bascule de 0 à 60 victoires sur
+quelques pour cent de puissance. J'ai essayé trois tables d'échelle : toutes
+pires que l'actuelle. Le tranchant ne vient pas du dosage mais de la létalité du
+combat lui-même — c'est un chantier de mathématiques de combat, pas de réglage.
+
+Suite complète : **1 853 tests**, 93 fichiers.

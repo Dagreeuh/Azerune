@@ -6,6 +6,7 @@ import{fileURLToPath}from'node:url';
 import{Unit}from'../src/pages/BattlePage';
 import{HEROES}from'../src/data/heroes';
 import{levelCap,MAX_LEVEL}from'../src/utils/progression';
+import{championsDeCombat}from'../src/utils/combatChampions';
 
 // Niveau du champion sur sa carte de combat, en haut a droite.
 //
@@ -100,10 +101,14 @@ describe('elle ne se marche pas sur les pieds avec le reste de la carte',()=>{
 });
 
 describe('le niveau affiché est le vrai',()=>{
-  it('l’écran de combat embarque le niveau réel du champion',()=>{
-    const page=fs.readFileSync(fileURLToPath(new URL('../src/pages/BattlePage.jsx',import.meta.url)),'utf8');
-    expect(page,'le niveau n’est plus lu depuis la progression')
-      .toContain('currentLevel:getProgress(hero).level');
+  // Ce contrat cherchait la CHAINE `currentLevel:getProgress(hero).level` dans
+  // le source de BattlePage. Il figeait une orthographe a un endroit precis :
+  // sortir la construction de la page pour la partager cassait le test sans
+  // qu'aucun comportement ait bouge. Il exerce desormais le constructeur.
+  it('le champion qui entre en combat embarque son niveau reel',()=>{
+    const [pret]=championsDeCombat(HEROES.slice(0,1),
+      {getProgress:()=>({stars:5,level:37,empreintes:[]})});
+    expect(pret.currentLevel,'le niveau n’est plus lu depuis la progression').toBe(37);
   });
 
   it('il s’affiche jusqu’au plafond du jeu',()=>{

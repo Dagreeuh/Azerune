@@ -8,7 +8,10 @@
 // Même signature que `accuracyDown` et que la Précision réduite d'Œil-Clair :
 // une moitié écrite, l'autre pas.
 import{describe,it,expect,afterEach,vi}from'vitest';
-import{RAIDS,createRaidMission}from'../src/data/raids';
+import{RAIDS,createRaidMission,NIVEAU_GARDIEN}from'../src/data/raids';
+// Le Gardien de lave apparaissait au niveau 6 alors que l'ecran l'annonce au
+// niveau 7. Ce test pointait le niveau en dur ; il suit maintenant la constante,
+// pour qu'il verifie le role du Gardien et non un numero de palier.
 import{createBattle,nextTurn,castSkill,chooseAutoEnemyTarget,performAutoAction}from'../src/battle/engine';
 import{makeHero,makeEnemy,statsFrom,withStatus,findUnit,fixedRandom,giveTurnTo}from'./helpers';
 
@@ -115,7 +118,7 @@ describe('le Gardien de lave du Raid retrouve son rôle',()=>{
     fixedRandom(.5);
     const heros=[0,1,2,3].map(index=>makeHero({id:9600+index,hp:20000,atk:70,def:0,spd:index?1:300,
       name:`A${index}`,skills:[{name:'Trait',icon:'✴️',cd:0,target:'enemy',description:'Frappe.',power:1,effect:'arcaneBlast'}]}));
-    const mission=createRaidMission(RAIDS[0].id,6);
+    const mission=createRaidMission(RAIDS[0].id,NIVEAU_GARDIEN);
     let combat=createBattle(heros.map(hero=>hero.id),heros,
       unite=>({...statsFrom(unite),accuracy:60,resistance:0}),
       {enemies:mission.enemies,enemyScale:mission.scale||1,
@@ -124,7 +127,7 @@ describe('le Gardien de lave du Raid retrouve son rôle',()=>{
   }
 
   it('le Raid comporte bien un Gardien qui provoque',()=>{
-    const mission=createRaidMission(RAIDS[0].id,6);
+    const mission=createRaidMission(RAIDS[0].id,NIVEAU_GARDIEN);
     expect(mission.enemies.map(unite=>unite.raidRole)).toContain('guardian');
   });
 

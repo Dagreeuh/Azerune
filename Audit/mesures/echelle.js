@@ -25,7 +25,16 @@ export const ECHELLE=[
  {nom:'zone 9 (n50, +12)',          zone:9, difficulte:'normal',   niveau:50, etoiles:5, niveauObjet:12, competences:'max'},
  {nom:'zone 10 (n55, 6★, +12)',     zone:10,difficulte:'normal',   niveau:55, etoiles:6, niveauObjet:12, competences:'max'},
  {nom:'normale finie (n60, +15)',   zone:10,difficulte:'normal',   niveau:60, etoiles:6, niveauObjet:15, competences:'max'},
+ // Six barreaux couvrent la campagne DIFFICILE zone par zone. Sans eux,
+ // l'echelle sautait de 14 698 a 20 895 — un trou de 42 % ou aucune equipe
+ // n'existait, qui faisait passer une progression graduelle pour un mur.
+ {nom:'difficile zone 2 (+12)',     zone:2, difficulte:'hard',     niveau:60, etoiles:6, niveauObjet:12, competences:'max'},
+ {nom:'difficile zone 4 (+12)',     zone:4, difficulte:'hard',     niveau:60, etoiles:6, niveauObjet:12, competences:'max'},
+ {nom:'difficile zone 6 (+13)',     zone:6, difficulte:'hard',     niveau:60, etoiles:6, niveauObjet:13, competences:'max'},
+ {nom:'difficile zone 8 (+14)',     zone:8, difficulte:'hard',     niveau:60, etoiles:6, niveauObjet:14, competences:'max'},
  {nom:'difficile en cours (rés.1)', zone:10,difficulte:'hard',     niveau:60, etoiles:6, niveauObjet:12, competences:'max', resonance:1, empreintes:true},
  {nom:'difficile finie (rés.3)',    zone:10,difficulte:'hard',     niveau:60, etoiles:6, niveauObjet:15, competences:'max', resonance:3, empreintes:true},
+ {nom:'hardcore zone 4 (rés.3)',    zone:4, difficulte:'hardcore', niveau:60, etoiles:6, niveauObjet:15, competences:'max', resonance:3, empreintes:true},
+ {nom:'hardcore zone 8 (rés.4)',    zone:8, difficulte:'hardcore', niveau:60, etoiles:6, niveauObjet:15, competences:'max', resonance:4, empreintes:true},
  {nom:'PLAFOND hardcore (rés.5)',   zone:10,difficulte:'hardcore', niveau:60, etoiles:6, niveauObjet:15, competences:'max', resonance:5, empreintes:true}
 ];
