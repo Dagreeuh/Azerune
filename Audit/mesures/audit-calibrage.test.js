@@ -1,5 +1,5 @@
 import{describe,it}from'vitest';
-import{joueur,avecHasard}from'./joueur.js';
+import{joueur,avecHasard,equipePour}from'./joueur.js';
 import{ECHELLE}from'./echelle.js';
 import{simulerMission}from'../../src/utils/simulation.js';
 import{createRaidMission,RAID_POWER}from'../../src/data/raids.js';
@@ -15,19 +15,17 @@ import{teamPower,championPower}from'../../src/utils/stats.js';
  * La puissance annoncée au joueur est comparée à la sienne : c'est l'écart
  * entre ce que le jeu promet et ce qu'il demande.
  */
-const equipeBrute=j=>[...j.heroes].map(h=>({h,pw:championPower(j.getStats(h))}))
-  .sort((a,b)=>b.pw-a.pw).slice(0,4).map(x=>x.h.id);
-
-const JOUEURS=ECHELLE.map(p=>{const j=joueur(p);const equipe=equipeBrute(j);
-  return{...p,j,equipe,puissance:teamPower(equipe,j.heroes,j.getStats)};});
+// La taille d'equipe suit la mission : quatre au raid, trois partout ailleurs.
+const JOUEURS=ECHELLE.map(p=>({...p,j:joueur(p)}));
 
 /** Premier palier de l'échelle qui gagne au moins 8 fois sur 16. */
 function palierRequis(mission,tirages=16){
   for(let i=0;i<JOUEURS.length;i+=1){
-    const p=JOUEURS[i];
-    const r=avecHasard(313,()=>simulerMission({mission,team:p.equipe,heroes:p.j.heroes,
+    const p=JOUEURS[i],equipe=equipePour(mission,p.j);
+    const r=avecHasard(313,()=>simulerMission({mission,team:equipe,heroes:p.j.heroes,
       getStats:p.j.getStats,tirages}));
-    if(r.victoires*2>=tirages)return{indice:i,...p,victoires:r.victoires,actions:r.actionsMoyennes};
+    if(r.victoires*2>=tirages)return{indice:i,...p,victoires:r.victoires,
+      puissance:teamPower(equipe,p.j.heroes,p.j.getStats),actions:r.actionsMoyennes};
   }
   return null;
 }
@@ -42,8 +40,8 @@ const ligne=(nom,annonce,r)=>{
 
 describe('à quel palier chaque contenu devient jouable',()=>{
   it('échelle de progression',()=>{
-    console.log('\nÉCHELLE DE PROGRESSION');
-    JOUEURS.forEach((p,i)=>console.log(`${String(i).padStart(2)}. ${p.nom.padEnd(30)} puissance ${p.puissance}`));
+    console.log('\nÉCHELLE DE PROGRESSION (puissance à 3 champions / à 4)');
+    JOUEURS.forEach((p,i)=>console.log(`${String(i).padStart(2)}. ${p.nom.padEnd(30)} ${teamPower(equipePour({},p.j),p.j.heroes,p.j.getStats)} / ${teamPower(equipePour({teamSize:4},p.j),p.j.heroes,p.j.getStats)}`));
     const entete=()=>console.log('CONTENU                        | annoncé | requis  | écart       | palier requis');
     const ecarts=[];
 

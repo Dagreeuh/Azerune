@@ -12,7 +12,7 @@
 import{HEROES}from'../../src/data/heroes.js';
 import{CONTINENTS}from'../../src/data/campaign.js';
 import{generateCampaignItem,SLOTS,SETS}from'../../src/data/items.js';
-import{totalStats}from'../../src/utils/stats.js';
+import{totalStats,championPower}from'../../src/utils/stats.js';
 import{empreinteTree,empreintePoints,empreinteDepth,empreinteBonuses}from'../../src/data/empreintes.js';
 import{skillMaxLevel}from'../../src/utils/skills.js';
 
@@ -129,3 +129,20 @@ export function joueur({zone=1,difficulte='normal',niveau=10,etoiles=3,niveauObj
   return{heroes:roster,getStats,equipement,inventaire,progres,
     etiquette:`zone ${zone} ${difficulte} · niv ${niveau} · ${etoiles}★ · +${niveauObjet}`};
 }
+
+/**
+ * L'équipe que le jeu autorise pour CETTE mission.
+ *
+ * Piège coûteux : seul le raid se joue à quatre. La campagne, les expéditions
+ * et le Mythic+ se jouent à TROIS (`Math.min(4, mission.teamSize || 3)` dans
+ * Layout et GameContext). Mesurer partout avec quatre champions donne une
+ * équipe 33 % plus fournie que celle du joueur, et fausse tout calibrage.
+ */
+const puissanceDe=(j,hero)=>championPower(j.getStats(hero));
+export const tailleEquipe=mission=>Math.max(1,Math.min(4,Number(mission?.teamSize)||3));
+export const equipePour=(mission,j,champion)=>{
+  const classe=[...j.heroes].map(h=>({h,pw:puissanceDe(j,h)})).sort((a,b)=>b.pw-a.pw);
+  const taille=tailleEquipe(mission);
+  if(champion===undefined)return classe.slice(0,taille).map(x=>x.h.id);
+  return[champion,...classe.filter(x=>x.h.id!==champion).slice(0,taille-1).map(x=>x.h.id)];
+};

@@ -1,5 +1,5 @@
 import{describe,it}from'vitest';
-import{joueur,avecHasard}from'./joueur.js';
+import{joueur,avecHasard,equipePour}from'./joueur.js';
 import{ECHELLE}from'./echelle.js';
 import{simulerMission}from'../../src/utils/simulation.js';
 import{createRaidMission}from'../../src/data/raids.js';
