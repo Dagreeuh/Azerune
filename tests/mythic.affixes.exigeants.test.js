@@ -149,7 +149,7 @@ describe('Incorporel — un contrôle devient nécessaire',()=>{
   });
 });
 
-describe('Retour temporel — la seule réanimation du jeu',()=>{
+describe('Distorsion temporelle — la seule réanimation du jeu',()=>{
   const caelion=()=>HEROES.find(hero=>hero.id===30);
 
   /** Caelion, un allié ancré, et cet allié éventuellement mort. */
@@ -175,7 +175,7 @@ describe('Retour temporel — la seule réanimation du jeu',()=>{
     expect(reanimateurs.map(hero=>hero.name)).toEqual(['Caelion']);
   });
 
-  it('l’allié ancré tombé est ramené',()=>{
+  it('l’allié tombé est ramené',()=>{
     const combat=scene();
     const sortie=castSkill(combat,2),apres=sortie.battle||sortie;
     const ancien=findUnit(apres,9300);
@@ -209,11 +209,24 @@ describe('Retour temporel — la seule réanimation du jeu',()=>{
     expect(findUnit(apres,9300).dead).toBe(true);
   });
 
-  it('sans allié tombé, le Retour temporel garde son effet d’origine',()=>{
+  // Sans allié tombé, l'ultime n'est pas gaspillé : il hâte toute l'équipe.
+  // L'ancien sort restaurait de la jauge — mesuré sans effet, la jauge étant une
+  // file d'attente et non une ressource.
+  it('sans allié tombé, la Distorsion hâte quand même toute l’équipe',()=>{
     const combat=scene({mort:false});
     const sortie=castSkill(combat,2),apres=sortie.battle||sortie;
     expect(findUnit(apres,9300).dead).toBe(false);
-    expect(findUnit(apres,9300).atb).toBeGreaterThanOrEqual(85);
+    apres.allies.filter(unite=>!unite.dead)
+      .forEach(unite=>expect(unite.buffs.speedUp,unite.name).toBeTruthy());
+  });
+
+  // Mesuré sur Caelion lui-même, et non sur le pantin : `currentSpd` a un
+  // plancher de 20, qui masquait l'accélération d'une unité à VIT 1.
+  it('un allié hâté agit réellement plus vite',()=>{
+    const combat=scene({mort:false});
+    const sortie=castSkill(combat,2),apres=sortie.battle||sortie;
+    const avant=findUnit(combat,30),pret=nextTurn(apres);
+    expect(findUnit(pret,30).currentSpd).toBeGreaterThan(avant.currentSpd);
   });
 });
 

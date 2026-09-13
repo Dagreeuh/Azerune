@@ -49,8 +49,8 @@ const PAR_EFFET={
  guardianLink:'ward',soulMetamorphosis:'ward',
  // Controle : ce qui bloque doit se voir bloquer.
  impactQuake:'control',unstableStun:'control',gardenPrison:'control',frostShatter:'control',
- huntMark:'control',condemnStrip:'control',shieldExpose:'control',timeAnchor:'control',
- timeRestore:'buff',prepareAim:'buff',vanish:'buff',refluxRelease:'buff',furyRecklessness:'buff',
+ huntMark:'control',condemnStrip:'control',shieldExpose:'control',temporalShard:'burst',temporalHaste:'buff',
+ timeWarp:'buff',prepareAim:'buff',vanish:'buff',refluxRelease:'buff',furyRecklessness:'buff',
  // Formes reconnaissables.
  frostBolt:'frost',frostNova:'frost',
  emberBurn:'flame',emberSpread:'flame',emberDetonate:'flame',

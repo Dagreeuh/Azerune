@@ -549,7 +549,7 @@ export function chooseAutoAllyTarget(battle,actor,skill){
   return [...allies].sort((a,b)=>{
     let sa=0,sb=0;
     if(effect==='healingSeed'){sa+=a.buffs?.healingSeed?500:0;sb+=b.buffs?.healingSeed?500:0;}
-    if(['rescueShield','atonementShield'].includes(effect)){sa+=(a.shield||0)>0?300:0;sb+=(b.shield||0)>0?300:0;if(effect==='atonementShield'){sa+=a.buffs?.atonement?.source===actor.id&&a.buffs.atonement.turns>1?900:0;sb+=b.buffs?.atonement?.source===actor.id&&b.buffs.atonement.turns>1?900:0;}}if(effect==='guardianLink'){const score=x=>x.id===actor.id?5000:(x.buffs?.guardianLink?1200:0)+(x.shield||0)*.4+hpRatio(x)*120+(x.def||0)*2-(x.atk||0)*2.2;sa+=score(a);sb+=score(b);}if(effect==='timeAnchor'){const score=x=>x.id===actor.id?900:-((x.atk||0)*.55+Math.max(...(x.skills||[]).map(skill=>Number(skill.cd)||0),0)*45+(x.spd||0)*.08);sa+=score(a);sb+=score(b);}
+    if(['rescueShield','atonementShield'].includes(effect)){sa+=(a.shield||0)>0?300:0;sb+=(b.shield||0)>0?300:0;if(effect==='atonementShield'){sa+=a.buffs?.atonement?.source===actor.id&&a.buffs.atonement.turns>1?900:0;sb+=b.buffs?.atonement?.source===actor.id&&b.buffs.atonement.turns>1?900:0;}}if(effect==='guardianLink'){const score=x=>x.id===actor.id?5000:(x.buffs?.guardianLink?1200:0)+(x.shield||0)*.4+hpRatio(x)*120+(x.def||0)*2-(x.atk||0)*2.2;sa+=score(a);sb+=score(b);}if(effect==='temporalHaste'){const score=x=>x.id===actor.id?900:-((x.atk||0)*.55+Math.max(...(x.skills||[]).map(skill=>Number(skill.cd)||0),0)*45+(x.spd||0)*.08);sa+=score(a);sb+=score(b);}
     const da=Object.keys(a.debuffs||{}),db=Object.keys(b.debuffs||{});
     if(String(effect).toLowerCase().includes('cleanse')){sa-=da.reduce((n,key)=>n+(AUTO_CONTROL_DEBUFFS.has(key)?100:AUTO_DANGEROUS_DEBUFFS.has(key)?40:10),0);sb-=db.reduce((n,key)=>n+(AUTO_CONTROL_DEBUFFS.has(key)?100:AUTO_DANGEROUS_DEBUFFS.has(key)?40:10),0);}
     sa+=hpRatio(a)*100+(a.def||0)*.03;sb+=hpRatio(b)*100+(b.def||0)*.03;
@@ -563,7 +563,10 @@ const autoSkillUseful=(battle,actor,skill,{respectPlayerPriority=false}={})=>{
   if(effect==='livingGarden'&&actor.mechanic?.active)return false;
   if(effect==='healingTotem'&&actor.mechanic?.active)return false;if(effect==='guardianLink'){const linked=allies.find(unit=>unit.id===actor.mechanic?.targetId&&!unit.dead&&unit.buffs?.guardianLink?.source===actor.id);if(linked&&linked.buffs.guardianLink.turns>1)return false;if(!allies.some(unit=>unit.id!==actor.id&&!unit.dead))return false;}if(effect==='guardianWall'){const linked=allies.find(unit=>unit.id===actor.mechanic?.targetId&&!unit.dead&&unit.buffs?.guardianLink?.source===actor.id);if(!linked)return false;}
   if(effect==='seedBloom'&&!allies.some(unit=>unit.buffs?.healingSeed)&&allies.every(unit=>hpRatio(unit)>.72))return false;
-  if(effect==='timeRestore'){const anchor=allies.find(unit=>unit.id===actor.mechanic?.targetId&&!unit.dead),snapshot=actor.mechanic?.snapshot;if(!actor.mechanic?.active||!anchor||!snapshot||!anchor.buffs?.timeAnchor)return false;const cooldownValue=anchor.cooldowns.some((value,index)=>value>(snapshot.cooldowns[index]||0)),gaugeValue=anchor.atb<Math.min(35,snapshot.atb||0),expiring=anchor.buffs.timeAnchor.turns<=1;if(!actor.mechanic.anchorSpent&&!cooldownValue&&!gaugeValue&&!expiring)return false;}
+  // La Distorsion temporelle n'a plus de condition d'usage : une equipe hatee
+  // agit plus souvent, qu'elle soit en danger ou non. L'ancienne porte exigeait
+  // un Ancrage pose au prealable, et le combat automatique ne la franchissait
+  // quasiment jamais.
   if(effect==='alchemyCatalyst'&&!enemies.some(unit=>['poison','burn','bleed'].filter(key=>unit.debuffs?.[key]).length>=2))return false;
   if(effect==='emberDetonate'&&!enemies.some(unit=>unit.debuffs?.burn))return false;
   if(effect==='apocalypse'&&!enemies.some(unit=>(unit.debuffs?.festering?.stacks||0)>=2))return false;
@@ -578,7 +581,7 @@ const autoSkillUseful=(battle,actor,skill,{respectPlayerPriority=false}={})=>{
   if(effect==='aimShot'&&!actor.mechanic?.active)return false;
   if(effect==='arcaneBarrage'&&(actor.mechanic?.value||0)<2)return false;
   if(effect==='soulMetamorphosis'&&(actor.mechanic?.value||0)<1)return false;if(effect==='soulMetamorphosis'&&(actor.mechanic?.value||0)<3&&allies.every(unit=>hpRatio(unit)>.35))return false;
-  if(!respectPlayerPriority&&['allAllies','ally'].includes(skill.target)&&['livingGarden','healingTotem','totemTide','seedBloom','timeRestore','soulMetamorphosis'].includes(effect)&&allies.every(unit=>hpRatio(unit)>.88)&&!actor.mechanic?.active)return false;
+  if(!respectPlayerPriority&&['allAllies','ally'].includes(skill.target)&&['livingGarden','healingTotem','totemTide','seedBloom','soulMetamorphosis'].includes(effect)&&allies.every(unit=>hpRatio(unit)>.88)&&!actor.mechanic?.active)return false;
   return true;
 };
 
@@ -706,7 +709,7 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
   const targets=skill.target==='allEnemies'?enemies.filter(unit=>!unit.dead):skill.target==='enemy'?[chosen]:[];
   const e=skill.effect,m=actor.mechanic||(actor.mechanic={value:0,max:5}),resonanceIV=Number(actor.resonanceLevel||0)>=4;const vexilInstabilityBefore=actor.id===24?Math.max(0,Math.min(5,Number(m.value)||0)):0;const ghoulTurns=Math.max(0,m.ghoulTurns||0),offensiveSkill=['enemy','allEnemies'].includes(skill.target),ghoulTarget=chosen?.side==='enemy'&&!chosen.dead?chosen:enemies.find(unit=>!unit.dead);if(ghoulTurns>0&&offensiveSkill&&ghoulTarget){const ghoulDamage=Math.round(actor.atk*.28);ghoulTarget.hp=Math.max(0,ghoulTarget.hp-ghoulDamage);ghoulTarget.dead=ghoulTarget.hp<=0;if(ghoulTarget.dead){ghoulTarget.atb=0;ghoulTarget.shield=0;}damageTotal+=ghoulDamage;event(ghoulTarget,ghoulDamage,'ghoul',{sourceType:'ghoul'});m.ghoulTurns=Math.max(0,ghoulTurns-1);m.value=m.ghoulTurns;m.active=m.ghoulTurns>0;if(m.ghoulTurns>0)actor.buffs.ghoul={turns:m.ghoulTurns+1,source:actor.id,damage:ghoulDamage};else delete actor.buffs.ghoul;logs.push(`💀 La Goule de ${actor.name} frappe ${ghoulTarget.name} : ${ghoulDamage} dégâts.`);}
   // Generic damage first, with unique modifiers.
-  const damageEffects=new Set(['guardianStrike','huntStrike','huntMark','huntFinish','bladeDance','bladeDanceDrain','bladeDanceStorm','impactStrike','impactFracture','impactQuake','herbalThorn','shieldBreaker','shieldExpose','shieldExecute','refluxStrike','refluxDrain','virulentStrike','virulentPoison','virulentSpread','aegisStrike','unstableBolt','unstableStun','unstableRelease','tideStanceStrike','lowTide','highTide','emberBurn','emberSpread','emberDetonate','gardenThorn','gardenPrison','condemnStrike','condemnStrip','condemnJudgment','alchemyPoison','alchemyMix','alchemyCatalyst','anchorStrike','holyPowerStrike','holyPowerStorm','holyPowerVerdict','feralBuilder','feralShred','feralFinish','rogueBuilder','rogueFinish','atonementStrike','atonementPenance','aimBuilder','aimShot','arcaneBlast','arcaneBarrage','arcaneOrb','festeringStrike','festeringSpread','apocalypse','agony','corruption','rapture','soulCleaveBuilder','soulSigil','maelstromStrike','maelstromDischarge','furyStrike','furyExecute','frostBolt','frostNova','frostShatter','mistStrike','prescienceStrike','disintegrate','eternitySurge','empowerCharge']);
+  const damageEffects=new Set(['guardianStrike','huntStrike','huntMark','huntFinish','bladeDance','bladeDanceDrain','bladeDanceStorm','impactStrike','impactFracture','impactQuake','herbalThorn','shieldBreaker','shieldExpose','shieldExecute','refluxStrike','refluxDrain','virulentStrike','virulentPoison','virulentSpread','aegisStrike','unstableBolt','unstableStun','unstableRelease','tideStanceStrike','lowTide','highTide','emberBurn','emberSpread','emberDetonate','gardenThorn','gardenPrison','condemnStrike','condemnStrip','condemnJudgment','alchemyPoison','alchemyMix','alchemyCatalyst','temporalShard','holyPowerStrike','holyPowerStorm','holyPowerVerdict','feralBuilder','feralShred','feralFinish','rogueBuilder','rogueFinish','atonementStrike','atonementPenance','aimBuilder','aimShot','arcaneBlast','arcaneBarrage','arcaneOrb','festeringStrike','festeringSpread','apocalypse','agony','corruption','rapture','soulCleaveBuilder','soulSigil','maelstromStrike','maelstromDischarge','furyStrike','furyExecute','frostBolt','frostNova','frostShatter','mistStrike','prescienceStrike','disintegrate','eternitySurge','empowerCharge']);
   if(damageEffects.has(e))targets.forEach(target=>{let bonus=1,pierce=false,forceCrit=false,defScale=false,shieldBreaker=false,hits=1;if(e==='huntFinish'&&target.debuffs.hunt)bonus=1.45;if(e==='guardianStrike'||e==='impactStrike'||e==='tideStanceStrike'||e==='soulCleaveBuilder')defScale=true;if(e==='shieldBreaker'||e==='shieldExpose'){shieldBreaker=true;if((target.shield||0)>0)bonus=resonanceIV?1.38:1.25}if(e==='shieldExecute'&&(target.debuffs.exposed||target.shieldBroken||((target.maxShield||0)>0&&(target.shield||0)<=0)))bonus=1.65;if(e==='virulentStrike')bonus+=.18*(target.debuffs.virulence?.stacks||0);if(e==='unstableBolt'||e==='unstableStun'||e==='unstableRelease')bonus+=(resonanceIV?.14:.12)*(m.value||0);if(e==='condemnStrike'||e==='condemnJudgment')bonus+=.16*(m.value||0);if(e==='tideStanceStrike'){if(m.mode==='low')bonus*=resonanceIV?1.38:1.28;else if(m.mode==='high')bonus*=resonanceIV?1.16:1.10;}if(e==='maelstromDischarge')bonus+=(resonanceIV?.22:.18)*(m.value||0);if(e==='furyExecute'&&target.hp/target.maxHp<.35)bonus+=resonanceIV?1.1:.9;if(e==='frostShatter')bonus+=.15*(target.debuffs.frost?.stacks||0);if(e==='disintegrate')bonus+=(resonanceIV?.56:.50)*(m.value||0);if(e==='eternitySurge')bonus+=(resonanceIV?.46:.40)*(m.value||0);if(e==='holyPowerVerdict')bonus+=.28*(m.value||0);if(e==='feralFinish')bonus+=.22*(m.value||0);if(e==='rogueFinish'){bonus+=(resonanceIV?.28:.25)*(m.value||0);forceCrit=m.active}if(e==='atonementPenance')hits=COUPS_PENITENCE;if(e==='aimShot'){bonus+=.22*(m.value||0);pierce=resonanceIV?.10:.15;forceCrit=m.active}if(e==='arcaneBlast'||e==='arcaneBarrage'||e==='arcaneOrb')bonus+=.16*(e==='arcaneOrb'?4:(m.value||0));if(actor.id===11&&m.active&&['enemy','allEnemies'].includes(skill.target))forceCrit=true;if(e==='apocalypse')bonus+=.2*(target.debuffs.festering?.stacks||0);if(e==='rapture')bonus+=.22*['agony','corruption','poison','burn','bleed'].filter(k=>target.debuffs[k]).length;for(let i=0;i<hits;i++)hit(target,(skill.power||0)/hits,{bonus,pierce,forceCrit,defScale,shieldBreaker});});
   // Unique mechanics and effects.
   /* Renforts elementaires — Feu, Eau, Arcane. */
@@ -783,21 +786,49 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
   if(e==='gardenThorn')debuff(chosen,'slow',2,.75);
   if(e==='livingGarden'){m.active=true;m.type='livingGarden';m.value=3+mastery.duration;allies.filter(x=>!x.dead).forEach(x=>{heal(x,x.maxHp*(resonanceIV?.15:.12)*(1+mastery.power));x.buffs.regen={turns:3+mastery.duration};x.buffs.livingGarden={turns:3+mastery.duration,source:actor.id}});enemies.filter(x=>!x.dead).forEach(x=>debuff(x,'slow',2,.8));}
   if(e==='gardenPrison')targets.forEach(t=>debuff(t,'stun',1,m.active?.65:.35));
-  if(e==='condemnStrip'){const protectedBuffs=new Set(['guardianLink','timeAnchor','ghoul','livingGarden','healingTotem']);const removable=Object.keys(chosen.buffs||{}).filter(key=>!protectedBuffs.has(key));removable.forEach(key=>delete chosen.buffs[key]);const gained=removable.length;m.value=Math.min(6,(m.value||0)+gained);m.active=m.value>0;logs.push(gained?`Dissipation sacrée retire ${gained} amélioration(s) : Condamnation ${m.value}/6.`:'Dissipation sacrée ne trouve aucune amélioration dissipable.');}
+  if(e==='condemnStrip'){const protectedBuffs=new Set(['guardianLink','ghoul','livingGarden','healingTotem']);const removable=Object.keys(chosen.buffs||{}).filter(key=>!protectedBuffs.has(key));removable.forEach(key=>delete chosen.buffs[key]);const gained=removable.length;m.value=Math.min(6,(m.value||0)+gained);m.active=m.value>0;logs.push(gained?`Dissipation sacrée retire ${gained} amélioration(s) : Condamnation ${m.value}/6.`:'Dissipation sacrée ne trouve aucune amélioration dissipable.');}
   if(e==='condemnStrike'&&(m.value||0)>0)logs.push(`Sentence radieuse est renforcée par ${m.value} charge(s) de Condamnation.`);
   if(e==='condemnJudgment'){const spent=m.value||0;if(spent)logs.push(`Jugement de l’Aube consume ${spent} charge(s) de Condamnation sur toute la zone.`);m.value=resonanceIV&&spent>0?1:0;m.active=m.value>0;if(m.value)logs.push('Résonance IV : 1 charge de Condamnation est conservée.');}
   const alchemyReaction=t=>{const poison=Boolean(t.debuffs.poison),burn=Boolean(t.debuffs.burn),bleed=Boolean(t.debuffs.bleed),count=[poison,burn,bleed].filter(Boolean).length;if(count<2)return;if(poison&&bleed){const burst=Math.round(pvReference(t)*(count===3?.10:.06)*(resonanceIV?1.15:1)*(1+mastery.power));t.hp=Math.max(0,t.hp-burst);t.dead=t.hp<=0;damageTotal+=burst;event(t,burst,'damage');logs.push(`🧪 Réaction hémotoxique sur ${t.name} : ${burst} dégâts immédiats.`);}if(poison&&burn){poserDebuff(battle,actor,t,'healingDown',(count===3?3:2)+(resonanceIV?1:0),null,resisted);logs.push(`🧪 Réaction caustique : soins reçus réduits sur ${t.name}.`);}if(burn&&bleed){poserDebuff(battle,actor,t,'defDown',(count===3?3:2)+(resonanceIV?1:0),null,resisted);logs.push(`🧪 Réaction thermique : Défense réduite sur ${t.name}.`);}if(count===3){poserDebuff(battle,actor,t,'slow',resonanceIV?3:2,null,resisted);logs.push(`☣️ Catalyse parfaite sur ${t.name} : les afflictions sont conservées.`);}};
   if(e==='alchemyPoison')targets.forEach(t=>{debuff(t,'poison',3,.8);alchemyReaction(t)});
   if(e==='alchemyMix')targets.forEach(t=>{debuff(t,'poison',3,.8);debuff(t,'bleed',3,.8);alchemyReaction(t)});
   if(e==='alchemyCatalyst')targets.forEach(alchemyReaction);
-  if(e==='anchorStrike'){const gaugeMastery=Math.round((mastery.effectRate||0)*100),removed=Math.min(15+gaugeMastery,chosen.atb||0);chosen.atb=Math.max(0,(chosen.atb||0)-removed);if(m.targetId){const ally=allies.find(x=>x.id===m.targetId&&!x.dead&&x.buffs?.timeAnchor);if(ally){const gain=25+gaugeMastery;ally.atb=Math.min(100,(ally.atb||0)+gain);logs.push(`Sablier brisé transfère ${gain} % de jauge à ${ally.name}.`);}}else{const gain=15+gaugeMastery;actor.atb=Math.min(100,(actor.atb||0)+gain);retain=Math.max(retain,gain);logs.push(`Sans Ancrage, Caelion conserve ${gain} % de jauge.`);}}
-  if(e==='timeAnchor'){allies.forEach(x=>{if(x.id!==chosen.id&&x.buffs?.timeAnchor)delete x.buffs.timeAnchor});const snapshot={atb:chosen.atb,cooldowns:[...chosen.cooldowns]};actor.mechanic={...m,targetId:chosen.id,active:true,anchorSpent:false,snapshot};const anchorGain=15+Math.round((mastery.effectRate||0)*100);chosen.atb=Math.min(100,(chosen.atb||0)+anchorGain);chosen.buffs.timeAnchor={turns:4+mastery.duration,source:actor.id,snapshotAtb:snapshot.atb,snapshotCooldowns:[...snapshot.cooldowns]};logs.push(`${chosen.name} est ancré et gagne ${anchorGain} % de jauge : mémoire ${Math.round(snapshot.atb)} %, délais ${snapshot.cooldowns.join('/')}.`);}
-  if(e==='timeRestore'){// Retour temporel : si l'allie ancre est tombe, le remonter avant sa mort.
-  // Seule reanimation du jeu, une fois par combat.
-  const tombe=allies.find(x=>x.id===m.targetId&&x.dead);
-  // Fraction de la barre de vie, volontairement : on ressuscite a un tiers de barre.
-  if(tombe&&!m.reviveSpent){const retour=Math.round(tombe.maxHp*(resonanceIV?.5:.35));tombe.dead=false;tombe.hp=Math.max(1,retour);tombe.shield=0;tombe.maxShield=0;tombe.atb=0;tombe.skip=false;tombe.debuffs={};tombe.buffs={};m.reviveSpent=true;event(tombe,retour,'heal');logs.push(`Retour temporel : ${tombe.name} est ramené avant sa chute avec ${retour} PV.`);}
-  const anchor=allies.find(x=>x.id===m.targetId&&!x.dead),floor=resonanceIV?100:Math.min(95,85+Math.round((mastery.effectRate||0)*100));if(anchor&&m.snapshot&&anchor.buffs?.timeAnchor){anchor.atb=Math.max(anchor.atb,m.snapshot.atb,floor);anchor.cooldowns=anchor.cooldowns.map((v,i)=>Math.min(v,m.snapshot.cooldowns[i]||0));delete anchor.buffs.timeAnchor;logs.push(`${anchor.name} revient à ${Math.round(anchor.atb)} % de jauge et retrouve ses délais mémorisés.`);}allies.filter(x=>x.id!==actor.id&&x.id!==m.targetId).forEach(x=>x.cooldowns=x.cooldowns.map(v=>Math.max(0,v-(resonanceIV?2:1))));m.active=false;m.anchorSpent=false;if(resonanceIV)logs.push('Résonance IV : retour à 100 % de jauge et délais des autres alliés réduits de 2 tours.');}
+  /* CAELION, CHRONOMANCIEN — refonte.
+     L'ancien kit etait entierement de la manipulation de JAUGE : voler 15 % ici,
+     en donner 25 % la, memoriser puis restaurer. Mesure sur quatre rencontres et
+     trois compositions : 6 victoires sur 288 quand la mediane du roster est a 71,
+     dernier du jeu. Et il y restait apres avoir QUADRUPLE ses chiffres — offrir un
+     tour entier de jauge ne changeait rien.
+     La raison est structurelle : la jauge est une FILE D'ATTENTE, pas une
+     ressource. Avancer un allie retarde les autres ; le nombre d'actions d'une
+     equipe est fixe par la VITESSE. Caelion passait donc son tour a reordonner ce
+     qui allait arriver de toute facon.
+     Le kit garde son identite — le temps — et change de levier : ralentir
+     l'ennemi, hater l'allie. La Vitesse, elle, cree des actions. */
+  if(e==='temporalShard')debuff(chosen,'slow',2+mastery.duration,.85+(mastery.effectRate||0));
+  if(e==='temporalHaste'){
+    chosen.buffs.speedUp={turns:3+mastery.duration,source:actor.id,label:'Hâte temporelle'};
+    const rendu=1+Math.round(mastery.effectRate||0);
+    chosen.cooldowns=chosen.cooldowns.map(v=>Math.max(0,v-rendu));
+    logs.push(`${chosen.name} est hâté ${3+mastery.duration} tours et regagne ${rendu} tour de recharge.`);
+  }
+  if(e==='timeWarp'){
+    const vivants=allies.filter(x=>!x.dead);
+    vivants.forEach(x=>{x.buffs.speedUp={turns:3+mastery.duration,source:actor.id,label:'Distorsion temporelle'}});
+    logs.push(`Distorsion temporelle : ${vivants.length} champions accélérés ${3+mastery.duration} tours.`);
+    /* Le retour en arriere reste la SEULE reanimation du jeu. Il etait
+       conditionne a un « Ancrage » pose au prealable sur le champion tombe —
+       condition que le combat automatique ne reunissait quasiment jamais. Il ne
+       demande plus qu'une chose : que quelqu'un soit tombe. Une fois par combat. */
+    const tombe=allies.find(x=>x.dead);
+    if(tombe&&!m.reviveSpent){
+      const retour=Math.round(tombe.maxHp*(resonanceIV?.5:.35));
+      tombe.dead=false;tombe.hp=Math.max(1,retour);tombe.shield=0;tombe.maxShield=0;
+      tombe.atb=0;tombe.skip=false;tombe.debuffs={};tombe.buffs={};
+      m.reviveSpent=true;event(tombe,retour,'heal');
+      logs.push(`Le temps revient en arrière : ${tombe.name} se relève avec ${retour} PV.`);
+    }
+  }
   if(e==='holyPowerStrike')m.value=Math.min(5,(m.value||0)+1);
   if(e==='holyPowerStorm')m.value=Math.min(5,(m.value||0)+2);
   if(e==='holyPowerVerdict')m.value=resonanceIV?1:0;

@@ -21,6 +21,11 @@ import{ETATS,TERRAINS,pastille}from'./helpers/ressourcesMatrice';
 // refonte puis comparee caractere pour caractere : 1 632 combinaisons
 // (32 champions x 17 etats de mecanique x 3 terrains), 0 difference. C'est ce
 // qui autorise a dire que la refonte ne change rien a ce que voit le joueur.
+//
+// Les 51 lignes de CAELION ont ete regenerees en v1.90.0, et elles seules : son
+// kit a change, il n'ancre plus personne et n'a plus de ressource a memoriser.
+// Verifie avant de toucher au fichier — les 1 581 autres lignes etaient
+// identiques, ce qui est precisement ce que cette reference sert a montrer.
 
 const lire=chemin=>fs.readFileSync(fileURLToPath(new URL(chemin,import.meta.url)),'utf8');
 const REFERENCE=JSON.parse(lire('./fixtures/ressources-champions.json'));
@@ -149,7 +154,7 @@ describe('reconnaissance d’un champion',()=>{
 
   it('par effet de sort, pour les héros dérivés qui n’ont pas l’identifiant',()=>{
     expect(descripteurDeRessource({id:9999,skills:[{effect:'huntMark'}]}).classe).toBe('kaelen-hunt');
-    expect(descripteurDeRessource({id:9999,skills:[{effect:'timeAnchor'}]}).classe).toBe('caelion-anchor');
+    expect(descripteurDeRessource({id:9999,skills:[{effect:'timeWarp'}]}).classe).toBe('caelion-warp');
   });
 
   it('par préfixe d’effet, pour Morghast dont les sorts partagent une famille',()=>{

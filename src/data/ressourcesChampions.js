@@ -125,10 +125,14 @@ export const RESSOURCES_CHAMPIONS={
     return{etat:actifSi(lie),titre:lie?'🛡️ SERMENT ACTIF':'🛡️ LIEN RUNIQUE',
       detail:lie?`${lie.name} · ${tours} ${pluriel(tours,'tour')}`:'Aucun allié lié'};}},
 
-  30:{classe:'caelion-anchor',effet:'timeAnchor',lire(unit,{allies}){
-    const ancre=allies.find(ally=>ally.id===unit.mechanic?.targetId);
-    return{etat:actifSi(unit.mechanic?.active),titre:unit.mechanic?.anchorSpent?'⏳ RETOUR PRÊT':'⏳ ANCRAGE',
-      detail:ancre?`${ancre.name} · ${unit.mechanic?.anchorSpent?'Restaurable':'En attente'}`:'Aucun allié ancré'};}},
+  // Caelion n'a plus de ressource a suivre : son kit ne memorise plus d'etat,
+  // il hate. Ce qui compte est visible sur les allies (le buff Hate) et sur le
+  // compteur de son ultime, comme pour tout autre champion.
+  30:{classe:'caelion-warp',effet:'timeWarp',lire(unit,{allies}){
+    const hates=allies.filter(ally=>!ally.dead&&ally.buffs?.speedUp).length;
+    return{etat:actifSi(hates>0),titre:hates?'🌀 TEMPS ACCÉLÉRÉ':'🌀 DISTORSION',
+      detail:hates?`${hates} ${pluriel(hates,'champion')} hâté${hates>1?'s':''}`:
+        (unit.mechanic?.reviveSpent?'Retour déjà utilisé':'Retour en arrière prêt')};}},
 
   // Korga se reconnait par son NOM depuis toujours, pas par son identifiant.
   20:{classe:'korga-fracture',nom:'Korga',effet:'shieldExecute',lire(unit,{livingEnemies}){

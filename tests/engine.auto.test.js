@@ -283,9 +283,11 @@ describe('chooseAutoAllyTarget',()=>{
     expect(cible.name).toBe('Carry');
   });
 
-  it('l Ancrage temporel ne se pose jamais sur le lanceur',()=>{
+  // L'Ancrage temporel de Caelion est devenu la Hate temporelle : meme regle de
+  // ciblage — on hate un autre allie, pas soi-meme.
+  it('la Hate temporelle ne se pose jamais sur le lanceur',()=>{
     const{combat}=trio();
-    const cible=chooseAutoAllyTarget(combat,combat.allies[0],S('timeAnchor','ally'));
+    const cible=chooseAutoAllyTarget(combat,combat.allies[0],S('temporalHaste','ally'));
     expect(cible.id).not.toBe(combat.allies[0].id);
   });
 

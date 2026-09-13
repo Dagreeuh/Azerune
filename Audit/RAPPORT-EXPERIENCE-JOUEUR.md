@@ -2966,3 +2966,62 @@ Je m'arrête là plutôt que de leur inventer une identité : les rendre utiles
 demande de décider ce qu'ils sont, pas de tourner un bouton.
 
 Suite complète : **1 865 tests**, 95 fichiers.
+
+---
+
+## 1.90.0 — Caelion : refondre un kit que les chiffres ne pouvaient pas sauver
+
+Suite de la phase 2. Caelion était dernier du roster (6/288, médiane 71) et y
+restait après trois passes de renforcement chiffré, dont une qui lui offrait un
+**tour entier** de jauge.
+
+### Le diagnostic
+
+Son kit reposait entièrement sur la jauge : voler 15 %, en donner 25 %,
+mémoriser puis restaurer. Or **la jauge est une file d'attente, pas une
+ressource** — avancer un allié retarde les autres, et le nombre d'actions d'une
+équipe est fixé par la Vitesse. Chacun de ses tours réordonnait ce qui allait
+arriver de toute façon.
+
+C'est la même famille de constat que l'audit a produit ailleurs : une mécanique
+complète et soignée qui ne pèse sur rien.
+
+### La refonte
+
+Identité conservée — le temps — levier changé : **ralentir l'ennemi, hâter les
+siens**. `temporalShard` (frappe + Ralentissement), `temporalHaste` (un allié
+accéléré, une recharge rendue), `timeWarp` (équipe entière accélérée, et le
+retour en arrière qui relève un allié tombé).
+
+La réanimation, seule du jeu, est conservée mais **déconditionnée** : elle
+exigeait un « Ancrage » posé au préalable sur le champion qui allait tomber, ce
+que le combat automatique ne réunissait quasiment jamais. Mesurée après :
+**7 combats sur 20** contre presque zéro.
+
+### Mesures
+
+| | Avant | Après |
+|---|---|---|
+| classement (288 combats) | 6 | **23** |
+| alliés hâtés | — | **93 % du temps** |
+| actions alliées par action ennemie | 2,37 (4ᵉ ordinaire) | **2,92** |
+| ennemis ralentis | — | 28 % du temps |
+| réanimation utilisée | ~0 | **7 / 20 combats** |
+
+Il reste sous la médiane. La refonte le sort du fond, elle n'en fait pas une
+pièce maîtresse — et une passe supplémentaire sur sa puissance de frappe
+(0,88 → 1,15) n'a donné que 23 → 24, dans le bruit : elle n'est pas livrée.
+
+### Ce que la refonte a coûté en registrations
+
+Onze fichiers connaissaient ses anciens sorts. La suite les a tous signalés, un
+par un : listes d'effets à jet et temporels (déduites **par la mesure** depuis
+la v1.84.0 — c'est elle qui m'a dit que `temporalShard` devait y figurer),
+archétype visuel, pistes d'amélioration de compétence, descriptions, affichage
+de ressource, étiquette d'effet en combat, et quatre tests de comportement.
+
+Un test à référence figée (1 632 rendus capturés avant une refonte) a signalé
+**51 écarts** : vérifié, tous chez Caelion, les 1 581 autres inchangés. Ses
+lignes seules ont été régénérées.
+
+Suite complète : **1 873 tests**, 96 fichiers.

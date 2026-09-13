@@ -100,9 +100,9 @@ describe('Yunmei : un 4★ ne doit pas dominer tous les 5★',()=>{
   it('Renouveau reste un soin d’équipe avec purification',()=>{
     // Correction d'une erreur de ma part : « Renouveau » n'est pas une
     // resurrection. La seule reanimation du jeu appartient a Caelion
-    // (effet `timeRestore`), pas a Yunmei.
+    // (effet `timeWarp`), pas a Yunmei.
     expect(yunmei().skills[2].effect).toBe('revival');
-    const caelion=HEROES.find(h=>h.skills.some(s=>s.effect==='timeRestore'));
+    const caelion=HEROES.find(h=>h.skills.some(s=>s.effect==='timeWarp'));
     expect(caelion,'plus personne ne porte la réanimation du jeu').toBeTruthy();
     expect(caelion.name).not.toBe('Yunmei');
   });
