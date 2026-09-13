@@ -4,6 +4,7 @@
 // affichee avant chaque mission. Une erreur ici ne plante rien, elle conseille
 // mal — le pire des defauts, parce qu il est invisible.
 import{describe,it,expect}from'vitest';
+import{socleDeRarete}from'../src/utils/stats';
 import{progressionStats,totalStats,championPower,teamPower,missionDifficulty,
         campaignXp,enemyPower,encounterPower,calibratedEncounterPower,
         assessTeamForMission}from'../src/utils/stats';
@@ -65,21 +66,28 @@ describe('teamPower',()=>{
 describe('progressionStats',()=>{
   const hero=()=>makeHero({hp:1000,atk:100,def:50,spd:100,rarity:3,role:'Combattant'});
 
+  // Les statistiques de base passent par le SOCLE DE RARETE, un levier
+  // d'equilibrage introduit pour que l'invocation tienne sa promesse. Ces
+  // contrats verifient la FORME de la formule, pas des nombres figes : les
+  // figer reviendrait a garder une copie du levier ici.
+  const socle=socleDeRarete(3);
+
   it('le niveau 1 sans etoile bonus rend les statistiques de base',()=>{
     const resultat=progressionStats(hero(),progression());
-    expect(resultat.hp).toBe(1000);
-    expect(resultat.atk).toBe(100);
+    expect(resultat.hp).toBe(Math.round(1000*socle));
+    expect(resultat.atk).toBe(Math.round(100*socle));
+    // La Vitesse ne passe PAS par le socle : c'est un trait d'identite.
     expect(resultat.spd).toBe(100);
   });
 
   it('chaque niveau ajoute 4,5 % aux statistiques principales',()=>{
     const resultat=progressionStats(hero(),progression({level:11}));
-    expect(resultat.hp).toBe(Math.round(1000*(1+10*.045)));
+    expect(resultat.hp).toBe(Math.round(1000*socle*(1+10*.045)));
   });
 
   it('chaque etoile au-dela de la rarete ajoute 18 %',()=>{
     const resultat=progressionStats(hero(),progression({stars:5}));
-    expect(resultat.atk).toBe(Math.round(100*(1+2*.18)));
+    expect(resultat.atk).toBe(Math.round(100*socle*(1+2*.18)));
   });
 
   it('la Vitesse progresse par paliers, pas en pourcentage',()=>{
@@ -105,12 +113,12 @@ describe('totalStats',()=>{
   it('additionne les bonus plats avant les bonus en pourcentage',()=>{
     const objet={id:'o1',stats:{atk:50,atkPct:100}};
     const resultat=totalStats(hero,equipe([objet]),progression(),[objet]);
-    expect(resultat.atk).toBe(Math.round((100+50)*2));
+    expect(resultat.atk).toBe(Math.round((Math.round(100*socleDeRarete(3))+50)*2));
   });
 
   it('ignore un objet equipe introuvable dans l inventaire',()=>{
     const resultat=totalStats(hero,{[hero.id]:{arme:'inexistant'}},progression(),[]);
-    expect(resultat.atk).toBe(100);
+    expect(resultat.atk).toBe(Math.round(100*socleDeRarete(3)));
   });
 
   it('borne le Critique, la Precision et la Resistance',()=>{

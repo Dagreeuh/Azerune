@@ -109,13 +109,19 @@ describe('le quatrième champion du Raid n’est plus une punition',()=>{
   it('à armes égales, quatre champions valent mieux que trois',()=>{
     const j=joueur({zone:9,difficulte:'normal',niveau:50,etoiles:5,niveauObjet:12,competences:'max'});
     const noyau=['Hicho','Aurelis','Morghast'].map(n=>j.heroes.find(h=>h.name===n).id);
-    // Vexil, et pas n'importe qui : la mesure d'origine le donnait a 37
-    // victoires sur 60 la ou le trio seul en faisait 57. Ignovar, lui, etait
-    // deja neutre — le prendre comme renfort laissait le defaut invisible, et
-    // un mutant qui retire le correctif passait le test.
-    const renfort=j.heroes.find(h=>h.name==='Vexil').id;
+    // Le renfort est choisi pour que le test SEPARE, et il a change une fois :
+    // Vexil servait tant qu'il etait de valeur moyenne ; depuis le socle de
+    // rarete il est trop faible pour que son ajout paie le quatrieme
+    // emplacement, et le test echouait pour une raison etrangere a la mecanique
+    // qu'il garde. Mathanae donne la separation la plus nette — verifie :
+    //   avec le correctif : trio 56/60, +Mathanae 60/60
+    //   sans le correctif : trio 56/60, +Mathanae 46/60
+    const renfort=j.heroes.find(h=>h.name==='Mathanae').id;
     const mission=avecHasard(11,()=>createRaidMission(RAID,9));
-    const taux=equipe=>[1,2].reduce((s,g)=>s+avecHasard(g*977,()=>simulerMission({mission,
+    // Trois graines et 60 tirages : c'est le protocole du banc de mesure. A
+    // 40 tirages la separation mesuree (60 contre 46) ne se reproduisait pas,
+    // et un mutant qui retire le correctif passait le test.
+    const taux=equipe=>[1,2,3].reduce((s,g)=>s+avecHasard(g*977,()=>simulerMission({mission,
       team:equipe,heroes:j.heroes,getStats:j.getStats,tirages:20})).victoires,0);
     const trois=taux(noyau),quatre=taux([...noyau,renfort]);
     // Le defaut d'origine, en une ligne : le quatrieme faisait PERDRE.

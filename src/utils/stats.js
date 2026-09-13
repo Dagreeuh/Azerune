@@ -2,16 +2,57 @@ import{ITEMS,itemStats,setStats,activeSets,SETS}from'../data/items';
 import{normalizeChampionProgress,resonanceBonus}from'./progression';
 import{empreinteBonuses}from'../data/empreintes';
 
+/**
+ * SOCLE DE RARETE — ce qu'une invocation rare achete vraiment.
+ *
+ * La promesse centrale d'un jeu a invocations : un 5* vaut mieux qu'un 3*.
+ * Mesuree, elle ne tenait pas. Sur deux rencontres et trois compositions :
+ *
+ *   sans Ascension      3* 11 victoires · 4* 16 · 5* 19   ordre CORRECT
+ *   tous a 5 etoiles    3* 11 · 4* 10 · 5*  9             ordre INVERSE
+ *   tous a 6 etoiles    3* 11 · 4* 13 · 5* 10             ordre INVERSE
+ *
+ * La cause est arithmetique, pas une affaire de kits. `starFactor` vaut
+ * `1 + (etoiles - rarete) x 0,18` : mene a 6 etoiles, un 3* gagne 54 % et un
+ * 5* seulement 18 %. Comme les budgets de base n'etaient espaces que de 7,7 %
+ * par rang (561 / 604 / 652), l'Ascension RETOURNAIT l'ordre — et pas seulement
+ * au plafond : des 4 etoiles, un 3* ascensionne depassait un 4* neuf.
+ *
+ * Deux facons de reparer. Reduire le gain d'Ascension viderait le principal
+ * levier de progression du joueur. On elargit donc le SOCLE : les ecarts de
+ * base passent de 7,7 % a 19 % par rang, ce qui laisse l'Ascension aussi
+ * genereuse qu'avant tout en gardant l'ordre a CHAQUE palier d'etoiles :
+ *
+ *   a 4 etoiles  3* 594  4* 600
+ *   a 5 etoiles  3* 685  4* 707  5* 713
+ *   a 6 etoiles  3* 776  4* 815  5* 842
+ *
+ * La moyenne du roster ne bouge pas (606 avant, 606 apres) : le niveau de
+ * puissance general est conserve, donc les calibrages de contenu tiennent.
+ *
+ * Le socle vit ICI et non dans les fiches des champions : c'est un levier
+ * d'equilibrage, pas une caracteristique de personnage. Les 32 fiches gardent
+ * les valeurs voulues par leur conception.
+ *
+ * Detail : Audit/RAPPORT-EXPERIENCE-JOUEUR.md
+ */
+export const SOCLE_RARETE={3:.851,4:.990,5:1.131};
+export const socleDeRarete=rarete=>SOCLE_RARETE[rarete]??1;
+
 export function progressionStats(hero,championProgress){
   const progress=normalizeChampionProgress(hero,championProgress);
   const extraStars=progress.stars-hero.rarity;
   const levelFactor=1+(progress.level-1)*0.045;
   const starFactor=1+extraStars*.18;
+  // La Vitesse n'est pas mise a l'echelle : c'est un trait d'identite
+  // (Caelion le plus rapide, Thorgar le plus lent) et elle decide de l'ordre
+  // des tours, pas de la puissance brute.
+  const socle=socleDeRarete(hero.rarity);
   const resonance=resonanceBonus(progress),resonanceFactor=1+resonance.allPercent/100;
   return {
-    hp:Math.round(hero.hp*levelFactor*starFactor*resonanceFactor),
-    atk:Math.round(hero.atk*levelFactor*starFactor*resonanceFactor),
-    def:Math.round(hero.def*levelFactor*starFactor*resonanceFactor),
+    hp:Math.round(hero.hp*socle*levelFactor*starFactor*resonanceFactor),
+    atk:Math.round(hero.atk*socle*levelFactor*starFactor*resonanceFactor),
+    def:Math.round(hero.def*socle*levelFactor*starFactor*resonanceFactor),
     spd:hero.spd+extraStars*2+Math.floor((progress.level-1)/10)+resonance.speed,
     crit:5,
     critDamage:50,

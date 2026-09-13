@@ -78,6 +78,13 @@ describe('classement multi-rencontres',()=>{
   const median=tri[Math.floor(tri.length/2)];
   console.log(`\nmediane du roster : ${median}/288 (3 noyaux x 4 rencontres x 24 tirages)`);
   console.log('champion        rar elem     |'+refs.map(([n])=>n.padStart(13)).join('')+'   TOTAL');
+  // Moyenne par rarete : c'est elle qui dit si l'invocation tient sa promesse.
+  // Un 5* isole peut etre mauvais sans que la promesse soit rompue ; c'est le
+  // SOCLE qui doit s'ordonner.
+  const parRarete=r=>{const l=lignes.filter(x=>x.h.rarity===r);
+    return Math.round(l.reduce((s,x)=>s+x.total,0)/l.length);};
+  const[m3,m4,m5]=[parRarete(3),parRarete(4),parRarete(5)];
+  console.log(`moyenne par rarete : 3* ${m3}  4* ${m4}  5* ${m5}   ordre ${m5>m4&&m4>m3?'CROISSANT':'rompu'}`);
   lignes.forEach(l=>{
     const marque=l.total<median-45?'  TRES FAIBLE':l.total<median-22?'  faible':l.total>median+22?'  FORT':'';
     console.log(`${l.h.name.padEnd(15)} ${l.h.rarity}* ${l.h.element.padEnd(8)} |`+

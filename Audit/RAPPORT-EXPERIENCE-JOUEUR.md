@@ -3025,3 +3025,81 @@ Un test à référence figée (1 632 rendus capturés avant une refonte) a signa
 lignes seules ont été régénérées.
 
 Suite complète : **1 873 tests**, 96 fichiers.
+
+---
+
+## 1.91.0 — L'Ascension retournait la promesse de l'invocation
+
+Chantier 1 de la liste restante : la rareté n'achetait rien.
+
+### Le diagnostic, en deux mesures
+
+`Audit/mesures/audit-rarete.test.js` compare les moyennes par rareté sous trois
+politiques d'étoiles :
+
+| | 3★ | 4★ | 5★ | ordre |
+|---|---|---|---|---|
+| rareté d'origine | 11 (pw 1473) | 16 (pw 1582) | **19** (pw 1675) | **correct** |
+| tous à 5 étoiles | 11 (pw 1820) | 10 (pw 1776) | 9 (pw 1675) | inversé |
+| tous à 6 étoiles | 11 (pw 1996) | 13 (pw 1968) | 10 (pw 1889) | inversé |
+
+**Sans Ascension, la rareté fonctionne parfaitement.** Ce n'était donc ni les
+kits ni les statistiques de base : c'était le facteur d'étoiles.
+
+L'arithmétique confirme et va plus loin que je ne pensais —
+`starFactor = 1 + (étoiles − rareté) × 0,18` inverse l'ordre **dès la première
+Ascension**, pas seulement au plafond :
+
+| | 3★ | 4★ | 5★ |
+|---|---|---|---|
+| à 4 étoiles | **662** | 604 | — |
+| à 5 étoiles | **763** | 712 | 652 |
+| à 6 étoiles | **864** | 821 | 770 |
+
+### Le choix de réparation
+
+Deux chemins. Réduire le gain d'Ascension aurait vidé le principal levier de
+progression du joueur. On élargit donc le **socle** : les écarts de base passent
+de 7,7 % à 19 % par rang, l'Ascension reste intacte, et l'ordre tient à chaque
+palier (594/600 · 685/707/713 · 776/815/842).
+
+`SOCLE_RARETE` vit dans `stats.js`, à un seul endroit — c'est un levier
+d'équilibrage, pas une caractéristique de personnage, et les 32 fiches gardent
+les valeurs voulues par leur conception. La **Vitesse en est exclue** : c'est un
+trait d'identité et elle décide de l'ordre des tours, pas de la puissance.
+
+**La moyenne du roster est préservée** (606 → 606), et les trois cartes de
+contenu — raid, expéditions, campagne — restent des escaliers monotones.
+
+### Résultat
+
+Moyenne par rareté sur le banc complet (288 combats par champion) :
+
+| | Avant | Après |
+|---|---|---|
+| 3★ | 72 | **50** |
+| 4★ | 74 | **77** |
+| 5★ | 80 | **110** |
+
+Ordre croissant, facteur 2,2 entre 3★ et 5★. Aurelis (3★) reste 7ᵉ : un
+excellent 3★ garde sa place, c'est la moyenne qui devait s'ordonner.
+
+### Un test qui a failli mentir par omission
+
+`simulation.estimation` exigeait qu'il **existe** des combats où le verdict
+affiché contredit le combat réel — la justification même du simulateur. Il n'en
+trouvait plus après le changement, et son commentaire disait : *« si ce test
+tombe, c'est que l'indicateur est devenu fiable, supprimez-le »*.
+
+Vérifié avant de le croire, par un balayage bien plus large : **840 couples
+(palier × mission), 172 contradictions franches, soit 20 %.** L'indicateur n'est
+pas devenu fiable — c'est l'échantillon du test qui avait cessé de traverser la
+zone de désaccord, parce qu'il multipliait les statistiques d'une équipe par un
+coefficient au lieu d'utiliser de vrais joueurs. Le test est réécrit sur le
+modèle de joueur.
+
+Ces contradictions vont toutes dans le même sens : le jeu annonce
+« insuffisant » à un joueur qui gagne 12 fois sur 12. C'est le sens le moins
+dangereux, mais il décourage d'essayer. **À corriger.**
+
+Suite complète : **1 872 tests**, 97 fichiers.
