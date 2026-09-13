@@ -1,5 +1,6 @@
 import{ENEMIES}from'../data/enemies';
 import{skillBonuses}from'../utils/skills';
+import{mitigation}from'../utils/skillMath';
 import{affinity,normalizeElement}from'../utils/elements';
 import{createMythicState,advanceMythicClock,mythicCollapseFactor}from'../utils/mythic';
 
@@ -347,7 +348,7 @@ export function enemyAction(battle){
     const raging=battle.mythic&&battle.affixState?.ids?.includes('raging')&&actor.hp/actor.maxHp<.30;const attackPower=actor.atk*(1+.08*(actor.buffs?.mythicBolster?.stacks||0))*(raging?1.15:1)*mythicCollapseFactor(battle.mythicState)*(actor.debuffs.atkDown?.7:1);
     const variance=.92+Math.random()*.16,critical=Math.random()<(actor.bossUnit?(actor.campaignUnit?({easy:.10,normal:.13,hard:.16,hardcore:.19}[actor.campaignDifficulty]||.13):.16):.08);
     const relation=affinity(actor.element,target.element,battle.difficulte);
-    let damage=Math.max(6,Math.round(attackPower*multiplier*100/(100+defense*3)*variance*(actor.bossUnit?(actor.campaignUnit?({easy:1.04,normal:1.08,hard:1.13,hardcore:1.18}[actor.campaignDifficulty]||1.08):1.12):1)*(critical?1.5:1)*relation.damage)),personalMitigation=0;if(target.id===25&&target.mechanic?.mode==='high'){const reduced=Math.max(1,Math.round(damage*.82));personalMitigation=damage-reduced;damage=reduced;}
+    let damage=Math.max(6,Math.round(attackPower*multiplier*mitigation(defense)*variance*(actor.bossUnit?(actor.campaignUnit?({easy:1.04,normal:1.08,hard:1.13,hardcore:1.18}[actor.campaignDifficulty]||1.08):1.12):1)*(critical?1.5:1)*relation.damage)),personalMitigation=0;if(target.id===25&&target.mechanic?.mode==='high'){const reduced=Math.max(1,Math.round(damage*.82));personalMitigation=damage-reduced;damage=reduced;}
     const absorbed=Math.min(target.shield,damage),shieldSource=target.buffs?.shield?.source;if(personalMitigation)battle=addCombatStat(battle,target.id,{mitigation:personalMitigation,personalMitigation});if(absorbed&&shieldSource)battle=addCombatStat(battle,shieldSource,{mitigation:absorbed,shieldMitigation:absorbed});damage-=absorbed;
     target.hp=Math.max(0,target.hp-damage);target.shield=Math.max(0,target.shield-absorbed);target.dead=target.hp<=0;if(battle.mythic&&battle.affixState?.ids?.includes('necrotic')&&damage>0)poserDebuff(battle,actor,target,'necrotic',2,{stacks:Math.min(5,(target.debuffs.necrotic?.stacks||0)+1)},resisted);if(battle.mythic&&battle.affixState?.ids?.includes('afflicted')&&damage>0)poserDebuff(battle,actor,target,'affliction',99,{stacks:Math.min(5,(target.debuffs.affliction?.stacks||0)+1)},resisted);
     const guardianId=target.buffs.guardianLink?.source,guardian=allies.find(unit=>unit.id===guardianId&&!unit.dead);
@@ -357,7 +358,7 @@ export function enemyAction(battle){
     if(damage>0)battle=addCombatStat(battle,target.id,{damageTaken:damage});if(target.id===18&&damage>0)target.mechanic.value=Math.min(5,(target.mechanic.value||0)+1);
     actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}-${target.id}`,sourceId:actor.id,targetId:target.id,amount:damage,type:'damage',affinity:relation.key,critical});
     // Set Contre-attaque : 20 % de riposte, calculee sur la Defense de l'attaquant.
-    if(damage>0&&!target.dead&&self&&!self.dead&&target.setEffects?.includes('counterSet')&&Math.random()<.20){const counterDefense=self.def*(self.buffs.defUp?1.3:1)*(self.debuffs.defDown?.7:1),counter=Math.max(1,Math.round(target.atk*.75*100/(100+counterDefense*3)));self.hp=Math.max(0,self.hp-counter);self.dead=self.hp<=0;battle=addCombatStat(battle,target.id,{damage:counter});actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}-${actor.id}-counter`,sourceId:target.id,targetId:actor.id,amount:counter,type:'damage',affinity:'neutral',critical:false,sourceType:'counter'});}
+    if(damage>0&&!target.dead&&self&&!self.dead&&target.setEffects?.includes('counterSet')&&Math.random()<.20){const counterDefense=self.def*(self.buffs.defUp?1.3:1)*(self.debuffs.defDown?.7:1),counter=Math.max(1,Math.round(target.atk*.75*mitigation(counterDefense)));self.hp=Math.max(0,self.hp-counter);self.dead=self.hp<=0;battle=addCombatStat(battle,target.id,{damage:counter});actionEvents.push({id:`event-${(battle.eventSeq||0)+actionEvents.length+1}-${actor.id}-counter`,sourceId:target.id,targetId:actor.id,amount:counter,type:'damage',affinity:'neutral',critical:false,sourceType:'counter'});}
     return{damage,absorbed,critical,relation};
   };
   let text='';
@@ -695,7 +696,7 @@ return tryDebuff(actor,target,key,turns+mastery.duration,chance+relation.effect,
     const ferveur=cleDe(actor,'ferveur');if(ferveur)power*=1+ferveur*Math.max(0,Number(actor.mechanic?.value)||0);
     // Cle de voute — Acharnement : la cible affaiblie prend davantage.
     const acharnement=cleDe(actor,'acharnement');
-    if(acharnement&&target.maxHp>0&&target.hp/target.maxHp<.40)power*=1+acharnement;if(actor.setEffects?.includes('volcanicFurySet')&&actor.hp/actor.maxHp<.5)power*=1.12;let base=Math.max(5,Math.round(attack*power*100/(100+defense*3)*(intangible?.45:1))),critical=opts.forceCrit||Math.random()<(actor.crit||5)/100,damage=Math.round(base*(critical?1+(actor.critDamage||50)/100:1));const absorbed=Math.min(target.shield||0,opts.shieldBreaker?damage*2:damage);target.shield=Math.max(0,(target.shield||0)-absorbed);if(absorbed>0&&target.shield<=0)target.shieldBroken=true;if(!opts.shieldOnly){damage=Math.max(0,damage-(opts.shieldBreaker?Math.ceil(absorbed/2):absorbed));target.hp=Math.max(0,target.hp-damage);target.dead=target.hp<=0;}damageTotal+=damage;
+    if(acharnement&&target.maxHp>0&&target.hp/target.maxHp<.40)power*=1+acharnement;if(actor.setEffects?.includes('volcanicFurySet')&&actor.hp/actor.maxHp<.5)power*=1.12;let base=Math.max(5,Math.round(attack*power*mitigation(defense)*(intangible?.45:1))),critical=opts.forceCrit||Math.random()<(actor.crit||5)/100,damage=Math.round(base*(critical?1+(actor.critDamage||50)/100:1));const absorbed=Math.min(target.shield||0,opts.shieldBreaker?damage*2:damage);target.shield=Math.max(0,(target.shield||0)-absorbed);if(absorbed>0&&target.shield<=0)target.shieldBroken=true;if(!opts.shieldOnly){damage=Math.max(0,damage-(opts.shieldBreaker?Math.ceil(absorbed/2):absorbed));target.hp=Math.max(0,target.hp-damage);target.dead=target.hp<=0;}damageTotal+=damage;
     // Cle de voute — Vampirisme : une part des degats revient en PV.
     const vampirisme=cleDe(actor,'vampirisme');
     if(vampirisme&&damage>0&&actor.hp<actor.maxHp){

@@ -5,6 +5,7 @@
 //   variance = 0,92 + Math.random() * 0,16      (donc 1,00 pour un tirage a 0,5)
 //   critique = Math.random() < 0,08             (x1,5 sur un ennemi ordinaire)
 import{describe,it,expect,beforeEach,afterEach,vi}from'vitest';
+import{mitigation}from'../src/utils/skillMath';
 import{createBattle,nextTurn,enemyAction}from'../src/battle/engine';
 import{makeHero,makeEnemy,statsFrom,withStatus,findUnit,seedRandom,fixedRandom}from './helpers';
 
@@ -51,10 +52,16 @@ describe('formule de base',()=>{
     expect(degats({ennemi:{atk:37}})).toBe(37);
   });
 
-  it('la Defense reduit selon 100 / (100 + Def x 3)',()=>{
+  // Ces deux contrats recopiaient le coefficient « x 3 ». Ils gardaient donc une
+  // copie du levier d'equilibrage le plus sensible du moteur, et la modifier
+  // les faisait echouer alors que le moteur restait fidele a ce qu'il annonce.
+  // Ils lisent desormais COEFF_DEFENSE : ce qu'ils verifient est l'accord entre
+  // la formule declaree et celle appliquee, pas une valeur figee.
+  it('la Defense reduit selon 100 / (100 + Def x COEFF_DEFENSE)',()=>{
+    expect(mitigation(0)).toBe(1);
     [10,25,50,100].forEach(def=>{
       expect(degats({allie:{def},ennemi:{atk:1000}}))
-        .toBe(Math.round(1000*100/(100+def*3)));
+        .toBe(Math.round(1000*mitigation(def)));
     });
   });
 
@@ -62,7 +69,11 @@ describe('formule de base',()=>{
     const sansDefense=degats({allie:{def:0},ennemi:{atk:1000}});
     const grosseDefense=degats({allie:{def:500},ennemi:{atk:1000}});
     expect(grosseDefense).toBeGreaterThan(0);
-    expect(grosseDefense).toBeLessThan(sansDefense/10);
+    // Decroissant : doubler la Defense ne double pas la reduction.
+    const simple=degats({allie:{def:100},ennemi:{atk:1000}});
+    const double=degats({allie:{def:200},ennemi:{atk:1000}});
+    expect(sansDefense-double).toBeLessThan((sansDefense-simple)*2);
+    expect(grosseDefense).toBeLessThan(sansDefense*mitigation(500)*1.01+1);
   });
 
   it('applique un plancher de 6 degats',()=>{

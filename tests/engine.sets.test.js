@@ -3,6 +3,7 @@
 // src/combat/engine.js, jamais portees dans src/battle — voir
 // Audit/RAPPORT-SETS-ORPHELINS.md et Audit/RAPPORT-SUPPRESSION-COMBAT-ENGINE.md.
 import{describe,it,expect,beforeEach,afterEach,vi}from'vitest';
+import{mitigation}from'../src/utils/skillMath';
 import{createBattle,nextTurn,enemyAction,castSkill}from'../src/battle/engine';
 import{makeHero,makeEnemy,statsFrom,giveTurnTo,findUnit,withStatus,fixedRandom}from './helpers';
 
@@ -105,7 +106,8 @@ describe('set Contre-attaque — riposte',()=>{
 
   it('la riposte vaut 75 % de l Attaque, reduite par la Defense de l attaquant',()=>{
     const{ennemi}=echange({sets:['counterSet'],tirage:.1,atkAllie:200,defEnnemi:20});
-    const attendu=Math.max(1,Math.round(200*.75*100/(100+20*3)));
+    // Le coefficient de Defense vient de la constante partagee, pas d'une copie.
+    const attendu=Math.max(1,Math.round(200*.75*mitigation(20)));
     expect(ennemi.maxHp-ennemi.hp).toBe(attendu);
   });
 

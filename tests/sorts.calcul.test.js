@@ -2,7 +2,7 @@ import{describe,it,expect}from'vitest';
 import fs from'node:fs';
 import{fileURLToPath}from'node:url';
 import{HEROES}from'../src/data/heroes';
-import{skillDamageProfile,scalingStat,bonusLabel,mitigation,CONDITIONAL_BONUSES,
+import{skillDamageProfile,scalingStat,bonusLabel,mitigation,COEFF_DEFENSE,CONDITIONAL_BONUSES,
   DEF_SCALED,HP_SCALED,CRIT_MULTIPLIER,SCALING_LABEL}from'../src/utils/skillMath';
 import{skillBonuses,skillMaxLevel}from'../src/utils/skills';
 import{createBattle,castSkill}from'../src/battle/engine';
@@ -61,9 +61,19 @@ describe('le tooltip dit la vérité sur le moteur',()=>{
   it('le multiplicateur critique et la mitigation viennent du moteur',()=>{
     expect(moteur).toContain('(critical?1.5:1)');
     expect(CRIT_MULTIPLIER).toBe(1.5);
-    expect(moteur).toContain('100/(100+defense*3)');
-    expect(mitigation(100)).toBeCloseTo(100/400);
     expect(mitigation(0)).toBe(1);
+    expect(mitigation(100)).toBeCloseTo(100/(100+100*COEFF_DEFENSE));
+  });
+
+  // Ce contrat cherchait la chaine `100/(100+defense*3)` dans le moteur. Il
+  // gardait donc une COPIE de la formule, a trois endroits, et il a casse le
+  // jour ou cette copie a ete supprimee au profit d'un appel partage. La
+  // garantie utile n'est pas « le moteur ecrit cette formule » mais « le
+  // moteur n'en ecrit aucune autre » : le poids de la Defense est un levier
+  // d'equilibrage, une valeur oubliee ailleurs le rendrait faux en silence.
+  it('aucune formule de mitigation n’est recopiee dans le moteur',()=>{
+    expect(moteur).toContain("from'../utils/skillMath'");
+    expect(moteur.match(/100\/\(100\+/g)).toBeNull();
   });
 });
 

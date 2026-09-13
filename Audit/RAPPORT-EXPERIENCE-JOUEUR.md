@@ -2862,3 +2862,72 @@ Je n'ai pas non plus créé de nouveaux champions. Le roster est déséquilibré
 champion doit faire pour être utile reviendrait à en ajouter d'inutiles.
 
 Suite complète : **1 855 tests**, 93 fichiers. Bancs de mesure : 19 fichiers.
+
+---
+
+## 1.89.0 — Faire compter les dégâts : un seul nombre
+
+Phase 1 de la direction retenue : corriger le moteur d'abord, ne réécrire
+ensuite que les kits qui restent faibles.
+
+### Le levier
+
+La mitigation valait `100/(100 + DÉF × 3)`. Mesuré le long de la progression
+(`Audit/mesures/audit-mitigation.test.js`) :
+
+| Contenu | DÉF | absorbé | dégâts/action | soutien/action | rapport |
+|---|---|---|---|---|---|
+| campagne z1 | 13 | 29 % | 19 | 17 | 0,89 |
+| campagne z5 | 25 | 43 % | 56 | 123 | 2,20 |
+| campagne z7 | 31 | 48 % | 64 | 185 | **2,89** |
+| raid 10 | 73 | **69 %** | 199 | 402 | 2,02 |
+
+Soins et boucliers se calculent sur les PV max de l'allié, que l'ennemi ne
+réduit pas. L'asymétrie est structurelle : le jeu commençait équilibré et
+glissait vers le soutien à mesure que la Défense ennemie montait.
+
+### Le balayage
+
+Quatre valeurs mesurées, sur le rapport soutien/dégâts et sur le classement :
+
+| Coefficient | Rapport au raid 10 | Écart du roster |
+|---|---|---|
+| 3 (avant) | 2,02 | 123 → 231 (**108**) |
+| 2 | 1,77 | — |
+| **1,5 (retenu)** | **1,40** | 163 → 239 (**76**) |
+| 1 | 1,04 | 191 → 240 (49) |
+
+À 1, le roster s'aplatit : tous les champions se valent, ce qui remplace un
+défaut par l'autre. À 1,5 l'inversion disparaît sans effacer les différences.
+
+### Ce que la mesure a révélé par surprise
+
+**La campagne était une formalité.** Avec l'ancien coefficient et une équipe
+correctement composée, un joueur équipé en zone 3 gagnait 29 à 30 fois sur 30
+sur les boss des zones 1 à 9. Mon audit précédent la disait « bien calibrée » —
+mesure faite avec une équipe choisie à la puissance, donc handicapée. Avec une
+équipe normale, elle ne demandait rien.
+
+Après correction, ce même joueur passe les zones 1-5, peine sur 6-8 et échoue
+sur 9-10. C'est une progression.
+
+### Une constante, un seul endroit
+
+Le « × 3 » vivait à **quatre endroits de code, une chaîne d'affichage et deux
+commentaires**. `COEFF_DEFENSE` est désormais exporté par `skillMath.js` et lu
+par le moteur, par l'infobulle de combat et par les tests. Trois contrats qui
+recopiaient la formule — dont un qui cherchait la chaîne `100/(100+defense*3)`
+dans le source du moteur — ont été réécrits : ils vérifient maintenant l'accord
+entre la formule déclarée et celle appliquée, et un test interdit toute copie.
+
+### État du roster après phase 1
+
+Écart ramené de 108 à 76 points. Les frappeurs purs remontent : Vharok
+129 → 202, Vélomoteur 142 → 232, Ragnhild 139 → 212, Seraphiel 145 → 211,
+Brilith 133 → 194.
+
+Restent quatre champions nettement en dessous : **Nyxaris (163), Aszhal (166),
+Caelion (166), Yunmei (179)** — trois Arcane sur quatre. Leur écart ne vient
+plus du moteur : c'est la phase 2.
+
+Suite complète : **1 861 tests**, 94 fichiers.

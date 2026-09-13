@@ -7,7 +7,7 @@
 // moteur ne manque ici : une table recopiee a la main derive toujours.
 //
 // La formule du moteur, telle quelle :
-//   degats = statistique × ratio × 100/(100 + DEF_cible × 3)
+//   degats = statistique × ratio × 100/(100 + DEF_cible × COEFF_DEFENSE)
 //            × variance(0,92–1,08) × critique(×1,5) × affinite
 // Le ratio est `skill.power`, augmente par la maitrise, puis multiplie ou
 // augmente par les bonus conditionnels ci-dessous.
@@ -70,8 +70,28 @@ export const CONDITIONAL_BONUSES={
 export const CRIT_MULTIPLIER=1.5;
 export const VARIANCE=[.92,1.08];
 export const AFFINITY={effective:1.30,weak:.75,neutral:1};
-/** Mitigation : 100/(100 + DEF × 3). */
-export const mitigation=defense=>100/(100+Math.max(0,Number(defense)||0)*3);
+/**
+ * Poids de la Defense dans la mitigation — LE levier d'equilibrage du moteur.
+ *
+ * Mesure le long de la progression : la part de degats absorbee passait de
+ * 29 % (zone 1) a 69 % (raid 10), pendant que soins et boucliers, calcules sur
+ * les PV MAX de l'allie, ne subissent aucune reduction. Le rapport
+ * soutien/degats derivait donc de 0,89 a 2,89 : le jeu commencait equilibre et
+ * glissait mecaniquement vers le soutien.
+ *
+ * Consequence mesuree sur le roster : plus un champion inflige de degats par
+ * action, MOINS il fait gagner son equipe. Les cinq champions sans utilite
+ * occupaient les cinq dernieres places du classement.
+ *
+ * Cette constante vit ici et nulle part ailleurs : le moteur, l'infobulle du
+ * sort et cette fonction la lisent tous les trois, pour qu'aucun ne puisse
+ * annoncer une formule que les autres n'appliquent pas.
+ *
+ * Detail : Audit/RAPPORT-EXPERIENCE-JOUEUR.md
+ */
+export const COEFF_DEFENSE=1.5;
+/** Mitigation : 100/(100 + DEF × COEFF_DEFENSE). */
+export const mitigation=defense=>100/(100+Math.max(0,Number(defense)||0)*COEFF_DEFENSE);
 
 /**
  * Profil chiffre d'un sort, pour l'ecran.

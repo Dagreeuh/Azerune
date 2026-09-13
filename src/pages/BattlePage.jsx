@@ -6,6 +6,7 @@ import{createBattle,nextTurn,enemyAction,castSkill,advanceMythicWave,performAuto
 import{optionsDeCombat}from'../utils/simulation';
 import{affinity,areaAffinity,elementMeta,detailAffinite,POIDS_AFFINITE}from'../utils/elements';
 import{championIdentity}from'../data/championIdentities'; import{skillMechanic,skillPowerLabel,skillMaxLevel}from'../utils/skills';
+import{COEFF_DEFENSE}from'../utils/skillMath';
 import{CONTINENTS,DIFFICULTIES,createMission}from'../data/campaign';
 import SpellVfx from'../components/SpellVfx';
 import{ressourceAffichee,classeRessource}from'../data/ressourcesChampions';
@@ -83,7 +84,7 @@ export function SkillTooltip({actor,skill,index,relation,unlocked,onGuide,defens
    <div className="scaling-formula"><b>{pourcent(profil.ratio)}</b><span>{/^[AEIOUY]/.test(profil.statLabel)?'d’':'de '}{profil.statLabel}</span><strong>{profil.statValue.toLocaleString('fr-FR')}</strong></div>
    {profil.maxPower>0&&<em className="scaling-mastery">dont +{pourcent(profil.maxPower)} de maîtrise (niveau {profil.level})</em>}
    {profil.damage&&defense>0&&<div className="scaling-expected"><span>Contre {defense} de Défense</span><b>≈ {profil.expected.toLocaleString('fr-FR')}</b><i>{profil.expectedCrit.toLocaleString('fr-FR')} en critique</i></div>}
-   {profil.damage&&<p className="scaling-note">Mitigation 100 / (100 + DÉF × 3) · variance ±8 % · critique ×1,5</p>}
+   {profil.damage&&<p className="scaling-note">Mitigation 100 / (100 + DÉF × {String(COEFF_DEFENSE).replace('.',',')}) · variance ±8 % · critique ×1,5</p>}
  </section>}
  {profil?.conditionals?.length>0&&<section className="tooltip-conditionals"><small>BONUS CONDITIONNELS</small>
    {profil.conditionals.map((bonus,rang)=><div key={rang}><b>{bonusLabel(bonus)}</b><span>{bonus.when}</span></div>)}

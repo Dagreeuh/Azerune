@@ -21,8 +21,12 @@ export const expeditionHonorReward=id=>EXPEDITION_HONOR_REWARDS[id]||null;
  *
  * Chaque valeur est desormais la puissance mediane, sur les quatre
  * expeditions, de la premiere equipe simulee qui gagne une fois sur deux.
+ *
+ * Revue une seconde fois apres l'allegement du poids de la Defense
+ * (COEFF_DEFENSE 3 -> 1,5) : les degats portant davantage, les memes niveaux
+ * tombent avec moins de puissance.
  */
-export const EXPEDITION_POWER=[2900,3700,4300,5100,5900,6500,6900,7400,9500,11100];
+export const EXPEDITION_POWER=[2500,2900,3300,3800,4400,5100,5800,6400,7400,8700];
 const rewards={gold:[1000,1500,2200,3200,4500,6200,8500,11500,15000,20000],xp:[150,250,400,650,1000,1500,2200,3200,4500,6000],essence:[5,8,12,17,24,32,42,55,70,90],ascension:[{minor:6},{minor:9},{minor:13},{minor:18,major:1},{minor:24,major:1},{minor:30,major:2},{minor:38,major:3},{minor:48,major:4},{major:6,mythic:1},{major:8,mythic:2}]};
 export const EXPEDITIONS=[
 {id:'treasury',name:'Trésorerie des Gobelins',icon:'🪙',color:'#f59e0b',rewardType:'gold',rewardIcon:'🪙',rewardName:'Or',description:'Traque les voleurs et abats les gardes avant de briser le Trésorier blindé.'},
