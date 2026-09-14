@@ -1,0 +1,98 @@
+{
+  "champion": "Hicho",
+  "heroId": 15,
+  "source": "assets-source/hicho.png",
+  "hauteurCible": 140,
+  "animations": [
+    {
+      "nom": "repos",
+      "rangee": 1,
+      "xMin": 450
+    },
+    {
+      "nom": "marche",
+      "rangee": 2,
+      "minLargeur": 80
+    },
+    {
+      "nom": "attaque",
+      "rangee": 3
+    },
+    {
+      "nom": "eclair",
+      "rangee": 4
+    },
+    {
+      "nom": "soin",
+      "rangee": 5,
+      "xMin": 450
+    },
+    {
+      "nom": "portrait",
+      "rangee": 5,
+      "xMax": 450
+    },
+    {
+      "nom": "mort",
+      "rangee": 6,
+      "xMax": 520
+    },
+    {
+      "nom": "totem",
+      "rangee": 0,
+      "xMin": 1100,
+      "echelle": 1
+    },
+    {
+      "nom": "icone",
+      "rangee": 0,
+      "xMin": 420,
+      "xMax": 900,
+      "echelle": 1
+    },
+    {
+      "nom": "effets",
+      "rangee": 6,
+      "xMin": 520,
+      "echelle": 1
+    }
+  ],
+  "sorts": [
+    {
+      "anim": "soin",
+      "effets": [
+        {
+          "source": "effets",
+          "index": 3,
+          "ou": "cible"
+        }
+      ]
+    },
+    {
+      "anim": "soin",
+      "effets": [
+        {
+          "source": "totem",
+          "index": 2,
+          "ou": "lanceur"
+        }
+      ]
+    },
+    {
+      "anim": "soin",
+      "effets": [
+        {
+          "source": "effets",
+          "index": 6,
+          "ou": "lanceur"
+        },
+        {
+          "source": "effets",
+          "index": 3,
+          "ou": "cibles"
+        }
+      ]
+    }
+  ],
+  "attente": 3
+}
