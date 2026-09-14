@@ -3171,3 +3171,66 @@ Reste 3 cas sur 840 dans le sens dangereux (annoncé « confortable », perdu).
 C'est peu, et c'est noté.
 
 Suite complète : **1 874 tests**, 97 fichiers.
+
+---
+
+## 1.93.0 — Les champions faibles : ce qui se corrige, et ce que j'ai cru à tort
+
+Depuis le socle de rareté, le bon critère n'est plus le rang absolu mais
+**l'écart à la moyenne de sa rareté**. Le banc de classement le calcule
+désormais lui-même.
+
+### Résultats
+
+| Champion | Avant | Après | Levier |
+|---|---|---|---|
+| Nyxaris (4★) | 15 · −81 % | **42** · −47 % | paiement des Charges, remplissage 0,62 → 0,86 |
+| Nerissa (3★) | 14 · −72 % | **35** · −33 % | Reflux : jauge → amplification de dégâts |
+| Brilith (5★) | 58 · −47 % | **91** · −19 % | paiement +16 % → +40 % par Charge |
+| Vharok (4★) | 29 · −62 % | **34** · −57 % | paiement +18 % → +45 %, accumulation ×2 |
+
+Moyennes par rareté : 3★ 50 → 52, 4★ 77 → 80, 5★ 110 → 113, ordre préservé.
+
+### Nerissa : la troisième fois que la jauge ne sert à rien
+
+Son kit volait de la jauge aux ennemis — utile, car la file ennemie et la file
+alliée sont distinctes — puis la redistribuait aux **alliés**, ce qui ne fait que
+réordonner sa propre équipe. Même constat que pour Caelion (v1.90.0) et pour
+l'ancien Aszhal. Le Reflux stocké devient une amplification de dégâts : ×2,5.
+
+### Les archétypes à accumulation
+
+Nyxaris, Brilith et Vharok bâtissent puis dépensent. Mesuré : un quatrième
+champion n'obtient que **8 à 9 actions par combat**, soit deux cycles au mieux —
+et pour Vharok, qui visait cinq cumuls à raison d'un par frappe, même pas deux.
+Leurs bouquets finals (×1,64 à ×1,9 au plafond) ne payaient pas les tours
+d'accumulation.
+
+Comparaison qui a éclairé le diagnostic : **Ignovar et Morghast ne sont pas des
+frappeurs purs, ce sont des moteurs à dégâts persistants.** Leurs Brûlures et
+Poisons tiquent à chaque tour ennemi, puis explosent — 1 016 et 995 dégâts par
+action contre 333 pour Nyxaris. Un archétype de bouquet doit compenser par
+l'ampleur ce qu'il ne gagne pas hors de ses tours.
+
+### Deux hypothèses testées, une fausse
+
+**« Un kit sans utilité ne peut pas percer. »** Testée en donnant une Défense
+réduite à la Désintégration de Nyxaris : 32 → 29, soit rien. **Fausse**, et le
+changement n'est pas livré.
+
+**« Il existe un seuil de dégâts. »** Brilith réussit à 594 dégâts par action et
+Nyxaris échoue à 419. Testée en portant Nyxaris à 498 : 32 → 42. **Confirmée**,
+et livrée.
+
+Elle a cependant une limite que je note : Vharok atteint 491 dégâts par action
+AVEC de l'utilité (son totem accélère l'équipe) et reste à 34. Le seuil n'est
+donc pas toute l'explication.
+
+### Ce qui reste
+
+Caelion −65 %, Sylven −63 %, Vharok −57 %. **Sylven meurt dans 16 combats sur
+20** — de loin le plus mortel du roster, et c'est un soutien. Sa faiblesse n'a
+rien à voir avec celle des autres ; elle n'est pas traitée ici. Aszhal reste
+intact sur demande.
+
+Suite complète : **1 880 tests**, 98 fichiers.

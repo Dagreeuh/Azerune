@@ -85,6 +85,15 @@ describe('classement multi-rencontres',()=>{
     return Math.round(l.reduce((s,x)=>s+x.total,0)/l.length);};
   const[m3,m4,m5]=[parRarete(3),parRarete(4),parRarete(5)];
   console.log(`moyenne par rarete : 3* ${m3}  4* ${m4}  5* ${m5}   ordre ${m5>m4&&m4>m3?'CROISSANT':'rompu'}`);
+  // Depuis le socle de rarete, « faible » ne veut plus dire « bas du
+  // classement » : un 3* doit etre sous un 5*, c'est voulu. Ce qui compte est
+  // l'ecart de chaque champion a la MOYENNE DE SA RARETE.
+  const moyR={3:parRarete(3),4:parRarete(4),5:parRarete(5)};
+  const deficit=l=>Math.round((l.total/moyR[l.h.rarity]-1)*100);
+  console.log('\n--- les plus faibles POUR LEUR RARETE');
+  [...lignes].sort((a,b)=>deficit(a)-deficit(b)).slice(0,8).forEach(l=>
+    console.log(`  ${l.h.name.padEnd(13)} ${l.h.rarity}* ${String(l.total).padStart(4)} contre ${moyR[l.h.rarity]} de moyenne ${l.h.rarity}*  =>  ${deficit(l)} %`));
+  console.log('');
   lignes.forEach(l=>{
     const marque=l.total<median-45?'  TRES FAIBLE':l.total<median-22?'  faible':l.total>median+22?'  FORT':'';
     console.log(`${l.h.name.padEnd(15)} ${l.h.rarity}* ${l.h.element.padEnd(8)} |`+

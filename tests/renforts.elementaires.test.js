@@ -71,10 +71,13 @@ describe('répartition élémentaire du roster',()=>{
 });
 
 describe('Vharok — Maelström',()=>{
-  it('Frappe-tempête accumule un cumul',()=>{
+  // Deux cumuls par frappe depuis l'equilibrage des archetypes a accumulation :
+  // atteindre cinq en cinq tours etait hors de portee d'un champion qui n'obtient
+  // que huit ou neuf actions par combat.
+  it('Frappe-tempête accumule deux cumuls',()=>{
     fixedRandom(.5);
     const combat=scene(31);
-    expect(findUnit(lance(combat,0,cible(combat)),31).mechanic.value).toBe(1);
+    expect(findUnit(lance(combat,0,cible(combat)),31).mechanic.value).toBe(2);
   });
 
   it('la réserve est plafonnée à cinq',()=>{

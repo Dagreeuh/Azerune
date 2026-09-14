@@ -40,19 +40,21 @@ const degats=(charges,index)=>{
 };
 
 describe('les Charges de Nyxaris pèsent sur les dégâts',()=>{
-  it('trois Charges valent +150 % sur la Désintégration',()=>{
+  it('trois Charges valent +210 % sur la Désintégration',()=>{
     const sans=degats(0,DESINTEGRATION),plein=degats(3,DESINTEGRATION);
     expect(sans).toBeGreaterThan(0);
-    // Le defaut d'origine, en une ligne : trois Charges ne valaient que +90 %.
-    expect(plein/sans).toBeGreaterThan(2.3);
-    expect(plein/sans).toBeLessThan(2.7);
+    // Trois Charges ne valaient que +90 % a l'origine, puis +150 %. Mesure :
+    // a +150 % Nyxaris restait dernier du roster ; c'est au-dela de 480 degats
+    // par action que son apport en equipe decolle.
+    expect(plein/sans).toBeGreaterThan(2.9);
+    expect(plein/sans).toBeLessThan(3.3);
   });
 
-  it('trois Charges valent +120 % sur la Vague d’éternité',()=>{
+  it('trois Charges valent +165 % sur la Vague d’éternité',()=>{
     const sans=degats(0,VAGUE),plein=degats(3,VAGUE);
     expect(sans).toBeGreaterThan(0);
-    expect(plein/sans).toBeGreaterThan(2.0);
-    expect(plein/sans).toBeLessThan(2.4);
+    expect(plein/sans).toBeGreaterThan(2.5);
+    expect(plein/sans).toBeLessThan(2.9);
   });
 
   it('chaque Charge compte, pas seulement la troisième',()=>{
@@ -62,8 +64,8 @@ describe('les Charges de Nyxaris pèsent sur les dégâts',()=>{
 
   it('la description annonce ce que le moteur applique',()=>{
     const nyxaris=HEROES.find(h=>h.id===NYXARIS);
-    expect(nyxaris.skills[DESINTEGRATION].description).toContain('+50 %');
-    expect(nyxaris.skills[VAGUE].description).toContain('+40 %');
+    expect(nyxaris.skills[DESINTEGRATION].description).toContain('+70 %');
+    expect(nyxaris.skills[VAGUE].description).toContain('+55 %');
     // L'infobulle reconstitue le calcul : elle doit connaitre le bonus.
     const profil=skillDamageProfile(nyxaris,DESINTEGRATION,{});
     expect(profil).toBeTruthy();
