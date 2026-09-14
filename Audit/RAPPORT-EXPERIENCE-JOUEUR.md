@@ -3103,3 +3103,71 @@ Ces contradictions vont toutes dans le même sens : le jeu annonce
 dangereux, mais il décourage d'essayer. **À corriger.**
 
 Suite complète : **1 872 tests**, 97 fichiers.
+
+---
+
+## 1.92.0 — Deux chiffres sur le même écran, et un facteur cinq entre eux
+
+Chantier issu de la mesure de la v1.91.0 : 20 % des verdicts affichés
+contredisaient franchement le combat réel, toujours dans le sens décourageant.
+
+### La cause principale n'était pas là où je la cherchais
+
+Je cherchais un réglage trop sévère. Le défaut était ailleurs, et bien plus
+gros : `assessTeamForMission` passe par `calibratedEncounterPower`, dont le
+prédicat décidait « ce mode annonce-t-il une puissance calibrée ? » par
+**procuration** — `Boolean(mission.difficultyId) || Boolean(mission.mythic)`.
+
+Or seule la campagne porte un `difficultyId`. Le Raid et les Expéditions
+annoncent pourtant une puissance, relevée par simulation en v1.86 à v1.88 —
+la mieux calibrée du jeu. Ils étaient exclus, et leur verdict recalculé depuis
+les statistiques ennemies :
+
+| Raid | affiché | verdict calculé sur | écart |
+|---|---|---|---|
+| niveau 5 | 5 400 | 19 968 | +295 % |
+| niveau 10 | 10 200 | 52 300 | **+420 %** |
+
+Le commentaire au-dessus du prédicat décrivait exactement ce défaut — *« la
+dériver des statistiques ennemies donnerait un second chiffre, différent, sur le
+même écran. C'est arrivé au Mythic+ »* — et le prédicat le reproduisait dans deux
+modes de plus. La règle était juste ; son implémentation posait la mauvaise
+question. Elle demande désormais la seule qui compte : **cette mission
+annonce-t-elle un chiffre ?**
+
+### La campagne, elle, annonçait 47 % de trop
+
+Seul mode dont la recommandation est **calculée** — 210 missions ne se mettent
+pas en table. Facteurs `× 1,52` (boss) et `× 1,38`, jamais revus depuis
+l'allègement de la Défense (v1.89.0) ni le socle de rareté (v1.91.0). Divisés
+par 1,47, la médiane relevée.
+
+| | avant | après |
+|---|---|---|
+| campagne | médian **+47 %**, max +78 % | médian **−1 %** |
+| raid (verdict) | médian +295 % | **+1 %** |
+| expéditions (verdict) | médian +152 % | **+2 %** |
+
+Contradictions franches sur le balayage de 840 couples : **172 → 8**, soit
+**20 % → 1 %**.
+
+### Le contrat change de camp
+
+Le test qui gardait le simulateur exigeait qu'il EXISTE un désaccord. Il a cessé
+d'en trouver deux fois, pour deux raisons opposées :
+
+- **v1.91.0, faux espoir** — son échantillon multipliait les statistiques d'une
+  équipe par un coefficient, et l'équilibrage avait déplacé la zone de désaccord
+  hors de portée. Le balayage large montrait 20 % d'erreurs. Test réécrit sur de
+  vrais joueurs.
+- **ici, vraie réussite** — vérifiée par le même balayage : 1 %.
+
+Le contrat est donc **inversé** : il exige désormais l'accord, plafonne les
+contradictions à 10 %, les faux « insuffisant » à 8 %, et vérifie qu'un mode qui
+annonce un chiffre voit ce chiffre faire foi sur son propre écran. Il échouera
+si un rééquilibrage futur remet l'annonce en défaut.
+
+Reste 3 cas sur 840 dans le sens dangereux (annoncé « confortable », perdu).
+C'est peu, et c'est noté.
+
+Suite complète : **1 874 tests**, 97 fichiers.

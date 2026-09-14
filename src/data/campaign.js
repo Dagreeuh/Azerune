@@ -204,7 +204,13 @@ export function createMission(difficulty,continent,item){
  const baseGold=Math.round((item.boss?330:125)*(1+continentIndex*.10)*difficulty.multiplier),baseGems=missionGems(zone,item.boss,difficulty.multiplier);
  const enemies=item.enemies.map((unit,index)=>{const bossUnit=item.boss&&index===0,bossFactor=bossUnit?1.14:1;return{...unit,bossUnit,campaignUnit:true,campaignDifficulty:difficulty.id,campaignZone:continent.id,campaignZoneIndex:continentIndex,campaignRole:bossUnit?'boss':CAMPAIGN_ROLES[index%CAMPAIGN_ROLES.length],campaignMechanic:CAMPAIGN_MECHANICS[continent.id],campaignMechanicTier:tuning.mechanicTier,hp:Math.round(unit.hp*tuning.hp*stageRamp*bossFactor*wall),atk:Math.round(unit.atk*tuning.atk*stageRamp*(bossUnit?1.08:1)*wall),def:Math.round(unit.def*tuning.def*stageRamp*(bossUnit?1.08:1)),spd:Math.round(unit.spd*tuning.spd),resistance:Math.min(90,(unit.resistance||15)+tuning.res+(bossUnit?12:0)),accuracy:Math.min(90,(unit.accuracy||10)+tuning.acc+(bossUnit?7:0))}});
  const xpBase=missionXpBase(zone,stageId,item.boss,tuning.xp);
- const recommended=Math.round(enemies.reduce((sum,u)=>sum+u.hp*.30+u.atk*7.5+u.def*5.5+u.spd*1.7+(u.accuracy||0)*1.5+(u.resistance||0)*1.25,0)*(item.boss?1.52:1.38));
+ /* La campagne est le seul mode dont la puissance recommandee est CALCULEE et
+   non relevee : 210 missions ne se mettent pas en table. Les facteurs valaient
+   1,52 (boss) et 1,38 ; mesure contre la puissance de la premiere equipe
+   simulee qui gagne une fois sur deux, ils annoncaient 47 % de trop en median
+   et jusqu'a 78 %. Un joueur lisait « insuffisant » et gagnait douze fois sur
+   douze. Les facteurs sont divises par 1,47 — la mediane relevee. */
+ const recommended=Math.round(enemies.reduce((sum,u)=>sum+u.hp*.30+u.atk*7.5+u.def*5.5+u.spd*1.7+(u.accuracy||0)*1.5+(u.resistance||0)*1.25,0)*(item.boss?1.03:.94));
  const regle=regleDeMission(difficulty.id,continentIndex,item.id,item.boss);
  return{regle,key:missionKey(difficulty.id,continent.id,item.id),difficultyId:difficulty.id,difficultyName:difficulty.name,continentId:continent.id,continentName:continent.name,continentIndex,setId:(continent.setIds||[continent.setId])[Math.floor(Math.random()*(continent.setIds||[continent.setId]).length)],setIds:continent.setIds||[continent.setId],stageId:item.id,slotHint:item.slot,name:item.name,icon:item.icon,boss:item.boss,enemies,scale,mechanics:[CAMPAIGN_MECHANICS[continent.id]],mechanicTier:tuning.mechanicTier,progressionWall:item.boss&&[5,10].includes(zone)?zone:null,reward:{gold:baseGold,gems:baseGems,stones:item.boss?1:0,xpBase},recommended};
 }
