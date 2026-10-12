@@ -1,0 +1,2819 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sim Survie Forever</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Marcellus+SC&display=swap">
+<style>
+/* Carnet de pisteur : réglages à gauche, résultats à droite, une seule colonne sur téléphone. */
+:root {
+  --bg: #eef1ea;
+  --surface: #fbfcf8;
+  --surface-2: #f3f6ef;
+  --ink: #1c231a;
+  --muted: #5a6656;
+  --line: #d3dacb;
+  --accent: #3f6b26;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3ecd9;
+  --mark: #4a7a2e;
+  --mark-hover: #365c1f;
+  --amber: #8a5a0e;
+  --amber-soft: #f6ead2;
+  --blue: #2c5d8a;
+  --blue-soft: #e1ebf4;
+  --green: #2f6b33;
+  --green-soft: #dfeedd;
+  --grey: #555b52;
+  --grey-soft: #e6e8e3;
+  --danger: #a23a2a;
+  --danger-soft: #f6e0dc;
+  --shadow: 0 1px 2px rgb(28 35 26 / 0.06), 0 6px 18px rgb(28 35 26 / 0.06);
+
+  --font-display: 'Marcellus SC', 'Cinzel', Georgia, serif;
+  --font-body: 'Alegreya Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius: 10px;
+  --gap: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121611;
+    --surface: #1a1f18;
+    --surface-2: #20271e;
+    --ink: #e5ebe0;
+    --muted: #9ba696;
+    --line: #303a2d;
+    --accent: #8fc263;
+    --accent-ink: #13180f;
+    --accent-soft: #263321;
+    --mark: #6c9e44;
+    --mark-hover: #86b95b;
+    --amber: #e0a446;
+    --amber-soft: #3a2c13;
+    --blue: #8db8e0;
+    --blue-soft: #1c2b3a;
+    --green: #8fcf8a;
+    --green-soft: #1e3320;
+    --grey: #b3bbae;
+    --grey-soft: #2a3028;
+    --danger: #e2826f;
+    --danger-soft: #3a1d17;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.25);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #121611;
+  --surface: #1a1f18;
+  --surface-2: #20271e;
+  --ink: #e5ebe0;
+  --muted: #9ba696;
+  --line: #303a2d;
+  --accent: #8fc263;
+  --accent-ink: #13180f;
+  --accent-soft: #263321;
+  --mark: #6c9e44;
+  --mark-hover: #86b95b;
+  --amber: #e0a446;
+  --amber-soft: #3a2c13;
+  --blue: #8db8e0;
+  --blue-soft: #1c2b3a;
+  --green: #8fcf8a;
+  --green-soft: #1e3320;
+  --grey: #b3bbae;
+  --grey-soft: #2a3028;
+  --danger: #e2826f;
+  --danger-soft: #3a1d17;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 18px rgb(0 0 0 / 0.25);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.app {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 20px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1, h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.02em; }
+h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.1; }
+h2 { font-size: 1.25rem; }
+h3 { font-size: 1rem; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--accent); }
+small, .muted { color: var(--muted); }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* En-tête */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+.brand { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+.brand p { color: var(--muted); max-width: 62ch; }
+
+.profile-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1 1 380px;
+  max-width: 620px;
+}
+.profile-bar select { flex: 1 1 100%; min-width: 0; }
+@media (max-width: 980px) {
+  .profile-bar { justify-content: flex-start; max-width: none; }
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.small { min-height: 30px; padding: 3px 10px; font-size: 0.9rem; }
+.btn.ghost { background: transparent; }
+
+input[type="number"], input[type="text"], select, textarea {
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  width: 100%;
+}
+input[type="number"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+textarea { font-family: var(--font-mono); font-size: 0.82rem; min-height: 120px; resize: vertical; }
+input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; flex: none; }
+
+/* Mise en page principale */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 980px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.column { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+/* Feuille de personnage */
+.sheet {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.sheet > div {
+  background: var(--surface-2);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+@media (max-width: 560px) {
+  .sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.sheet .k { font-size: 0.78rem; color: var(--muted); }
+.sheet .v { font-variant-numeric: tabular-nums; font-size: 1.02rem; font-weight: 700; }
+.sheet .v.warn { color: var(--amber); }
+
+/* Onglets */
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.tab {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.tab:hover { color: var(--ink); background: var(--surface-2); }
+.tab[aria-selected="true"] { color: var(--ink); background: var(--accent-soft); border-color: var(--line); font-weight: 700; }
+
+.section-stack { display: flex; flex-direction: column; gap: 14px; }
+.section { display: flex; flex-direction: column; gap: 10px; }
+.section + .section { padding-top: 14px; border-top: 1px dashed var(--line); }
+.section-title { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hint { font-size: 0.9rem; color: var(--muted); }
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px 12px;
+}
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field > span { font-size: 0.85rem; color: var(--muted); }
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+.check span { min-width: 0; }
+
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.segmented button { border: 0; background: var(--surface); padding: 6px 12px; color: var(--muted); }
+.segmented button + button { border-left: 1px solid var(--line); }
+.segmented button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+/* Talents */
+.talent-list { display: flex; flex-direction: column; }
+.talent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.talent:last-child { border-bottom: 0; }
+.talent .name { font-weight: 700; }
+.talent .tree { font-size: 0.78rem; color: var(--muted); margin-left: 6px; font-weight: 400; }
+.talent .desc { grid-column: 1; font-size: 0.88rem; color: var(--muted); }
+.stepper { display: inline-flex; align-items: center; gap: 4px; grid-row: 1 / span 2; grid-column: 2; }
+.stepper button { width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); }
+.stepper .num { min-width: 42px; text-align: center; }
+.talent.off .name { color: var(--muted); }
+
+/* Buffs */
+.buff-group { display: flex; flex-direction: column; gap: 2px; }
+.buff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0 14px; }
+
+/* Rotation */
+.rotation { display: flex; flex-direction: column; gap: 6px; }
+.rot-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.rot-row .rank { font-family: var(--font-mono); color: var(--muted); width: 1.5em; text-align: right; }
+.rot-row .rot-name { display: flex; flex-direction: column; min-width: 0; }
+.rot-row .rot-name small { font-size: 0.82rem; }
+.rot-row .mana { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.rot-row .mana input { width: 64px; }
+.rot-row .moves { display: flex; gap: 4px; }
+.rot-row.disabled { opacity: 0.6; }
+@media (max-width: 560px) {
+  .rot-row { grid-template-columns: auto auto minmax(0, 1fr); }
+  .rot-row .mana, .rot-row .moves { grid-column: 3; }
+}
+
+/* Hypothèses */
+.mech-group { display: flex; flex-direction: column; }
+.mech {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 180px);
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+.mech:last-child { border-bottom: 0; }
+.mech .label { font-weight: 500; }
+.mech .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+.mech .meta a { color: var(--muted); }
+.mech .control { display: flex; align-items: center; gap: 6px; grid-column: 2; grid-row: 1 / span 2; }
+.mech.changed .label::after { content: ' · modifié'; color: var(--amber); font-weight: 700; font-size: 0.82rem; }
+@media (max-width: 560px) {
+  .mech { grid-template-columns: minmax(0, 1fr); }
+  .mech .control { grid-column: 1; grid-row: auto; }
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.chip.officiel { background: var(--green-soft); color: var(--green); }
+.chip.communaute { background: var(--blue-soft); color: var(--blue); }
+.chip.classic { background: var(--grey-soft); color: var(--grey); }
+.chip.estime { background: var(--amber-soft); color: var(--amber); }
+.chip.stale { background: var(--amber-soft); color: var(--amber); }
+.chip.fresh { background: var(--green-soft); color: var(--green); }
+
+/* Résultats */
+.runbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.runbar label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.9rem; }
+.runbar select { width: auto; }
+.progress { height: 4px; background: var(--grey-soft); border-radius: 4px; overflow: hidden; }
+.progress > i { display: block; height: 100%; width: 0; background: var(--mark); transition: width 0.12s linear; }
+
+.hero { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px 18px; }
+.hero .big { font-size: clamp(3rem, 7vw, 4.2rem); font-weight: 700; line-height: 0.95; letter-spacing: -0.01em; }
+.hero .unit { font-size: 1rem; color: var(--muted); font-weight: 500; }
+.hero .ci { color: var(--muted); }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 520px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.stat { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; background: var(--surface-2); }
+.stat .k { font-size: 0.8rem; color: var(--muted); }
+.stat .v { font-weight: 700; font-size: 1.1rem; }
+
+.bars { display: flex; flex-direction: column; gap: 6px; }
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.9fr) minmax(0, 1.6fr);
+  gap: 10px;
+  align-items: center;
+  padding: 2px 0;
+}
+.bar-row .bar-label { font-size: 0.92rem; min-width: 0; overflow-wrap: anywhere; }
+.bar-track { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; height: 22px; }
+.bar-fill { height: 18px; background: var(--mark); border-radius: 0 4px 4px 0; flex: none; min-width: 2px; width: calc((100% - 7.5em) * var(--ratio, 0)); }
+.bar-row:hover .bar-fill, .bar-row:focus-visible .bar-fill { background: var(--mark-hover); }
+.bar-value { font-variant-numeric: tabular-nums; font-size: 0.88rem; white-space: nowrap; color: var(--ink); }
+.bar-row.current .bar-label { font-weight: 700; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th, td { padding: 6px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+th { font-weight: 700; color: var(--muted); background: var(--surface-2); font-size: 0.8rem; }
+tbody tr:last-child td { border-bottom: 0; }
+td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+details summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+details[open] summary { margin-bottom: 8px; }
+
+.histo svg { display: block; width: 100%; height: auto; }
+.histo .axis text { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.histo .axis line, .histo .grid line { stroke: var(--line); stroke-width: 1; }
+.histo .col { fill: var(--mark); }
+.histo .col:hover { fill: var(--mark-hover); }
+.histo .mean-line { stroke: var(--ink); stroke-width: 1; }
+.histo .mean-label { fill: var(--ink); font-size: 11px; font-family: var(--font-body); font-weight: 700; }
+
+.log { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; font-size: 0.85rem; }
+.log-row { display: grid; grid-template-columns: 4.2em 4.6em minmax(0, 1fr); gap: 8px; padding: 3px 10px; border-bottom: 1px solid var(--line); }
+.log-row:last-child { border-bottom: 0; }
+.log-row .t, .log-row .m { font-family: var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.log-row.cast .txt { font-weight: 700; }
+.log-row.proc .txt { color: var(--accent); }
+
+.empty { padding: 14px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: 0.92rem; }
+
+.notice {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--amber-soft);
+  color: var(--ink);
+  font-size: 0.92rem;
+  border: 1px solid var(--line);
+}
+
+.io { display: flex; flex-direction: column; gap: 8px; }
+.io-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Sources */
+.sources ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; }
+.sources li { overflow-wrap: anywhere; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.legend > div { display: flex; flex-direction: column; gap: 4px; max-width: 30ch; }
+.legend small { font-size: 0.85rem; }
+
+.tooltip {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  box-shadow: var(--shadow);
+}
+.tooltip strong { display: block; font-size: 1rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">WoW Forever · Chasseur Survie</span>
+      <h1>Sim Survie mêlée</h1>
+      <p>Simulateur de DPS du chasseur Survie au corps à corps, construit sur les données de la bêta. Chaque valeur incertaine est modifiable et indique sa fiabilité.</p>
+    </div>
+    <div class="profile-bar" id="profileBar"></div>
+  </header>
+
+  <section class="panel" id="io" hidden></section>
+
+  <main class="layout">
+    <div class="column" id="config">
+      <section class="panel" aria-labelledby="sheet-title">
+        <div class="panel-head">
+          <h2 id="sheet-title">Feuille de personnage</h2>
+          <span class="hint">Calculée en direct, buffs et talents compris</span>
+        </div>
+        <div class="sheet" id="sheet"></div>
+      </section>
+      <section class="panel">
+        <div class="tabs" id="tabs" role="tablist" aria-label="Réglages"></div>
+        <div id="panel"></div>
+      </section>
+    </div>
+    <div class="column" id="results" aria-live="polite"></div>
+  </main>
+
+  <footer class="panel sources" id="sources"></footer>
+</div>
+<div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+<script type="module">
+// ---- src/data.js ----
+// Données du sim Survie mêlée — WoW Forever.
+// Chaque valeur incertaine porte un niveau de fiabilité (`conf`) et ses sources (`src`),
+// pour pouvoir la corriger dès qu'un tooltip change en bêta.
+
+const DATA_INFO = {
+  updated: '2026-10-12',
+  build: '1.60.1.70338',
+  note: 'Bêta WoW Forever (fin le 21 octobre, sortie le 4 novembre 2026). Les chiffres peuvent encore changer.',
+};
+
+const CONFIDENCE = {
+  officiel: { label: 'Officiel', desc: 'Notes de développement ou article Blizzard.' },
+  communaute: { label: 'Communauté', desc: 'Datamining ou guides de la bêta, sources concordantes ou presque.' },
+  classic: { label: 'Classic', desc: 'Valeur de Classic Era reprise faute de donnée Forever.' },
+  estime: { label: 'Estimé', desc: 'Hypothèse du sim, à vérifier en jeu.' },
+};
+
+const SOURCES = {
+  devnotes: {
+    label: 'Blizzard — Forever Beta Development Notes (8 octobre 2026)',
+    url: 'https://us.forums.blizzard.com/en/wow/t/wow-forever-beta-development-notes-%E2%80%93-updated-october-8/2360696/4',
+  },
+  deepdive: {
+    label: 'Blizzard — Class Deep Dives : Hunter and Druid',
+    url: 'https://worldofwarcraft.blizzard.com/en-us/news/24301515',
+  },
+  wowsims: {
+    label: 'wowsims/sod — table d’attaque Classic et stats de base (code open source)',
+    url: 'https://github.com/wowsims/sod',
+  },
+  magey: {
+    label: 'magey/classic-warrior — Attack table (Classic)',
+    url: 'https://github.com/magey/classic-warrior/wiki/Attack-table',
+  },
+  mobalytics: {
+    label: 'Mobalytics — Survival Hunter Guide (Forever)',
+    url: 'https://mobalytics.gg/wow-forever/classes/survival-hunter-guide',
+  },
+  icyveins: {
+    label: 'Icy Veins — Survival Hunter mêlée (Forever)',
+    url: 'https://www.icy-veins.com/wow-forever/survival-hunter-melee-dps-pve-guide',
+  },
+  classicwowgg: {
+    label: 'classicwow.gg — Survival Hunter Overview & Changes (Forever)',
+    url: 'https://classicwow.gg/forever/guides/hunter/survival',
+  },
+  wclboxMongoose: {
+    label: 'WCLBox — Mongoose Bite, rangs Forever vs Classic',
+    url: 'https://wowforever.wclbox.com/en/fashu/hunter/hunter-mongoose-bite',
+  },
+  wfTalents: {
+    label: 'WoW Forever Talents — talents et sorts du chasseur',
+    url: 'https://wowforevertalents.com/hunter/',
+  },
+  striderKick: {
+    label: 'WoW Forever Talents — Strider Kick',
+    url: 'https://wowforevertalents.com/hunter/talents/strider-kick/',
+  },
+  foreverdb: {
+    label: 'ForeverDB — stats et conversions',
+    url: 'https://foreverdb.net/stats',
+  },
+  itemization: {
+    label: 'EndGame Tools — itemisation Forever (toucher et crit unifiés)',
+    url: 'https://endgametools.com/en/wow-forever/news/wow-forever-itemization',
+  },
+  foreverchanges: {
+    label: 'ForeverChanges — changements du chasseur vs Classic',
+    url: 'https://foreverchanges.pro/class/hunter',
+  },
+  counterattack: {
+    label: 'The Forever Era — Counterattack',
+    url: 'https://theforeverera.com/en/spells/hunter/counterattack/',
+  },
+  leprestore: {
+    label: 'LepreStore — Survival Hunter niveau 30 (2M vs ambidextrie)',
+    url: 'https://leprestore.com/guides/world-of-warcraft-forever/wow-forever-survival-hunter-guide-best-builds-race-professions/',
+  },
+  mmonster: {
+    label: 'MMOnster — Rotation trainer chasseur (coûts niveau 30)',
+    url: 'https://mmonster.co/wow-forever/tools/rotation-trainer/hunter',
+  },
+  forevergithub: {
+    label: 'classic-hunter/forever-hunter — wiki « Forever Beta Changes »',
+    url: 'https://github.com/classic-hunter/forever-hunter/wiki/Forever-Beta-Changes',
+  },
+};
+
+const LEVELS = [60, 30];
+
+// Stats de base d’un chasseur humain (wowsims). Niveau 30 interpolé entre 25 et 40.
+const BASE_STATS = {
+  60: { str: 55, agi: 125, sta: 90, int: 65, spi: 70, mana: 1720 },
+  30: { str: 34, agi: 64, sta: 49, int: 38, spi: 41, mana: 776 },
+};
+
+const RACES = {
+  orc: {
+    name: 'Orc',
+    offsets: { str: 3, agi: -3, sta: 2, int: -3, spi: 3 },
+    skill: { axe: 5 },
+    cooldown: 'bloodFury',
+    note: 'Spécialisation hache (+5 compétence), Fureur sanguinaire.',
+  },
+  troll: {
+    name: 'Troll',
+    offsets: { str: 1, agi: 2, sta: 1, int: -4, spi: 1 },
+    skill: {},
+    cooldown: 'berserking',
+    note: 'Berserker (+10 % de hâte à pleine vie).',
+  },
+  tauren: {
+    name: 'Tauren',
+    offsets: { str: 5, agi: -5, sta: 2, int: -5, spi: 2 },
+    skill: {},
+    note: 'Pas de racial offensif en mêlée.',
+  },
+  nightelf: {
+    name: 'Elfe de la nuit',
+    offsets: { str: -3, agi: 5, sta: -1, int: 0, spi: 0 },
+    skill: {},
+    note: 'Pas de racial offensif en mêlée.',
+  },
+  dwarf: {
+    name: 'Nain',
+    offsets: { str: 2, agi: -4, sta: 3, int: -1, spi: -1 },
+    skill: {},
+    note: 'Spécialisation armes à feu : distance uniquement.',
+  },
+  human: {
+    name: 'Humain',
+    offsets: {},
+    skill: { sword: 5, mace: 5 },
+    note: 'Si la combinaison existe dans Forever : +5 épée et masse.',
+  },
+};
+
+const WEAPON_TYPES = {
+  axe: 'Hache',
+  sword: 'Épée',
+  mace: 'Masse',
+  polearm: 'Arme d’hast',
+  staff: 'Bâton',
+  dagger: 'Dague',
+  fist: 'Arme de pugilat',
+};
+
+const ENCHANTS = {
+  none: { name: 'Aucun' },
+  crusader: { name: 'Croisé', conf: 'classic' },
+  agility: { name: 'Agilité (+15, 2M : +25)', conf: 'classic' },
+  strength: { name: 'Force (+15)', conf: 'classic' },
+  counterweight: { name: 'Contrepoids (+3 % hâte)', conf: 'classic' },
+};
+
+const ON_USE_PRESETS = {
+  none: { name: 'Aucun' },
+  earthstrike: { name: 'Frappe-terre (+280 PA, 20 s / 2 min)', type: 'ap', value: 280, duration: 20, cd: 120 },
+  kiss: { name: 'Baiser de l’araignée (+20 % hâte, 15 s / 2 min)', type: 'haste', value: 20, duration: 15, cd: 120 },
+  custom: { name: 'Personnalisé', type: 'ap', value: 200, duration: 20, cd: 120 },
+};
+
+// Paramètres de mécanique : tout est modifiable dans l’onglet « Hypothèses ».
+// `value` peut dépendre du niveau ({ 60: x, 30: y }).
+const MECHANICS = [
+  // Formules de base
+  { key: 'agiPerCrit', group: 'Formules', label: 'Agilité pour 1 % de crit', value: { 60: 52.9, 30: 24.0 }, step: 0.1, conf: 'communaute', src: ['foreverdb', 'wowsims'], note: 'ForeverDB mesure ~52,9 au niveau 60 (spéculatif) et ~24,0 au niveau 30.' },
+  { key: 'baseCrit', group: 'Formules', label: 'Crit de base (sans Agilité), %', value: 0, step: 0.1, conf: 'classic', src: ['wowsims', 'foreverdb'], note: 'Non datamineable dans Forever : la bêta doit le mesurer.' },
+  { key: 'apPerAgi', group: 'Formules', label: 'PA de mêlée par point d’Agilité', value: 1, step: 0.1, conf: 'communaute', src: ['itemization', 'foreverdb'] },
+  { key: 'apPerStr', group: 'Formules', label: 'PA de mêlée par point de Force', value: 1, step: 0.1, conf: 'communaute', src: ['icyveins'] },
+  { key: 'apPerDps', group: 'Formules', label: 'PA pour 1 DPS d’arme', value: 14, step: 1, conf: 'communaute', src: ['foreverdb'] },
+  { key: 'gcd', group: 'Formules', label: 'Temps de recharge global (s)', value: 1.5, step: 0.1, conf: 'classic', src: ['wowsims'] },
+  { key: 'reaction', group: 'Formules', label: 'Temps de réaction aux procs (s)', value: 0.2, step: 0.05, conf: 'estime', src: [], note: 'Délai entre un proc (Expose Prey, esquive) et la Morsure.' },
+  { key: 'glancing', group: 'Formules', label: 'Coups érafles sur les attaques blanches', value: true, conf: 'classic', src: ['magey', 'wowsims'] },
+  { key: 'critSuppression', group: 'Formules', label: 'Réduction de crit contre un boss +3', value: true, conf: 'classic', src: ['magey', 'wowsims'] },
+  { key: 'dwMissPenalty', group: 'Formules', label: 'Pénalité de raté ambidextrie (blanc), %', value: 19, step: 1, conf: 'classic', src: ['wowsims'] },
+  { key: 'ohPenalty', group: 'Formules', label: 'Dégâts de la main gauche, % (avant talents)', value: 50, step: 1, conf: 'classic', src: ['wowsims'] },
+
+  // Raptor Strike
+  { key: 'raptorBonus', group: 'Raptor Strike', label: 'Bonus de dégâts (dégâts d’arme + X)', value: { 60: 70, 30: 25 }, step: 1, conf: 'communaute', src: ['wfTalents', 'foreverchanges'], note: 'Rang 8 : arme + 70 (Classic : +140). Niveau 30 (rang 4) estimé.' },
+  { key: 'raptorMana', group: 'Raptor Strike', label: 'Coût en mana', value: { 60: 100, 30: 40 }, step: 1, conf: 'communaute', src: ['wfTalents', 'mmonster'] },
+  { key: 'raptorCd', group: 'Raptor Strike', label: 'Recharge (s)', value: 6, step: 0.5, conf: 'communaute', src: ['wfTalents', 'mmonster'] },
+  { key: 'raptorMode', group: 'Raptor Strike', label: 'Fonctionnement', value: 'instant', options: { instant: 'Instantané (déclenche le GCD)', instantOffGcd: 'Instantané (hors GCD)', nextSwing: 'Prochaine attaque (Classic)' }, conf: 'estime', src: ['wfTalents'], note: 'Le tooltip Forever dit « Instant » ; Classic utilisait la prochaine attaque.' },
+
+  // Mongoose Bite
+  { key: 'mongooseBonus', group: 'Mongoose Bite', label: 'Bonus de dégâts (dégâts d’arme + X)', value: { 60: 57, 30: 22 }, step: 1, conf: 'communaute', src: ['wclboxMongoose'], note: 'Forever : dégâts d’arme + bonus (Classic : 115 fixes au rang 4).' },
+  { key: 'mongooseMana', group: 'Mongoose Bite', label: 'Coût en mana', value: { 60: 65, 30: 26 }, step: 1, conf: 'communaute', src: ['wclboxMongoose', 'mmonster'] },
+  { key: 'mongooseCd', group: 'Mongoose Bite', label: 'Recharge (s)', value: 5, step: 0.5, conf: 'communaute', src: ['wclboxMongoose'] },
+  { key: 'dodgeWindow', group: 'Mongoose Bite', label: 'Fenêtre après une esquive (s)', value: 5, step: 0.5, conf: 'classic', src: ['wowsims'] },
+
+  // Expose Prey
+  { key: 'exposePreyChance', group: 'Expose Prey', label: 'Chance de proc par rang, %', value: 5, step: 0.5, conf: 'communaute', src: ['mobalytics', 'classicwowgg', 'leprestore'], note: 'Sources : 5 % par rang (10 % à 2/2). Une source annonce « jusqu’à 10 % ».' },
+  { key: 'exposePreyWindow', group: 'Expose Prey', label: 'Durée de la fenêtre Mongoose (s)', value: 10, step: 0.5, conf: 'officiel', src: ['devnotes'], note: 'Passée de 5 à 10 s le 8 octobre.' },
+  { key: 'exposePreyOn', group: 'Expose Prey', label: 'Attaques qui peuvent déclencher', value: 'all', options: { all: 'Toutes les attaques qui touchent', white: 'Attaques automatiques seulement' }, conf: 'estime', src: ['deepdive'] },
+
+  // Lacerating Strikes
+  { key: 'laceratingPct', group: 'Lacerating Strikes', label: 'Saignement, % des dégâts de la Morsure', value: 40, step: 1, conf: 'communaute', src: ['deepdive', 'mobalytics'] },
+  { key: 'laceratingDuration', group: 'Lacerating Strikes', label: 'Durée (s)', value: 21, step: 1, conf: 'officiel', src: ['deepdive'] },
+  { key: 'laceratingTick', group: 'Lacerating Strikes', label: 'Intervalle entre tics (s)', value: 3, step: 0.5, conf: 'estime', src: [] },
+  { key: 'laceratingRefresh', group: 'Lacerating Strikes', label: 'Réapplication', value: 'replace', options: { replace: 'Remplace (le reste est perdu)', rolling: 'Cumule le reste dans le nouveau' }, conf: 'estime', src: [], note: 'Comportement non documenté. « Remplace » est l’hypothèse prudente.' },
+  { key: 'laceratingCanCrit', group: 'Lacerating Strikes', label: 'Les tics peuvent critiquer', value: false, conf: 'estime', src: ['mobalytics'], note: 'Une source dit que le saignement peut critiquer.' },
+
+  // Strider Kick & Counterattack
+  { key: 'striderWeaponPct', group: 'Strider Kick', label: 'Dégâts, % de l’arme', value: 100, step: 5, conf: 'communaute', src: ['striderKick'] },
+  { key: 'striderManaPct', group: 'Strider Kick', label: 'Coût, % du mana de base', value: 5.81, step: 0.01, conf: 'communaute', src: ['striderKick'] },
+  { key: 'striderCd', group: 'Strider Kick', label: 'Recharge (s)', value: 8, step: 0.5, conf: 'communaute', src: ['striderKick'] },
+  { key: 'counterWeaponPct', group: 'Counterattack', label: 'Dégâts, % de l’arme', value: 50, step: 5, conf: 'communaute', src: ['counterattack'] },
+  { key: 'counterBonus', group: 'Counterattack', label: 'Bonus de dégâts', value: { 60: 110, 30: 40 }, step: 1, conf: 'communaute', src: ['counterattack'], note: 'Rang 4 au niveau 60 ; rang 2 au niveau 30 estimé.' },
+  { key: 'counterMana', group: 'Counterattack', label: 'Coût en mana', value: { 60: 85, 30: 45 }, step: 1, conf: 'communaute', src: ['counterattack'] },
+  { key: 'counterCd', group: 'Counterattack', label: 'Recharge (s)', value: 5, step: 0.5, conf: 'classic', src: ['wowsims'] },
+
+  // Piège d’immolation
+  { key: 'trapDamage', group: 'Piège d’immolation', label: 'Dégâts de Feu totaux', value: { 60: 690, 30: 215 }, step: 5, conf: 'classic', src: ['wowsims'] },
+  { key: 'trapMana', group: 'Piège d’immolation', label: 'Coût en mana', value: { 60: 245, 30: 90 }, step: 5, conf: 'classic', src: ['wowsims'] },
+  { key: 'trapDuration', group: 'Piège d’immolation', label: 'Durée du DoT (s)', value: 15, step: 1, conf: 'classic', src: [] },
+  { key: 'trapCd', group: 'Piège d’immolation', label: 'Recharge (s)', value: 15, step: 1, conf: 'classic', src: ['wowsims'] },
+  { key: 'trapArm', group: 'Piège d’immolation', label: 'Délai avant déclenchement (s)', value: 1, step: 0.5, conf: 'estime', src: [] },
+
+  // Talents à valeur incertaine
+  { key: 'savageStrikesPerRank', group: 'Talents', label: 'Savage Strikes, % par rang', value: 2, step: 0.5, conf: 'communaute', src: ['mobalytics', 'deepdive'] },
+  { key: 'savageStrikesMode', group: 'Talents', label: 'Savage Strikes, effet', value: 'crit', options: { crit: 'Crit des techniques de mêlée', damage: 'Tous les dégâts de mêlée' }, conf: 'communaute', src: ['mobalytics', 'deepdive'], note: 'Les guides lisent « crit des techniques », un résumé de l’article Blizzard lit « dégâts ».' },
+  { key: 'predatorCritPerRank', group: 'Talents', label: 'Predator’s Edge, dégâts critiques % par rang', value: 6, step: 1, conf: 'communaute', src: ['mobalytics', 'classicwowgg'] },
+  { key: 'predatorOhPerRank', group: 'Talents', label: 'Predator’s Edge, dégâts main gauche % par rang', value: 10, step: 1, conf: 'communaute', src: ['mobalytics', 'classicwowgg'] },
+  { key: 'predatorCritMode', group: 'Talents', label: 'Predator’s Edge, application', value: 'bonus', options: { bonus: 'Sur le bonus de crit (200 % → 230 %)', total: 'Sur le total (200 % → 260 %)' }, conf: 'estime', src: [], note: 'Même formulation que Mortal Shots en Classic, qui s’applique au bonus.' },
+  { key: 'lightningReflexesPerRank', group: 'Talents', label: 'Lightning Reflexes, % Agilité par rang', value: 2, step: 0.5, conf: 'communaute', src: ['classicwowgg', 'wfTalents'], note: 'Réduit de 3 % à 2 % par rang en septembre.' },
+  { key: 'surefootedPerRank', group: 'Talents', label: 'Surefooted, % toucher par rang', value: 1, step: 0.5, conf: 'communaute', src: ['wfTalents'] },
+  { key: 'resourcefulnessPerRank', group: 'Talents', label: 'Resourcefulness, % de mana économisé par rang', value: 30, step: 5, conf: 'communaute', src: ['mobalytics', 'wfTalents'] },
+  { key: 'resourcefulnessProc', group: 'Talents', label: 'Resourcefulness, chance sur crit de garder 50 % de la regen (30 s), %', value: 0, step: 5, conf: 'estime', src: ['wfTalents'], note: 'Les sources donnent 0 % à 40 %.' },
+  { key: 'cleverTrapsPerRank', group: 'Talents', label: 'Clever Traps, % dégâts des pièges par rang', value: 15, step: 5, conf: 'classic', src: [] },
+  { key: 'survivalistsDiscipline', group: 'Talents', label: 'Survivalist’s Discipline, % de recharge des pièges', value: 40, step: 5, conf: 'communaute', src: ['wfTalents'] },
+  { key: 'survivalTacticsPerRank', group: 'Talents', label: 'Survival Tactics, % toucher des pièges par rang', value: 5, step: 1, conf: 'communaute', src: ['wfTalents', 'deepdive'], note: 'Les sources donnent 5 % ou 10 % au total.' },
+  { key: 'improvedTrackingPerRank', group: 'Talents', label: 'Improved Tracking, % dégâts par rang (cible pistée)', value: 1, step: 0.5, conf: 'estime', src: ['mobalytics'] },
+  { key: 'focusedFirePerRank', group: 'Talents', label: 'Focused Fire, % dégâts par rang (familier actif)', value: 1, step: 0.5, conf: 'estime', src: [] },
+  { key: 'deadlyAspectsChance', group: 'Talents', label: 'Deadly Aspects, chance sur attaque auto, %', value: 2, step: 0.5, conf: 'communaute', src: ['foreverchanges'] },
+  { key: 'deadlyAspectsHaste', group: 'Talents', label: 'Deadly Aspects, hâte de mêlée, %', value: 30, step: 1, conf: 'communaute', src: ['foreverchanges'] },
+  { key: 'deadlyAspectsDuration', group: 'Talents', label: 'Deadly Aspects, durée (s)', value: 12, step: 1, conf: 'communaute', src: ['foreverchanges'] },
+
+  // Aspects et raciaux
+  { key: 'beastAp', group: 'Aspects et raciaux', label: 'Aspect of the Beast, PA de mêlée', value: { 60: 110, 30: 50 }, step: 5, conf: 'communaute', src: ['forevergithub', 'icyveins'], note: '4 rangs : 50 / 70 / 90 / 110 (une seule source au-delà du rang 1).' },
+  { key: 'bloodFuryPct', group: 'Aspects et raciaux', label: 'Fureur sanguinaire, % du PA de base', value: 25, step: 1, conf: 'classic', src: ['wowsims'] },
+  { key: 'berserkingHaste', group: 'Aspects et raciaux', label: 'Berserker, % de hâte', value: 10, step: 1, conf: 'classic', src: ['wowsims'] },
+  { key: 'windfuryChance', group: 'Aspects et raciaux', label: 'Totem Furie-des-vents, chance %', value: 20, step: 1, conf: 'classic', src: ['wowsims'] },
+];
+
+// Talents utiles au sim. `need` = points requis dans l’arbre (pour l’affichage).
+const TALENTS = [
+  { id: 'savageStrikes', tree: 'Survie', name: 'Savage Strikes', max: 2, need: 5, desc: 'Crit des techniques de mêlée (ou dégâts, selon l’hypothèse).' },
+  { id: 'lightningReflexes', tree: 'Survie', name: 'Lightning Reflexes', max: 5, need: 25, desc: '+Agilité en %.' },
+  { id: 'surefooted', tree: 'Survie', name: 'Surefooted', max: 3, need: 10, desc: '+Toucher (unifié mêlée, distance, sorts).' },
+  { id: 'predatorsEdge', tree: 'Survie', name: 'Predator’s Edge', max: 5, need: 10, desc: '+Dégâts critiques de mêlée et +dégâts de la main gauche.' },
+  { id: 'counterattack', tree: 'Survie', name: 'Counterattack', max: 1, need: 15, desc: 'Après une parade : 50 % de l’arme + bonus, inévitable.' },
+  { id: 'resourcefulness', tree: 'Survie', name: 'Resourcefulness', max: 2, need: 20, desc: '−Coût en mana des techniques de mêlée et des pièges.' },
+  { id: 'exposePrey', tree: 'Survie', name: 'Expose Prey', max: 2, need: 20, desc: 'Les attaques sur une cible marquée activent Mongoose Bite.' },
+  { id: 'striderKick', tree: 'Survie', name: 'Strider Kick', max: 1, need: 20, desc: 'Coup de pied : 100 % de l’arme, 8 s de recharge.' },
+  { id: 'laceratingStrikes', tree: 'Survie', name: 'Lacerating Strikes', max: 1, need: 30, minLevel: 40, desc: 'Mongoose Bite fait saigner : 40 % de ses dégâts en 21 s.' },
+  { id: 'cleverTraps', tree: 'Survie', name: 'Clever Traps', max: 2, need: 10, desc: '+Dégâts du Piège d’immolation.' },
+  { id: 'survivalistsDiscipline', tree: 'Survie', name: 'Survivalist’s Discipline', max: 1, need: 20, desc: '−Recharge des pièges.' },
+  { id: 'survivalTactics', tree: 'Survie', name: 'Survival Tactics', max: 2, need: 10, desc: '+Toucher des pièges.' },
+  { id: 'improvedTracking', tree: 'Survie', name: 'Improved Tracking', max: 5, need: 0, desc: '+Dégâts contre le type de créature pisté (hypothèse).' },
+  { id: 'deadlyAspects', tree: 'Maîtrise des bêtes', name: 'Deadly Aspects', max: 1, need: 5, desc: 'Sous Aspect of the Beast : procs de +30 % de vitesse d’attaque.' },
+  { id: 'focusedFire', tree: 'Maîtrise des bêtes', name: 'Focused Fire', max: 2, need: 0, desc: '+Dégâts tant que le familier est actif (valeur estimée).' },
+];
+
+const TALENT_PRESETS = {
+  60: {
+    savageStrikes: 2, lightningReflexes: 5, surefooted: 3, predatorsEdge: 5, counterattack: 1,
+    resourcefulness: 2, exposePrey: 2, striderKick: 1, laceratingStrikes: 1, cleverTraps: 0,
+    survivalistsDiscipline: 0, survivalTactics: 0, improvedTracking: 0, deadlyAspects: 0, focusedFire: 0,
+  },
+  30: {
+    savageStrikes: 2, lightningReflexes: 0, surefooted: 0, predatorsEdge: 4, counterattack: 1,
+    resourcefulness: 2, exposePrey: 2, striderKick: 1, laceratingStrikes: 0, cleverTraps: 0,
+    survivalistsDiscipline: 0, survivalTactics: 0, improvedTracking: 0, deadlyAspects: 0, focusedFire: 0,
+  },
+};
+
+// Buffs, débuffs et consommables (valeurs Classic : leur présence dans Forever reste à confirmer).
+// `group` = un seul actif par groupe. `stats` peut dépendre du niveau.
+const BUFFS = [
+  { id: 'battleShout', cat: 'Raid', name: 'Cri de guerre', stats: { 60: { ap: 193 }, 30: { ap: 57 } } },
+  { id: 'blessingOfMight', cat: 'Raid', name: 'Bénédiction de puissance', stats: { 60: { ap: 155 }, 30: { ap: 55 } } },
+  { id: 'markOfTheWild', cat: 'Raid', name: 'Marque du fauve', stats: { 60: { str: 12, agi: 12, sta: 12, int: 12, spi: 12 }, 30: { str: 6, agi: 6, sta: 6, int: 6, spi: 6 } } },
+  { id: 'blessingOfKings', cat: 'Raid', name: 'Bénédiction des rois (+10 % stats)', stats: { statPct: 10 } },
+  { id: 'trueshotAura', cat: 'Raid', name: 'Aura de précision', stats: { 60: { ap: 100 }, 30: {} } },
+  { id: 'leaderOfThePack', cat: 'Raid', name: 'Chef de la meute (+3 % crit)', stats: { crit: 3 } },
+  { id: 'strengthOfEarth', cat: 'Raid', name: 'Totem de force de la terre', stats: { 60: { str: 61 }, 30: { str: 20 } } },
+  { id: 'graceOfAir', cat: 'Raid', name: 'Totem de grâce aérienne', stats: { 60: { agi: 67 }, 30: {} } },
+  { id: 'windfury', cat: 'Raid', name: 'Totem Furie-des-vents', stats: { 60: { windfuryAp: 315 }, 30: {} } },
+  { id: 'blessingOfWisdom', cat: 'Raid', name: 'Bénédiction de sagesse', stats: { 60: { mp5: 30 }, 30: { mp5: 15 } } },
+
+  { id: 'mongoose', cat: 'Consommables', group: 'agiElixir', name: 'Élixir de la mangouste (+25 Agi, +2 % crit)', stats: { agi: 25, crit: 2 } },
+  { id: 'greaterAgility', cat: 'Consommables', group: 'agiElixir', name: 'Élixir d’agilité supérieure (+25 Agi)', stats: { agi: 25 } },
+  { id: 'agilityElixir', cat: 'Consommables', group: 'agiElixir', name: 'Élixir d’agilité (+15 Agi)', stats: { agi: 15 } },
+  { id: 'jujuPower', cat: 'Consommables', group: 'strElixir', name: 'Juju de pouvoir (+30 For)', stats: { str: 30 } },
+  { id: 'giants', cat: 'Consommables', group: 'strElixir', name: 'Élixir des géants (+25 For)', stats: { str: 25 } },
+  { id: 'jujuMight', cat: 'Consommables', group: 'apElixir', name: 'Juju de puissance (+40 PA)', stats: { ap: 40 } },
+  { id: 'firewater', cat: 'Consommables', group: 'apElixir', name: 'Eau-de-feu des Tombe-hiver (+35 PA)', stats: { ap: 35 } },
+  { id: 'dumplings', cat: 'Consommables', group: 'food', name: 'Boulettes du désert fumées (+20 For)', stats: { str: 20 } },
+  { id: 'squid', cat: 'Consommables', group: 'food', name: 'Calmar grillé (+10 Agi)', stats: { agi: 10 } },
+  { id: 'roids', cat: 'Consommables', group: 'scroll', name: 'R.O.I.D.S. (+25 For)', stats: { str: 25 } },
+  { id: 'scorpok', cat: 'Consommables', group: 'scroll', name: 'Essai de scorpide broyé (+25 Agi)', stats: { agi: 25 } },
+  { id: 'elementalStone', cat: 'Consommables', group: 'stone', name: 'Pierre à aiguiser élémentaire (+2 % crit)', stats: { crit: 2 } },
+  { id: 'denseStone', cat: 'Consommables', group: 'stone', name: 'Pierre à aiguiser dense (+8 dégâts d’arme)', stats: { weaponDmg: 8 } },
+  { id: 'manaPotion', cat: 'Consommables', name: 'Potions de mana majeures (1350–2250, 2 min)', stats: { manaPotion: 1 } },
+  { id: 'manaRune', cat: 'Consommables', name: 'Runes démoniaques (900–1500, 2 min)', stats: { manaRune: 1 } },
+
+  { id: 'rallyingCry', cat: 'Buffs de monde', name: 'Ralliement du tueur de dragon (+140 PA, +5 % crit)', stats: { ap: 140, crit: 5 } },
+  { id: 'songflower', cat: 'Buffs de monde', name: 'Sérénade de Chantefleur (+5 % crit, +15 stats)', stats: { crit: 5, str: 15, agi: 15, sta: 15, int: 15, spi: 15 } },
+  { id: 'zandalar', cat: 'Buffs de monde', name: 'Esprit de Zandalar (+15 % stats)', stats: { statPct: 15 } },
+  { id: 'warchief', cat: 'Buffs de monde', name: 'Bénédiction du chef de guerre (+15 % hâte, 10 mp5)', stats: { haste: 15, mp5: 10 } },
+  { id: 'fengus', cat: 'Buffs de monde', name: 'Férocité de Fengus (+200 PA)', stats: { ap: 200 } },
+
+  { id: 'sunder', cat: 'Débuffs', name: 'Fracasser armure ×5', stats: { 60: { armorReduction: 2250 }, 30: { armorReduction: 900 } } },
+  { id: 'faerieFire', cat: 'Débuffs', name: 'Lucioles', stats: { 60: { armorReduction: 505 }, 30: { armorReduction: 285 } } },
+  { id: 'curseOfRecklessness', cat: 'Débuffs', name: 'Malédiction de témérité', stats: { 60: { armorReduction: 640 }, 30: { armorReduction: 290 } } },
+];
+
+const BUFF_PRESETS = {
+  60: ['battleShout', 'markOfTheWild', 'trueshotAura', 'leaderOfThePack', 'mongoose', 'jujuPower', 'jujuMight', 'dumplings', 'elementalStone', 'manaPotion', 'sunder', 'faerieFire', 'curseOfRecklessness'],
+  30: ['battleShout', 'markOfTheWild', 'agilityElixir', 'sunder'],
+};
+
+const ROTATION_ABILITIES = {
+  mongoose: { name: 'Mongoose Bite', desc: 'Pendant une fenêtre (Expose Prey ou esquive).' },
+  raptor: { name: 'Raptor Strike', desc: 'Dégâts d’arme + bonus, 6 s de recharge.' },
+  striderKick: { name: 'Strider Kick', desc: 'Talent : 100 % de l’arme, 8 s de recharge.' },
+  counterattack: { name: 'Counterattack', desc: 'Talent : après une parade (si vous êtes attaqué).' },
+  immolation: { name: 'Piège d’immolation', desc: 'DoT de Feu, ne suit pas le PA.' },
+};
+
+const SAMPLE_WEAPONS = {
+  60: {
+    twoHand: { name: 'Exemple 2M : Faucheuse d’arcanite (Classic)', min: 153, max: 256, speed: 3.8, type: 'axe' },
+    mh: { name: 'Exemple MD : Charge sacrée de Dal’Rend (Classic)', min: 81, max: 151, speed: 2.8, type: 'sword' },
+    oh: { name: 'Exemple MG : Gardien tribal de Dal’Rend (Classic)', min: 52, max: 98, speed: 1.8, type: 'sword' },
+  },
+  30: {
+    twoHand: { name: 'Exemple 2M niveau 30', min: 60, max: 91, speed: 3.4, type: 'axe' },
+    mh: { name: 'Exemple MD niveau 30', min: 26, max: 49, speed: 2.6, type: 'sword' },
+    oh: { name: 'Exemple MG niveau 30', min: 19, max: 36, speed: 1.9, type: 'sword' },
+  },
+};
+
+const GEAR_PRESETS = {
+  60: { str: 90, agi: 180, sta: 150, int: 60, spi: 40, ap: 120, hit: 6, crit: 3, mp5: 0, haste: 0, expertise: 0, skill: 0 },
+  30: { str: 30, agi: 60, sta: 50, int: 30, spi: 30, ap: 20, hit: 1, crit: 1, mp5: 0, haste: 0, expertise: 0, skill: 0 },
+};
+
+const FIGHT_PRESETS = {
+  60: { bossArmor: 3731 },
+  30: { bossArmor: 1300 },
+};
+
+function mechanicDefault(def, level) {
+  const v = def.value;
+  if (v !== null && typeof v === 'object') return v[level] ?? v[60];
+  return v;
+}
+
+function defaultMechanics(level) {
+  const out = {};
+  for (const def of MECHANICS) out[def.key] = mechanicDefault(def, level);
+  return out;
+}
+
+function defaultProfile(level = 60) {
+  const w = SAMPLE_WEAPONS[level];
+  return {
+    name: level === 60 ? 'Survie 60 — 2M' : 'Survie 30 — bêta',
+    level,
+    race: 'orc',
+    gear: { ...GEAR_PRESETS[level] },
+    twoHand: true,
+    mh: { min: w.twoHand.min, max: w.twoHand.max, speed: w.twoHand.speed, type: w.twoHand.type, enchant: 'crusader' },
+    oh: { min: w.oh.min, max: w.oh.max, speed: w.oh.speed, type: w.oh.type, enchant: 'crusader' },
+    talents: { ...TALENT_PRESETS[level] },
+    buffs: [...BUFF_PRESETS[level]],
+    aspect: 'beast',
+    huntersMark: true,
+    racial: true,
+    trinkets: [{ preset: 'none' }, { preset: 'none' }],
+    extraAttackChance: 0,
+    rotation: [
+      { id: 'mongoose', enabled: true, minMana: 0 },
+      { id: 'raptor', enabled: true, minMana: 0 },
+      { id: 'striderKick', enabled: true, minMana: 0 },
+      { id: 'counterattack', enabled: true, minMana: 0 },
+      { id: 'immolation', enabled: false, minMana: 30 },
+    ],
+    fight: {
+      duration: 180,
+      variance: 10,
+      bossLevel: level + 3,
+      bossArmor: FIGHT_PRESETS[level].bossArmor,
+      behind: true,
+      beingAttacked: false,
+      bossSwing: 2.0,
+      playerDodge: 5,
+      playerParry: 5,
+      trackedType: true,
+    },
+    pet: { enabled: false, dps: 0 },
+    custom: { dmgPct: 0, crit: 0, ap: 0 },
+    mechanics: defaultMechanics(level),
+  };
+}
+
+// ---- src/engine.js ----
+// Moteur Monte-Carlo du sim Survie mêlée (WoW Forever).
+// Table d’attaque et formules reprises de Classic (wowsims/sod, magey),
+// modifiées par les changements Forever décrits dans data.js.
+
+
+// Générateur pseudo-aléatoire déterministe (mulberry32).
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return function rng() {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function iterationSeed(base, i) {
+  let h = (base ^ Math.imul(i + 1, 0x9e3779b1)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+function byLevel(stats, level) {
+  if (stats && (stats[60] || stats[30])) return stats[level] || {};
+  return stats || {};
+}
+
+// Table d’attaque Classic contre une cible (en pourcentages).
+function attackTable(level, bossLevel, skillBonus, expertise, M) {
+  const baseSkill = level * 5;
+  const skill = baseSkill + skillBonus;
+  const defense = bossLevel * 5;
+  const diff = defense - skill;
+  const baseDiff = defense - baseSkill;
+
+  let miss;
+  let hitSuppression;
+  if (diff > 10) {
+    hitSuppression = (diff - 10) * 0.2;
+    miss = 5 + diff * 0.2;
+  } else {
+    hitSuppression = 0;
+    miss = 5 + diff * 0.1;
+  }
+
+  const dodge = Math.max(0, 5 + diff * 0.1 - expertise);
+  const parry = Math.max(0, (baseDiff > 10 ? 5 + baseDiff * 0.6 : 5 + baseDiff * 0.1) - expertise);
+  const glance = M.glancing ? Math.max(0, 10 + baseDiff * 2) : 0;
+  const glanceMin = clamp(1.3 - 0.05 * diff, 0.01, 0.91);
+  const glanceMax = clamp(1.2 - 0.03 * diff, 0.2, 0.99);
+
+  let critSuppression = 0;
+  if (M.critSuppression) {
+    critSuppression = defense > baseSkill ? baseDiff * 0.2 : baseDiff * 0.04;
+    if (bossLevel - level >= 3) critSuppression += 1.8;
+  }
+
+  return { skill, miss: Math.max(0, miss), hitSuppression, dodge, parry, glance, glanceMin, glanceMax, critSuppression };
+}
+
+function spellMissBase(levelDiff) {
+  if (levelDiff <= 0) return 4;
+  if (levelDiff === 1) return 5;
+  if (levelDiff === 2) return 6;
+  return 17 + (levelDiff - 3) * 11;
+}
+
+function onUseFromTrinket(tr) {
+  if (!tr || tr.preset === 'none') return null;
+  const preset = ON_USE_PRESETS[tr.preset];
+  if (!preset) return null;
+  const src = tr.preset === 'custom' ? { ...preset, ...tr } : preset;
+  const value = Number(src.value) || 0;
+  const duration = Number(src.duration) || 0;
+  const cd = Number(src.cd) || 0;
+  if (!value || !duration || !cd) return null;
+  return { name: src.name, type: src.type, value, duration, cd };
+}
+
+// Transforme un profil (saisie de l’utilisateur) en personnage prêt à simuler.
+function buildCharacter(profile) {
+  const L = Number(profile.level) === 30 ? 30 : 60;
+  const M = { ...defaultMechanics(L), ...(profile.mechanics || {}) };
+  const fight = profile.fight || {};
+  const bossLevel = Number(fight.bossLevel) || L + 3;
+
+  const T = {};
+  for (const def of TALENTS) {
+    let v = clamp(Math.round(Number(profile.talents?.[def.id]) || 0), 0, def.max);
+    if (def.minLevel && L < def.minLevel) v = 0;
+    T[def.id] = v;
+  }
+
+  const race = RACES[profile.race] || RACES.orc;
+  const classBase = BASE_STATS[L];
+  const base = {};
+  for (const k of ['str', 'agi', 'sta', 'int', 'spi']) base[k] = classBase[k] + (race.offsets[k] || 0);
+
+  const add = { str: 0, agi: 0, sta: 0, int: 0, spi: 0, ap: 0, crit: 0, hit: 0, mp5: 0, expertise: 0, skill: 0, weaponDmg: 0, armorReduction: 0, windfuryAp: 0 };
+  const statPct = [];
+  const haste = [];
+  let manaPotion = false;
+  let manaRune = false;
+
+  const gear = profile.gear || {};
+  for (const k of Object.keys(add)) add[k] += Number(gear[k]) || 0;
+  if (Number(gear.haste)) haste.push(Number(gear.haste));
+
+  const usedGroups = new Set();
+  const activeBuffs = [];
+  for (const id of profile.buffs || []) {
+    const def = BUFFS.find((b) => b.id === id);
+    if (!def) continue;
+    if (def.group) {
+      if (usedGroups.has(def.group)) continue;
+      usedGroups.add(def.group);
+    }
+    activeBuffs.push(def.id);
+    const s = byLevel(def.stats, L);
+    for (const [k, v] of Object.entries(s)) {
+      if (k === 'statPct') statPct.push(v);
+      else if (k === 'haste') haste.push(v);
+      else if (k === 'manaPotion') manaPotion = true;
+      else if (k === 'manaRune') manaRune = true;
+      else if (k in add) add[k] += v;
+    }
+  }
+
+  const twoHand = profile.twoHand !== false;
+  const dw = !twoHand && !!profile.oh;
+  const weaponsIn = [profile.mh, dw ? profile.oh : null];
+  for (const w of weaponsIn) {
+    if (!w) continue;
+    if (w.enchant === 'agility') add.agi += twoHand ? 25 : 15;
+    if (w.enchant === 'strength') add.str += 15;
+    if (w.enchant === 'counterweight' && twoHand) haste.push(3);
+  }
+
+  const custom = profile.custom || {};
+  add.ap += Number(custom.ap) || 0;
+  add.crit += Number(custom.crit) || 0;
+
+  if (profile.aspect === 'beast') add.ap += Number(M.beastAp) || 0;
+  add.hit += T.surefooted * M.surefootedPerRank;
+
+  const statMult = statPct.reduce((m, p) => m * (1 + p / 100), 1);
+  const agiMult = statMult * (1 + (T.lightningReflexes * M.lightningReflexesPerRank) / 100);
+  const strMult = statMult;
+
+  const str = (base.str + add.str) * strMult;
+  const agi = (base.agi + add.agi) * agiMult;
+  const int = (base.int + add.int) * statMult;
+  const spi = (base.spi + add.spi) * statMult;
+
+  const levelAp = L * 2 - 20;
+  const ap = levelAp + str * M.apPerStr + agi * M.apPerAgi + add.ap;
+  const baseApForRacial = levelAp + base.str * M.apPerStr + base.agi * M.apPerAgi;
+  const crit = M.baseCrit + agi / M.agiPerCrit + add.crit;
+  const hit = add.hit;
+  const hasteStatic = haste.reduce((m, h) => m * (1 + h / 100), 1);
+
+  const manaMax = classBase.mana + Math.min(20, int) + Math.max(0, int - 20) * 15;
+  const spiritTick = 15 + spi / 5;
+
+  const peCrit = (T.predatorsEdge * M.predatorCritPerRank) / 100;
+  const critMult = M.predatorCritMode === 'total' ? 2 * (1 + peCrit) : 1 + (1 + peCrit);
+
+  const trackMult = fight.trackedType !== false ? 1 + (T.improvedTracking * M.improvedTrackingPerRank) / 100 : 1;
+  const petActive = !!profile.pet?.enabled;
+  const ffMult = petActive ? 1 + (T.focusedFire * M.focusedFirePerRank) / 100 : 1;
+  const dmgMult = (1 + (Number(custom.dmgPct) || 0) / 100) * trackMult * ffMult;
+  const savage = T.savageStrikes * M.savageStrikesPerRank;
+  const meleeMult = dmgMult * (M.savageStrikesMode === 'damage' ? 1 + savage / 100 : 1);
+  const specialCritBonus = M.savageStrikesMode === 'crit' ? savage : 0;
+
+  const armor = Math.max(0, (Number(fight.bossArmor) || 0) - add.armorReduction);
+  const armorMult = 1 - armor / (armor + 400 + 85 * L);
+
+  const behind = fight.behind !== false;
+
+  function makeWeapon(w, isOH) {
+    const min = Math.max(0, Number(w.min) || 0);
+    const max = Math.max(min, Number(w.max) || 0);
+    const speed = Math.max(0.5, Number(w.speed) || 2);
+    const skillBonus = add.skill + (race.skill[w.type] || 0);
+    const mult = isOH ? (M.ohPenalty / 100) * (1 + (T.predatorsEdge * M.predatorOhPerRank) / 100) : 1;
+    return {
+      isOH, min, max, speed, type: w.type, enchant: w.enchant || 'none', flat: add.weaponDmg, mult,
+      table: attackTable(L, bossLevel, skillBonus, add.expertise, M),
+    };
+  }
+  const mh = makeWeapon(profile.mh || { min: 1, max: 2, speed: 2 }, false);
+  const oh = dw ? makeWeapon(profile.oh, true) : null;
+
+  const resourceful = 1 - (T.resourcefulness * M.resourcefulnessPerRank) / 100;
+  const costs = {
+    raptor: M.raptorMana * resourceful,
+    mongoose: M.mongooseMana * resourceful,
+    striderKick: ((classBase.mana * M.striderManaPct) / 100) * resourceful,
+    counterattack: M.counterMana * resourceful,
+    immolation: M.trapMana * resourceful,
+  };
+
+  const beingAttacked = !!fight.beingAttacked;
+  const known = {
+    mongoose: true,
+    raptor: true,
+    striderKick: T.striderKick > 0,
+    counterattack: T.counterattack > 0 && beingAttacked,
+    immolation: true,
+  };
+  const rotation = (profile.rotation || [])
+    .filter((r) => r.enabled && known[r.id])
+    .map((r) => ({ id: r.id, minMana: clamp(Number(r.minMana) || 0, 0, 100) }));
+  const raptorEnabled = rotation.some((r) => r.id === 'raptor');
+  const gcdRotation = rotation.filter((r) => !(r.id === 'raptor' && M.raptorMode !== 'instant'));
+  const enabledCosts = rotation.map((r) => costs[r.id]);
+  const minCost = enabledCosts.length ? Math.min(...enabledCosts) : 0;
+
+  const cooldowns = [];
+  if (profile.racial !== false) {
+    if (race.cooldown === 'bloodFury') {
+      cooldowns.push({ id: 'bloodFury', name: 'Fureur sanguinaire', type: 'ap', value: (baseApForRacial * M.bloodFuryPct) / 100, duration: 15, cd: 120 });
+    } else if (race.cooldown === 'berserking') {
+      cooldowns.push({ id: 'berserking', name: 'Berserker', type: 'haste', value: M.berserkingHaste, duration: 10, cd: 180 });
+    }
+  }
+  (profile.trinkets || []).forEach((tr, i) => {
+    const cd = onUseFromTrinket(tr);
+    if (cd) cooldowns.push({ ...cd, id: `trinket${i}` });
+  });
+
+  const huntersMark = profile.huntersMark !== false;
+  const exposePreyChance = huntersMark ? T.exposePrey * M.exposePreyChance : 0;
+  const trapMiss = Math.max(1, spellMissBase(bossLevel - L) - hit - T.survivalTactics * M.survivalTacticsPerRank);
+  const trapTicks = Math.max(1, Math.round(M.trapDuration / 3));
+
+  return {
+    level: L, bossLevel, M, T, race,
+    stats: { str, agi, int, spi, ap, crit, hit, hasteStatic, mp5: add.mp5, expertise: add.expertise },
+    strMult, agiMult, baseApForRacial,
+    manaMax, spiritTick, baseMana: classBase.mana,
+    mh, oh, dw, twoHand, behind,
+    critMult, dmgMult, meleeMult, specialCritBonus, armor, armorMult,
+    costs, rotation, gcdRotation, raptorEnabled, minCost, cooldowns,
+    huntersMark, exposePreyChance,
+    lacerating: T.laceratingStrikes > 0,
+    deadlyAspects: T.deadlyAspects > 0 && profile.aspect === 'beast',
+    windfuryAp: add.windfuryAp,
+    extraAttackChance: Number(profile.extraAttackChance) || 0,
+    resourcefulnessProc: T.resourcefulness > 0 ? M.resourcefulnessProc : 0,
+    manaPotion, manaRune,
+    trapMiss, trapTicks, trapMult: dmgMult * (1 + (T.cleverTraps * M.cleverTrapsPerRank) / 100),
+    trapCd: M.trapCd * (1 - (T.survivalistsDiscipline * M.survivalistsDiscipline) / 100),
+    beingAttacked, bossSwing: Math.max(0.5, Number(fight.bossSwing) || 2),
+    playerDodge: Number(fight.playerDodge) || 0, playerParry: Number(fight.playerParry) || 0,
+    pet: petActive ? (Number(profile.pet.dps) || 0) * ffMult : 0,
+    activeBuffs,
+  };
+}
+
+const METRIC_IDS = ['mh', 'oh', 'extra', 'raptor', 'mongoose', 'striderKick', 'counterattack', 'lacerating', 'immolation'];
+
+function newMetrics() {
+  const m = {};
+  for (const id of METRIC_IDS) m[id] = { dmg: 0, casts: 0, hits: 0, crits: 0, miss: 0, dodge: 0, parry: 0, glance: 0, ticks: 0 };
+  return m;
+}
+
+// Simule un combat. `log` (tableau) reçoit le journal des `logLimit` premières secondes.
+function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
+  const M = C.M;
+  const metrics = newMetrics();
+  let t = 0;
+  let mana = C.manaMax;
+  let lastSpend = -100;
+  let gcdReady = 0;
+  const cdReady = { raptor: 0, mongoose: 0, striderKick: 0, counterattack: 0, immolation: 0 };
+  let mbUntil = -1;
+  let mbAvail = 0;
+  let caUntil = -1;
+  let caAvail = 0;
+  let rsQueued = false;
+  let oomTime = 0;
+  let potionReady = 0;
+  let runeReady = 0;
+  const procs = { exposePrey: 0, dodgeWindows: 0, parryWindows: 0, deadlyAspects: 0, windfury: 0, crusader: 0, potions: 0 };
+  const cdReadyAt = C.cooldowns.map(() => 0);
+
+  const dyn = { ap: 0, str: 0, agi: 0, crit: 0 };
+  let regenWhileCasting = 0;
+  let haste = C.stats.hasteStatic;
+  const auras = [];
+
+  let nextMH = 0;
+  let nextOH = C.dw ? rng() * 0.3 : Infinity;
+  let nextRegen = rng() * 2;
+  let nextBoss = C.beingAttacked ? rng() * C.bossSwing : Infinity;
+  let nextDecide = 0;
+  const bleed = { perTick: 0, ticksLeft: 0, next: Infinity };
+  const trap = { triggerAt: Infinity, perTick: 0, ticksLeft: 0, next: Infinity };
+
+  const say = log ? (text) => { if (t <= logLimit) log.push({ t, text, mana }); } : null;
+
+  const currentAP = () => C.stats.ap + dyn.ap + dyn.str * C.strMult * M.apPerStr + dyn.agi * C.agiMult * M.apPerAgi;
+  const currentCrit = () => C.stats.crit + dyn.crit + (dyn.agi * C.agiMult) / M.agiPerCrit;
+  const effHit = (tbl) => Math.max(0, C.stats.hit - tbl.hitSuppression);
+
+  function setHaste(newHaste) {
+    if (newHaste === haste) return;
+    const ratio = haste / newHaste;
+    if (nextMH > t && Number.isFinite(nextMH)) nextMH = t + (nextMH - t) * ratio;
+    if (nextOH > t && Number.isFinite(nextOH)) nextOH = t + (nextOH - t) * ratio;
+    haste = newHaste;
+  }
+
+  function applyEffect(a, sign) {
+    if (a.stat === 'haste') {
+      a.active = sign > 0;
+      let h = C.stats.hasteStatic;
+      for (const o of auras) if (o.stat === 'haste' && o.active) h *= 1 + o.value / 100;
+      setHaste(h);
+    } else if (a.stat === 'regen') {
+      regenWhileCasting += sign;
+    } else {
+      dyn[a.stat] += sign * a.value;
+    }
+  }
+
+  function applyAura(id, stat, value, dur) {
+    const existing = auras.find((a) => a.id === id);
+    if (existing) {
+      existing.until = t + dur;
+      return;
+    }
+    const a = { id, stat, value, until: t + dur, active: false };
+    auras.push(a);
+    applyEffect(a, 1);
+  }
+
+  function expireAuras() {
+    for (let i = auras.length - 1; i >= 0; i--) {
+      const a = auras[i];
+      if (a.until <= t) {
+        auras.splice(i, 1);
+        applyEffect(a, -1);
+        if (say) say(`Fin de ${a.id}`);
+      }
+    }
+  }
+
+  function spend(cost) {
+    mana -= cost;
+    lastSpend = t;
+  }
+
+  function weaponDamage(w, extraAp = 0) {
+    const base = w.min + rng() * (w.max - w.min);
+    return (base + ((currentAP() + extraAp) / M.apPerDps) * w.speed + w.flat) * w.mult;
+  }
+
+  function onHit(w, isWhite, isCrit, isExtra) {
+    if (C.exposePreyChance > 0 && (isWhite || M.exposePreyOn === 'all')) {
+      if (rng() * 100 < C.exposePreyChance) {
+        if (t >= mbUntil) mbAvail = t + M.reaction;
+        mbUntil = t + M.exposePreyWindow;
+        procs.exposePrey++;
+        if (say) say('Expose Prey : Mongoose Bite disponible');
+      }
+    }
+    if (isWhite && C.deadlyAspects && rng() * 100 < M.deadlyAspectsChance) {
+      applyAura('deadlyAspects', 'haste', M.deadlyAspectsHaste, M.deadlyAspectsDuration);
+      procs.deadlyAspects++;
+      if (say) say('Deadly Aspects : +vitesse d’attaque');
+    }
+    if (w.enchant === 'crusader' && rng() < w.speed / 60) {
+      applyAura(w.isOH ? 'crusaderOH' : 'crusaderMH', 'str', 100, 15);
+      procs.crusader++;
+    }
+    if (isCrit && C.resourcefulnessProc > 0 && rng() * 100 < C.resourcefulnessProc) {
+      applyAura('resourcefulness', 'regen', 1, 30);
+    }
+    if (!isExtra && !w.isOH && C.windfuryAp > 0 && rng() * 100 < M.windfuryChance) {
+      procs.windfury++;
+      if (say) say('Furie-des-vents : attaque supplémentaire');
+      whiteAttack(C.mh, C.windfuryAp, true);
+    } else if (!isExtra && C.extraAttackChance > 0 && rng() * 100 < C.extraAttackChance) {
+      whiteAttack(C.mh, 0, true);
+    }
+  }
+
+  function whiteAttack(w, extraAp = 0, isExtra = false) {
+    const id = w.isOH ? 'oh' : isExtra ? 'extra' : 'mh';
+    const m = metrics[id];
+    const tbl = w.table;
+    m.casts++;
+    const dwPenalty = C.dw && !rsQueued ? M.dwMissPenalty : 0;
+    const miss = Math.max(0, tbl.miss + dwPenalty - effHit(tbl));
+    const r = rng() * 100;
+    let acc = miss;
+    if (r < acc) { m.miss++; if (say) say(`${label(id)} : raté`); return; }
+    acc += tbl.dodge;
+    if (r < acc) { m.dodge++; if (say) say(`${label(id)} : esquivé`); return; }
+    if (!C.behind) {
+      acc += tbl.parry;
+      if (r < acc) { m.parry++; if (say) say(`${label(id)} : paré`); return; }
+    }
+    let dmg = weaponDamage(w, extraAp) * C.meleeMult * C.armorMult;
+    let isCrit = false;
+    acc += tbl.glance;
+    if (r < acc) {
+      dmg *= tbl.glanceMin + rng() * (tbl.glanceMax - tbl.glanceMin);
+      m.glance++;
+    } else {
+      acc += Math.max(0, currentCrit() - tbl.critSuppression);
+      if (r < acc) { dmg *= C.critMult; isCrit = true; m.crits++; } else m.hits++;
+    }
+    m.dmg += dmg;
+    if (say) say(`${label(id)} : ${Math.round(dmg)}${isCrit ? ' (crit)' : ''}`);
+    onHit(w, true, isCrit, isExtra);
+  }
+
+  function yellowAttack(id, raw, noAvoid = false) {
+    const m = metrics[id];
+    const tbl = C.mh.table;
+    m.casts++;
+    const r = rng() * 100;
+    let acc = Math.max(0, tbl.miss - effHit(tbl));
+    if (r < acc) { m.miss++; if (say) say(`${label(id)} : raté`); return null; }
+    if (!noAvoid) {
+      acc += tbl.dodge;
+      if (r < acc) { m.dodge++; if (say) say(`${label(id)} : esquivé`); return null; }
+      if (!C.behind) {
+        acc += tbl.parry;
+        if (r < acc) { m.parry++; if (say) say(`${label(id)} : paré`); return null; }
+      }
+    }
+    const isCrit = rng() * 100 < currentCrit() + C.specialCritBonus - tbl.critSuppression;
+    let dmg = raw() * C.meleeMult * C.armorMult;
+    if (isCrit) { dmg *= C.critMult; m.crits++; } else m.hits++;
+    m.dmg += dmg;
+    if (say) say(`${label(id)} : ${Math.round(dmg)}${isCrit ? ' (crit)' : ''}`);
+    onHit(C.mh, false, isCrit, false);
+    return { dmg, isCrit };
+  }
+
+  function applyBleed(dmg) {
+    const total = (dmg * M.laceratingPct) / 100;
+    const ticks = Math.max(1, Math.round(M.laceratingDuration / M.laceratingTick));
+    let pool = total;
+    if (M.laceratingRefresh === 'rolling' && bleed.ticksLeft > 0) pool += bleed.perTick * bleed.ticksLeft;
+    bleed.perTick = pool / ticks;
+    bleed.ticksLeft = ticks;
+    bleed.next = t + M.laceratingTick;
+  }
+
+  function cast(id) {
+    const cost = C.costs[id];
+    spend(cost);
+    if (id !== 'raptor' || M.raptorMode === 'instant') gcdReady = t + M.gcd;
+    if (say) say(`Lance ${label(id)} (−${Math.round(cost)} mana)`);
+    switch (id) {
+      case 'mongoose': {
+        mbUntil = -1;
+        cdReady.mongoose = t + M.mongooseCd;
+        const res = yellowAttack('mongoose', () => weaponDamage(C.mh) + M.mongooseBonus);
+        if (res && C.lacerating) applyBleed(res.dmg);
+        break;
+      }
+      case 'raptor':
+        cdReady.raptor = t + M.raptorCd;
+        yellowAttack('raptor', () => weaponDamage(C.mh) + M.raptorBonus);
+        break;
+      case 'striderKick':
+        cdReady.striderKick = t + M.striderCd;
+        yellowAttack('striderKick', () => (weaponDamage(C.mh) * M.striderWeaponPct) / 100);
+        break;
+      case 'counterattack':
+        caUntil = -1;
+        cdReady.counterattack = t + M.counterCd;
+        yellowAttack('counterattack', () => (weaponDamage(C.mh) * M.counterWeaponPct) / 100 + M.counterBonus, true);
+        break;
+      case 'immolation':
+        cdReady.immolation = t + C.trapCd;
+        metrics.immolation.casts++;
+        trap.triggerAt = t + M.trapArm;
+        break;
+      default:
+        break;
+    }
+  }
+
+  function usable(r) {
+    const id = r.id;
+    if (t < cdReady[id]) return false;
+    const cost = C.costs[id];
+    if (mana < cost) return false;
+    if (r.minMana > 0 && (mana / C.manaMax) * 100 < r.minMana) return false;
+    if (id === 'mongoose') return t < mbUntil && t >= mbAvail;
+    if (id === 'counterattack') return t < caUntil && t >= caAvail;
+    if (id === 'immolation') return trap.ticksLeft === 0 && trap.triggerAt === Infinity;
+    return true;
+  }
+
+  function decide() {
+    // Recharges hors GCD : raciaux, bijoux, potions.
+    for (let i = 0; i < C.cooldowns.length; i++) {
+      if (t >= cdReadyAt[i]) {
+        const cd = C.cooldowns[i];
+        applyAura(cd.id, cd.type, cd.value, cd.duration);
+        cdReadyAt[i] = t + cd.cd;
+        if (say) say(`Utilise ${cd.name}`);
+      }
+    }
+    if (C.manaPotion && t >= potionReady && C.manaMax - mana >= 2250) {
+      mana += 1350 + rng() * 900;
+      potionReady = t + 120;
+      procs.potions++;
+      if (say) say('Potion de mana');
+    }
+    if (C.manaRune && t >= runeReady && C.manaMax - mana >= 1500) {
+      mana += 900 + rng() * 600;
+      runeReady = t + 120;
+      procs.potions++;
+      if (say) say('Rune démoniaque');
+    }
+
+    if (C.raptorEnabled && M.raptorMode !== 'instant') {
+      const r = C.rotation.find((x) => x.id === 'raptor');
+      if (M.raptorMode === 'nextSwing') {
+        if (!rsQueued && usable(r)) rsQueued = true;
+      } else if (usable(r)) {
+        cast('raptor');
+      }
+    }
+
+    if (t >= gcdReady) {
+      for (const r of C.gcdRotation) {
+        if (usable(r)) { cast(r.id); break; }
+      }
+    }
+
+    // Prochain moment où une décision peut changer.
+    let next = Infinity;
+    const consider = (x) => { if (x > t && x < next) next = x; };
+    consider(gcdReady);
+    for (const r of C.rotation) consider(cdReady[r.id]);
+    if (mbUntil > t) consider(mbAvail);
+    if (caUntil > t) consider(caAvail);
+    for (const x of cdReadyAt) consider(x);
+    if (C.manaPotion) consider(potionReady);
+    if (C.manaRune) consider(runeReady);
+    nextDecide = next;
+  }
+
+  function mhSwing() {
+    if (rsQueued) {
+      rsQueued = false;
+      const cost = C.costs.raptor;
+      if (mana >= cost && t >= cdReady.raptor) {
+        spend(cost);
+        cdReady.raptor = t + M.raptorCd;
+        yellowAttack('raptor', () => weaponDamage(C.mh) + M.raptorBonus);
+      } else {
+        whiteAttack(C.mh);
+      }
+    } else {
+      whiteAttack(C.mh);
+    }
+    nextMH = t + C.mh.speed / haste;
+  }
+
+  function regenTick() {
+    let gain = (C.stats.mp5 * 2) / 5;
+    if (t - lastSpend >= 5) gain += C.spiritTick;
+    else if (regenWhileCasting > 0) gain += C.spiritTick * 0.5;
+    mana = Math.min(C.manaMax, mana + gain);
+    nextRegen = t + 2;
+  }
+
+  function bossSwing() {
+    const r = rng() * 100;
+    if (r < C.playerDodge) {
+      if (t >= mbUntil) mbAvail = t + M.reaction;
+      mbUntil = Math.max(mbUntil, t + M.dodgeWindow);
+      procs.dodgeWindows++;
+      if (say) say('Vous esquivez : Mongoose Bite disponible');
+    } else if (r < C.playerDodge + C.playerParry && C.T.counterattack > 0) {
+      if (t >= caUntil) caAvail = t + M.reaction;
+      caUntil = t + 5;
+      procs.parryWindows++;
+      if (say) say('Vous parez : Counterattack disponible');
+    }
+    nextBoss = t + C.bossSwing;
+  }
+
+  function trapTrigger() {
+    trap.triggerAt = Infinity;
+    if (rng() * 100 < C.trapMiss) {
+      metrics.immolation.miss++;
+      if (say) say('Piège d’immolation : résisté');
+      return;
+    }
+    metrics.immolation.hits++;
+    trap.ticksLeft = C.trapTicks;
+    trap.perTick = (M.trapDamage * C.trapMult) / C.trapTicks;
+    trap.next = t + M.trapDuration / C.trapTicks;
+  }
+
+  decide();
+  while (true) {
+    let nextExpire = Infinity;
+    for (const a of auras) if (a.until < nextExpire) nextExpire = a.until;
+    const tn = Math.min(nextExpire, nextRegen, bleed.next, trap.triggerAt, trap.next, nextBoss, nextMH, nextOH, nextDecide);
+    if (tn > duration) {
+      if (mana < C.minCost) oomTime += duration - t;
+      break;
+    }
+    if (mana < C.minCost) oomTime += tn - t;
+    t = tn;
+
+    if (tn === nextExpire) expireAuras();
+    else if (tn === nextRegen) regenTick();
+    else if (tn === bleed.next) {
+      let dmg = bleed.perTick;
+      if (M.laceratingCanCrit && rng() * 100 < currentCrit() + C.specialCritBonus - C.mh.table.critSuppression) {
+        dmg *= C.critMult;
+        metrics.lacerating.crits++;
+      }
+      metrics.lacerating.dmg += dmg;
+      metrics.lacerating.ticks++;
+      bleed.ticksLeft--;
+      bleed.next = bleed.ticksLeft > 0 ? t + M.laceratingTick : Infinity;
+    } else if (tn === trap.triggerAt) trapTrigger();
+    else if (tn === trap.next) {
+      metrics.immolation.dmg += trap.perTick;
+      metrics.immolation.ticks++;
+      trap.ticksLeft--;
+      trap.next = trap.ticksLeft > 0 ? t + M.trapDuration / C.trapTicks : Infinity;
+    } else if (tn === nextBoss) bossSwing();
+    else if (tn === nextMH) mhSwing();
+    else if (tn === nextOH) {
+      whiteAttack(C.oh);
+      nextOH = t + C.oh.speed / haste;
+    } else nextDecide = Infinity;
+
+    decide();
+  }
+
+  let total = 0;
+  for (const id of METRIC_IDS) total += metrics[id].dmg;
+  return { damage: total, duration, metrics, oomTime, procs, manaEnd: mana };
+}
+
+const LABELS = {
+  mh: 'Attaque auto (main droite)',
+  oh: 'Attaque auto (main gauche)',
+  extra: 'Attaques supplémentaires',
+  raptor: 'Raptor Strike',
+  mongoose: 'Mongoose Bite',
+  striderKick: 'Strider Kick',
+  counterattack: 'Counterattack',
+  lacerating: 'Lacerating Strikes (saignement)',
+  immolation: 'Piège d’immolation',
+  pet: 'Familier (estimation)',
+};
+
+function label(id) {
+  return LABELS[id] || id;
+}
+
+// Accumulateur : permet de lancer les itérations par paquets sans bloquer l’interface.
+function createAccumulator() {
+  return { n: 0, dps: [], damage: 0, duration: 0, oom: 0, metrics: newMetrics(), procs: {} };
+}
+
+function simulateBatch(C, profile, acc, start, count, seed = 1) {
+  const fight = profile.fight || {};
+  const base = Math.max(10, Number(fight.duration) || 180);
+  const variance = clamp(Number(fight.variance) || 0, 0, 50) / 100;
+  for (let i = start; i < start + count; i++) {
+    const rng = makeRng(iterationSeed(seed, i));
+    const duration = base * (1 - variance + 2 * variance * rng());
+    const res = simulateOnce(C, rng, duration);
+    const dps = res.damage / duration + C.pet;
+    acc.dps.push(dps);
+    acc.damage += res.damage;
+    acc.duration += duration;
+    acc.oom += res.oomTime;
+    for (const id of METRIC_IDS) {
+      const a = acc.metrics[id];
+      const b = res.metrics[id];
+      for (const k of Object.keys(a)) a[k] += b[k];
+    }
+    for (const [k, v] of Object.entries(res.procs)) acc.procs[k] = (acc.procs[k] || 0) + v;
+    acc.n++;
+  }
+  return acc;
+}
+
+function summarize(C, acc) {
+  const n = acc.n || 1;
+  const mean = acc.dps.reduce((s, x) => s + x, 0) / n;
+  const variance = acc.dps.reduce((s, x) => s + (x - mean) ** 2, 0) / Math.max(1, n - 1);
+  const sd = Math.sqrt(variance);
+  const sorted = [...acc.dps].sort((a, b) => a - b);
+  const avgDuration = acc.duration / n;
+  const breakdown = [];
+  for (const id of METRIC_IDS) {
+    const m = acc.metrics[id];
+    if (m.dmg <= 0 && m.casts <= 0) continue;
+    const landed = m.hits + m.crits + m.glance;
+    breakdown.push({
+      id,
+      name: label(id),
+      dps: m.dmg / acc.duration,
+      share: 0,
+      casts: m.casts / n,
+      ticks: m.ticks / n,
+      avgHit: m.ticks ? m.dmg / m.ticks : landed ? m.dmg / landed : 0,
+      critPct: m.ticks ? (m.crits / m.ticks) * 100 : landed ? (m.crits / landed) * 100 : 0,
+      missPct: m.casts ? (m.miss / m.casts) * 100 : 0,
+      dodgePct: m.casts ? (m.dodge / m.casts) * 100 : 0,
+      parryPct: m.casts ? (m.parry / m.casts) * 100 : 0,
+      glancePct: m.casts ? (m.glance / m.casts) * 100 : 0,
+    });
+  }
+  if (C.pet > 0) breakdown.push({ id: 'pet', name: label('pet'), dps: C.pet, share: 0, casts: 0, ticks: 0, avgHit: 0, critPct: 0, missPct: 0, dodgePct: 0, parryPct: 0, glancePct: 0 });
+  const totalDps = breakdown.reduce((s, b) => s + b.dps, 0) || 1;
+  for (const b of breakdown) b.share = (b.dps / totalDps) * 100;
+  breakdown.sort((a, b) => b.dps - a.dps);
+  const procs = {};
+  for (const [k, v] of Object.entries(acc.procs)) procs[k] = v / n;
+  return {
+    iterations: acc.n,
+    mean,
+    sd,
+    se: sd / Math.sqrt(n),
+    min: sorted[0] ?? 0,
+    max: sorted[sorted.length - 1] ?? 0,
+    p5: sorted[Math.floor(0.05 * (sorted.length - 1))] ?? 0,
+    p95: sorted[Math.floor(0.95 * (sorted.length - 1))] ?? 0,
+    avgDuration,
+    oomPct: (acc.oom / acc.duration) * 100,
+    breakdown,
+    procs,
+    dps: acc.dps,
+  };
+}
+
+function runSim(profile, { iterations = 1000, seed = 1 } = {}) {
+  const C = buildCharacter(profile);
+  const acc = createAccumulator();
+  simulateBatch(C, profile, acc, 0, iterations, seed);
+  return summarize(C, acc);
+}
+
+// Journal d’un combat (pour comprendre la rotation).
+function combatLog(profile, { seed = 1, seconds = 60 } = {}) {
+  const C = buildCharacter(profile);
+  const rng = makeRng(iterationSeed(seed, 0));
+  const log = [];
+  simulateOnce(C, rng, seconds, log, seconds);
+  return log;
+}
+
+// Feuille de personnage (valeurs affichées dans l’interface).
+function characterSheet(profile) {
+  const C = buildCharacter(profile);
+  const tbl = C.mh.table;
+  const hit = Math.max(0, C.stats.hit - tbl.hitSuppression);
+  return {
+    C,
+    ap: C.stats.ap,
+    agi: C.stats.agi,
+    str: C.stats.str,
+    crit: C.stats.crit,
+    critVsBoss: C.stats.crit - tbl.critSuppression,
+    hit: C.stats.hit,
+    yellowMiss: Math.max(0, tbl.miss - hit),
+    whiteMiss: Math.max(0, tbl.miss + (C.dw ? C.M.dwMissPenalty : 0) - hit),
+    hitCap: tbl.miss + tbl.hitSuppression,
+    dodge: tbl.dodge,
+    parry: C.behind ? 0 : tbl.parry,
+    glance: tbl.glance,
+    glancePenalty: (1 - (tbl.glanceMin + tbl.glanceMax) / 2) * 100,
+    skill: tbl.skill,
+    armor: C.armor,
+    armorReduction: (1 - C.armorMult) * 100,
+    critMult: C.critMult,
+    mana: C.manaMax,
+    costs: C.costs,
+    haste: (C.stats.hasteStatic - 1) * 100,
+    swing: C.mh.speed / C.stats.hasteStatic,
+    ohMult: C.oh ? C.oh.mult * 100 : null,
+    exposePrey: C.exposePreyChance,
+    trapMiss: C.trapMiss,
+  };
+}
+
+// Poids des stats : mêmes graines pour chaque variante (nombres aléatoires communs).
+// Les écarts sont volontairement larges : la hâte décale tous les événements et
+// rend la comparaison bruitée avec de petits écarts.
+const addGear = (key, n) => (p) => { p.gear[key] = (Number(p.gear[key]) || 0) + n; };
+
+const STAT_DELTAS = [
+  { key: 'agi', label: 'Agilité', delta: 50, apply: addGear('agi', 50) },
+  { key: 'str', label: 'Force', delta: 50, apply: addGear('str', 50) },
+  { key: 'hit', label: 'Toucher (par %)', delta: 2, apply: addGear('hit', 2) },
+  { key: 'crit', label: 'Critique (par %)', delta: 2, apply: addGear('crit', 2) },
+  { key: 'expertise', label: 'Réduction esquive/parade (par %)', delta: 2, apply: addGear('expertise', 2) },
+  { key: 'skill', label: 'Compétence d’arme (par point)', delta: 5, apply: addGear('skill', 5) },
+  { key: 'haste', label: 'Hâte (par %)', delta: 5, apply: addGear('haste', 5) },
+  {
+    key: 'weapon', label: 'DPS d’arme MD (par point)', delta: 5,
+    apply: (p) => { const s = Number(p.mh.speed) || 2; p.mh.min = (Number(p.mh.min) || 0) + 5 * s; p.mh.max = (Number(p.mh.max) || 0) + 5 * s; },
+  },
+];
+
+const AP_DELTA = 100;
+
+function profileVariants(profile) {
+  const clone = () => JSON.parse(JSON.stringify(profile));
+  const variants = [{ key: 'base', profile: clone() }];
+  const apP = clone();
+  addGear('ap', AP_DELTA)(apP);
+  variants.push({ key: 'ap', profile: apP });
+  for (const d of STAT_DELTAS) {
+    const p = clone();
+    d.apply(p);
+    variants.push({ key: d.key, profile: p });
+  }
+  return variants;
+}
+
+// Écart moyen et erreur type appariée entre deux séries de DPS jouées avec les mêmes graines.
+function pairedDiff(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (!n) return { mean: 0, se: 0 };
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += b[i] - a[i];
+  const mean = sum / n;
+  let sq = 0;
+  for (let i = 0; i < n; i++) sq += (b[i] - a[i] - mean) ** 2;
+  return { mean, se: Math.sqrt(sq / Math.max(1, n - 1) / n) };
+}
+
+// `runs[key]` = DPS de chaque combat (même ordre de graines pour toutes les variantes).
+function statWeightsFromRuns(runs) {
+  const ap = pairedDiff(runs.base, runs.ap);
+  const perAp = ap.mean / AP_DELTA;
+  const rows = [{ key: 'ap', label: 'Puissance d’attaque', dpsPerPoint: perAp, ep: 1, epError: 0 }];
+  for (const d of STAT_DELTAS) {
+    const diff = pairedDiff(runs.base, runs[d.key]);
+    const per = diff.mean / d.delta;
+    rows.push({
+      key: d.key, label: d.label, dpsPerPoint: per,
+      ep: perAp > 0 ? per / perAp : 0,
+      epError: perAp > 0 ? (1.96 * diff.se) / d.delta / perAp : 0,
+    });
+  }
+  return rows;
+}
+
+function computeStatWeights(profile, { iterations = 2000, seed = 7 } = {}) {
+  const runs = {};
+  for (const v of profileVariants(profile)) runs[v.key] = runSim(v.profile, { iterations, seed }).dps;
+  return statWeightsFromRuns(runs);
+}
+
+// ---- src/app.js ----
+// Interface du sim Survie mêlée (WoW Forever). Aucune dépendance.
+
+
+
+const STORE_KEY = 'forever-sv-sim:v1';
+const SEED = 1;
+
+const TABS = [
+  ['perso', 'Personnage'],
+  ['talents', 'Talents'],
+  ['buffs', 'Buffs'],
+  ['rotation', 'Rotation'],
+  ['combat', 'Combat'],
+  ['hypo', 'Hypothèses'],
+];
+
+const state = {
+  profiles: [],
+  currentId: null,
+  tab: 'perso',
+  iterations: 2000,
+  results: {},
+  weights: {},
+  compare: null,
+  log: {},
+  running: null,
+  notice: '',
+  ioOpen: false,
+  ioMessage: '',
+  confirmDelete: false,
+};
+
+// ---------- utilitaires ----------
+
+const fmt = (v, d = 1) => (Number.isFinite(v) ? v.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—');
+const fmt0 = (v) => fmt(v, 0);
+const uid = () => `p${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+const tick = () => new Promise((r) => setTimeout(r, 0));
+const $ = (id) => document.getElementById(id);
+
+function h(tag, attrs = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'text') el.textContent = v;
+    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, '');
+    else el.setAttribute(k, v);
+  }
+  for (const c of children.flat(Infinity)) {
+    if (c === null || c === undefined || c === false) continue;
+    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+
+function svg(tag, attrs = {}, ...children) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== null) el.setAttribute(k, v);
+  for (const c of children.flat()) if (c) el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return el;
+}
+
+function getPath(obj, path) {
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+
+function setPath(obj, path, value) {
+  const keys = path.split('.');
+  let o = obj;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (o[keys[i]] == null) o[keys[i]] = /^\d+$/.test(keys[i + 1]) ? [] : {};
+    o = o[keys[i]];
+  }
+  o[keys[keys.length - 1]] = value;
+}
+
+const current = () => state.profiles.find((p) => p.id === state.currentId) || state.profiles[0];
+const snapshot = (p) => JSON.stringify({ ...p, name: undefined });
+
+// ---------- profils ----------
+
+function normalizeProfile(p) {
+  const L = Number(p.level) === 30 ? 30 : 60;
+  const d = defaultProfile(L);
+  const out = { ...d, ...p, level: L };
+  for (const k of ['gear', 'mh', 'oh', 'talents', 'fight', 'pet', 'custom', 'mechanics']) out[k] = { ...d[k], ...(p[k] || {}) };
+  out.buffs = Array.isArray(p.buffs) ? p.buffs.filter((id) => BUFFS.some((b) => b.id === id)) : d.buffs;
+  out.trinkets = [0, 1].map((i) => ({ ...d.trinkets[i], ...((p.trinkets || [])[i] || {}) }));
+  const rot = Array.isArray(p.rotation) ? p.rotation.filter((r) => ROTATION_ABILITIES[r.id]) : [];
+  for (const r of d.rotation) if (!rot.some((x) => x.id === r.id)) rot.push({ ...r });
+  out.rotation = rot.map((r) => ({ id: r.id, enabled: !!r.enabled, minMana: Number(r.minMana) || 0 }));
+  out.id = p.id || uid();
+  out.name = String(p.name || d.name).slice(0, 80);
+  return out;
+}
+
+function sampleProfiles() {
+  const a = defaultProfile(60);
+  a.id = 'exemple-60-2m';
+  a.name = 'Exemple · niveau 60 · arme à deux mains';
+
+  const b = defaultProfile(60);
+  const w = SAMPLE_WEAPONS[60];
+  b.id = 'exemple-60-dw';
+  b.name = 'Exemple · niveau 60 · ambidextrie';
+  b.twoHand = false;
+  b.mh = { min: w.mh.min, max: w.mh.max, speed: w.mh.speed, type: w.mh.type, enchant: 'crusader' };
+  b.oh = { min: w.oh.min, max: w.oh.max, speed: w.oh.speed, type: w.oh.type, enchant: 'crusader' };
+
+  const c = defaultProfile(30);
+  c.id = 'exemple-30-beta';
+  c.name = 'Exemple · niveau 30 (bêta) · 2M';
+  return [a, b, c];
+}
+
+function load() {
+  let data = null;
+  try {
+    data = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+  } catch {
+    data = null;
+  }
+  if (data && Array.isArray(data.profiles) && data.profiles.length) {
+    state.profiles = data.profiles.map(normalizeProfile);
+    state.currentId = data.currentId;
+    state.iterations = [500, 1000, 2000, 5000, 10000].includes(data.iterations) ? data.iterations : 2000;
+    state.tab = TABS.some(([k]) => k === data.tab) ? data.tab : 'perso';
+  } else {
+    state.profiles = sampleProfiles();
+    state.currentId = state.profiles[0].id;
+  }
+  if (!state.profiles.some((p) => p.id === state.currentId)) state.currentId = state.profiles[0].id;
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      profiles: state.profiles, currentId: state.currentId, iterations: state.iterations, tab: state.tab,
+    }));
+  } catch {
+    // Stockage indisponible (navigation privée) : le sim fonctionne sans.
+  }
+}
+
+function switchProfile(id) {
+  state.currentId = id;
+  state.confirmDelete = false;
+  state.notice = '';
+  save();
+  renderAll();
+}
+
+function addProfile(p) {
+  const n = normalizeProfile({ ...p, id: uid() });
+  state.profiles.push(n);
+  switchProfile(n.id);
+}
+
+function changeLevel(L) {
+  const p = current();
+  if (p.level === L) return;
+  p.level = L;
+  p.fight.bossLevel = L + 3;
+  p.fight.bossArmor = FIGHT_PRESETS[L].bossArmor;
+  for (const def of MECHANICS) {
+    if (def.value !== null && typeof def.value === 'object') p.mechanics[def.key] = mechanicDefault(def, L);
+  }
+  if (L < 40) p.talents.laceratingStrikes = 0;
+  state.notice = `Niveau ${L} : niveau et armure du boss, rangs des sorts et valeurs dépendantes du niveau ont été remis à jour. Vérifiez l’équipement, les armes, les buffs et les talents.`;
+  save();
+  renderAll();
+}
+
+// ---------- champs de formulaire ----------
+
+function fieldId(path) {
+  return `f-${path.replace(/\./g, '-')}`;
+}
+
+function numField(label, path, opts = {}) {
+  const value = getPath(current(), path);
+  return h('label', { class: 'field', for: fieldId(path) },
+    h('span', {}, label),
+    h('input', {
+      id: fieldId(path), type: 'number', inputmode: 'decimal', step: opts.step ?? 'any', min: opts.min, max: opts.max,
+      value: value ?? 0, 'data-path': path, 'data-kind': 'num',
+    }));
+}
+
+function textField(label, path) {
+  return h('label', { class: 'field', for: fieldId(path) },
+    h('span', {}, label),
+    h('input', { id: fieldId(path), type: 'text', value: getPath(current(), path) ?? '', 'data-path': path, 'data-kind': 'str' }));
+}
+
+function selectEl(options, value, attrs = {}) {
+  const s = h('select', attrs, Object.entries(options).map(([k, v]) => h('option', { value: k }, v)));
+  s.value = String(value);
+  return s;
+}
+
+function selectField(label, path, options, { kind = 'str', rerender = false } = {}) {
+  return h('label', { class: 'field', for: fieldId(path) },
+    h('span', {}, label),
+    selectEl(options, getPath(current(), path), { id: fieldId(path), 'data-path': path, 'data-kind': kind, 'data-rerender': rerender ? '1' : undefined }));
+}
+
+function checkField(label, path, { rerender = false } = {}) {
+  const input = h('input', { id: fieldId(path), type: 'checkbox', 'data-path': path, 'data-rerender': rerender ? '1' : undefined });
+  input.checked = !!getPath(current(), path);
+  return h('label', { class: 'check', for: fieldId(path) }, input, h('span', {}, label));
+}
+
+function chip(conf) {
+  const c = CONFIDENCE[conf];
+  return h('span', { class: `chip ${conf}`, title: c ? c.desc : '' }, c ? c.label : conf);
+}
+
+function section(title, hint, ...content) {
+  return h('div', { class: 'section' },
+    h('div', { class: 'section-title' }, h('h3', {}, title), hint ? h('span', { class: 'hint' }, hint) : null),
+    content);
+}
+
+// ---------- en-tête et profils ----------
+
+function renderProfileBar() {
+  const bar = $('profileBar');
+  bar.replaceChildren();
+  const p = current();
+  const sel = h('select', { id: 'profileSelect', 'aria-label': 'Profil' },
+    state.profiles.map((x) => h('option', { value: x.id }, `${x.name} (niv. ${x.level})`)));
+  sel.value = p.id;
+  sel.addEventListener('change', () => switchProfile(sel.value));
+  bar.append(
+    sel,
+    h('button', { class: 'btn small', type: 'button', onclick: () => addProfile(defaultProfile(60)) }, 'Nouveau 60'),
+    h('button', { class: 'btn small', type: 'button', onclick: () => addProfile(defaultProfile(30)) }, 'Nouveau 30'),
+    h('button', {
+      class: 'btn small', type: 'button',
+      onclick: () => addProfile({ ...JSON.parse(JSON.stringify(p)), name: `${p.name} (copie)` }),
+    }, 'Dupliquer'),
+    h('button', {
+      class: `btn small${state.confirmDelete ? ' danger' : ''}`, type: 'button', disabled: state.profiles.length < 2,
+      onclick: () => {
+        if (!state.confirmDelete) {
+          state.confirmDelete = true;
+          renderProfileBar();
+          return;
+        }
+        state.profiles = state.profiles.filter((x) => x.id !== p.id);
+        delete state.results[p.id];
+        delete state.weights[p.id];
+        switchProfile(state.profiles[0].id);
+      },
+    }, state.confirmDelete ? 'Confirmer la suppression' : 'Supprimer'),
+    h('button', {
+      class: 'btn small', type: 'button', 'aria-expanded': state.ioOpen ? 'true' : 'false',
+      onclick: () => { state.ioOpen = !state.ioOpen; state.ioMessage = ''; renderIO(); renderProfileBar(); },
+    }, state.ioOpen ? 'Fermer l’import/export' : 'Importer / exporter'),
+  );
+}
+
+function renderIO() {
+  const box = $('io');
+  box.replaceChildren();
+  box.hidden = !state.ioOpen;
+  if (!state.ioOpen) return;
+  const p = current();
+  const exportData = JSON.stringify({ ...p, id: undefined }, null, 2);
+  const out = h('textarea', { id: 'exportText', readonly: true, 'aria-label': 'Profil exporté (JSON)' });
+  out.value = exportData;
+  const inp = h('textarea', { id: 'importText', placeholder: 'Collez ici un profil exporté (JSON)…', 'aria-label': 'Profil à importer (JSON)' });
+  const msg = h('p', { class: 'hint', 'aria-live': 'polite' }, state.ioMessage);
+  box.append(
+    h('div', { class: 'panel-head' }, h('h2', {}, 'Importer ou exporter un profil'), h('span', { class: 'hint' }, 'Pour sauvegarder ailleurs ou partager un profil.')),
+    h('div', { class: 'io' },
+      h('label', { class: 'field', for: 'exportText' }, h('span', {}, `Profil « ${p.name} »`), out),
+      h('div', { class: 'io-actions' },
+        h('button', {
+          class: 'btn small', type: 'button',
+          onclick: () => {
+            const done = () => { state.ioMessage = 'Profil copié dans le presse-papiers.'; msg.textContent = state.ioMessage; };
+            try {
+              navigator.clipboard.writeText(exportData).then(done, () => { out.select(); msg.textContent = 'Copie refusée : le texte est sélectionné, copiez-le avec Ctrl+C.'; });
+            } catch {
+              out.select();
+              msg.textContent = 'Copie refusée : le texte est sélectionné, copiez-le avec Ctrl+C.';
+            }
+          },
+        }, 'Copier le profil')),
+      h('label', { class: 'field', for: 'importText' }, h('span', {}, 'Importer'), inp),
+      h('div', { class: 'io-actions' },
+        h('button', {
+          class: 'btn small primary', type: 'button',
+          onclick: () => {
+            try {
+              const data = JSON.parse(inp.value);
+              if (!data || typeof data !== 'object') throw new Error('format');
+              state.ioMessage = 'Profil importé.';
+              addProfile(data);
+            } catch {
+              msg.textContent = 'Ce texte n’est pas un profil valide. Collez le JSON complet obtenu avec « Copier le profil ».';
+            }
+          },
+        }, 'Importer comme nouveau profil')),
+      msg),
+  );
+}
+
+// ---------- feuille de personnage ----------
+
+function renderSheet() {
+  const s = characterSheet(current());
+  const hitWarn = s.yellowMiss > 0;
+  const items = [
+    ['PA de mêlée', fmt0(s.ap)],
+    ['Agilité / Force', `${fmt0(s.agi)} / ${fmt0(s.str)}`],
+    ['Crit (feuille)', `${fmt(s.crit)} %`],
+    ['Crit contre le boss', `${fmt(s.critVsBoss)} %`],
+    ['Toucher / plafond', `${fmt(s.hit)} / ${fmt(s.hitCap)} %`, hitWarn],
+    ['Raté techniques', `${fmt(s.yellowMiss)} %`, hitWarn],
+    ['Raté attaques auto', `${fmt(s.whiteMiss)} %`],
+    ['Esquive du boss', `${fmt(s.dodge)} %`],
+    ['Érafles (pénalité)', `${fmt0(s.glance)} % (−${fmt0(s.glancePenalty)} %)`],
+    ['Compétence d’arme', fmt0(s.skill)],
+    ['Armure du boss', `${fmt0(s.armor)} (−${fmt(s.armorReduction)} %)`],
+    ['Dégâts critiques', `${fmt0(s.critMult * 100)} %`],
+    ['Mana', fmt0(s.mana)],
+    ['Expose Prey', `${fmt(s.exposePrey)} % par coup`],
+    ['Coût RS / MB / SK', `${fmt0(s.costs.raptor)} / ${fmt0(s.costs.mongoose)} / ${fmt0(s.costs.striderKick)}`],
+    s.ohMult !== null
+      ? ['Main gauche', `${fmt0(s.ohMult)} % des dégâts`]
+      : ['Vitesse d’attaque', `${fmt(s.swing, 2)} s${s.haste > 0 ? ` (+${fmt(s.haste)} %)` : ''}`],
+  ];
+  $('sheet').replaceChildren(...items.map(([k, v, warn]) => h('div', {}, h('span', { class: 'k' }, k), h('span', { class: `v${warn ? ' warn' : ''}` }, v))));
+}
+
+// ---------- onglets ----------
+
+function renderTabs() {
+  const tabs = $('tabs');
+  tabs.replaceChildren(...TABS.map(([key, label]) => h('button', {
+    class: 'tab', type: 'button', role: 'tab', 'aria-selected': state.tab === key ? 'true' : 'false',
+    onclick: () => { state.tab = key; save(); renderTabs(); renderPanel(); },
+  }, label)));
+}
+
+function renderPanel() {
+  const panel = $('panel');
+  const p = current();
+  const content = {
+    perso: panelPerso,
+    talents: panelTalents,
+    buffs: panelBuffs,
+    rotation: panelRotation,
+    combat: panelCombat,
+    hypo: panelHypo,
+  }[state.tab](p);
+  panel.replaceChildren(...[
+    state.notice ? h('div', { class: 'notice', role: 'status' }, state.notice) : null,
+    content,
+  ].filter(Boolean));
+}
+
+function weaponBlock(title, key, p) {
+  const w = p[key];
+  const dps = ((Number(w.min) + Number(w.max)) / 2) / (Number(w.speed) || 1);
+  const enchants = Object.fromEntries(Object.entries(ENCHANTS).filter(([k]) => k !== 'counterweight' || p.twoHand).map(([k, v]) => [k, v.name]));
+  return h('div', { class: 'section' },
+    h('div', { class: 'section-title' }, h('h3', {}, title), h('span', { class: 'hint num', id: `dps-${key}` }, `${fmt(dps)} DPS d’arme`)),
+    h('div', { class: 'fields' },
+      numField('Dégâts min', `${key}.min`, { min: 0, step: 1 }),
+      numField('Dégâts max', `${key}.max`, { min: 0, step: 1 }),
+      numField('Vitesse (s)', `${key}.speed`, { min: 0.5, step: 0.1 }),
+      selectField('Type', `${key}.type`, WEAPON_TYPES),
+      selectField('Enchantement', `${key}.enchant`, enchants)));
+}
+
+function panelPerso(p) {
+  const race = RACES[p.race] || RACES.orc;
+  const levelSel = selectEl({ 60: 'Niveau 60', 30: 'Niveau 30 (bêta)' }, p.level, { id: 'f-level', 'aria-label': 'Niveau' });
+  levelSel.addEventListener('change', () => changeLevel(Number(levelSel.value)));
+
+  const trinketTypes = { ap: 'Puissance d’attaque', haste: 'Hâte (%)', agi: 'Agilité', str: 'Force', crit: 'Critique (%)' };
+  const trinketRows = [0, 1].map((i) => {
+    const tr = p.trinkets[i];
+    const presets = Object.fromEntries(Object.entries(ON_USE_PRESETS).map(([k, v]) => [k, v.name]));
+    return h('div', { class: 'fields' },
+      selectField(`Bijou à activer ${i + 1}`, `trinkets.${i}.preset`, presets, { rerender: true }),
+      tr.preset === 'custom' ? [
+        selectField('Effet', `trinkets.${i}.type`, trinketTypes),
+        numField('Valeur', `trinkets.${i}.value`, { step: 1 }),
+        numField('Durée (s)', `trinkets.${i}.duration`, { min: 1, step: 1 }),
+        numField('Recharge (s)', `trinkets.${i}.cd`, { min: 1, step: 1 }),
+      ] : null);
+  });
+
+  const twoHandToggle = h('div', { class: 'segmented', role: 'group', 'aria-label': 'Style d’arme' },
+    h('button', { type: 'button', 'aria-pressed': p.twoHand ? 'true' : 'false', onclick: () => { p.twoHand = true; afterChange(true); } }, 'Arme à deux mains'),
+    h('button', { type: 'button', 'aria-pressed': p.twoHand ? 'false' : 'true', onclick: () => { p.twoHand = false; afterChange(true); } }, 'Ambidextrie'));
+
+  const loadSample = () => {
+    const s = SAMPLE_WEAPONS[p.level];
+    if (p.twoHand) Object.assign(p.mh, { min: s.twoHand.min, max: s.twoHand.max, speed: s.twoHand.speed, type: s.twoHand.type });
+    else {
+      Object.assign(p.mh, { min: s.mh.min, max: s.mh.max, speed: s.mh.speed, type: s.mh.type });
+      Object.assign(p.oh, { min: s.oh.min, max: s.oh.max, speed: s.oh.speed, type: s.oh.type });
+    }
+    afterChange(true);
+  };
+  const sample = SAMPLE_WEAPONS[p.level];
+
+  return h('div', { class: 'section-stack' },
+    section('Personnage', null,
+      h('div', { class: 'fields' },
+        textField('Nom du profil', 'name'),
+        h('label', { class: 'field', for: 'f-level' }, h('span', {}, 'Niveau'), levelSel),
+        selectField('Race', 'race', Object.fromEntries(Object.entries(RACES).map(([k, v]) => [k, v.name])), { rerender: true }),
+        selectField('Aspect', 'aspect', { beast: 'Aspect of the Beast', monkey: 'Aspect du singe', hawk: 'Aspect du faucon', none: 'Aucun' })),
+      h('p', { class: 'hint' }, race.note),
+      h('div', { class: 'fields' },
+        checkField('Hunter’s Mark sur la cible', 'huntersMark'),
+        checkField('Utiliser le racial offensif', 'racial'))),
+    section('Statistiques d’équipement', 'Totaux de l’équipement, sans buffs ni talents. Toucher et crit sont unifiés dans Forever.',
+      h('div', { class: 'fields' },
+        numField('Force', 'gear.str', { step: 1 }),
+        numField('Agilité', 'gear.agi', { step: 1 }),
+        numField('Endurance', 'gear.sta', { step: 1 }),
+        numField('Intelligence', 'gear.int', { step: 1 }),
+        numField('Esprit', 'gear.spi', { step: 1 }),
+        numField('Puissance d’attaque', 'gear.ap', { step: 1 }),
+        numField('Toucher (%)', 'gear.hit', { step: 0.5 }),
+        numField('Critique (%)', 'gear.crit', { step: 0.5 }),
+        numField('Hâte de mêlée (%)', 'gear.haste', { step: 0.5 }),
+        numField('Mana toutes les 5 s', 'gear.mp5', { step: 1 }),
+        numField('Compétence d’arme (+)', 'gear.skill', { step: 1 }),
+        numField('Réduction esquive/parade (%)', 'gear.expertise', { step: 0.5 }))),
+    h('div', { class: 'section' },
+      h('div', { class: 'section-title' }, h('h3', {}, 'Armes'), twoHandToggle),
+      h('div', { class: 'io-actions' },
+        h('button', { class: 'btn small', type: 'button', onclick: loadSample }, p.twoHand ? 'Charger l’arme d’exemple' : 'Charger les armes d’exemple'),
+        h('span', { class: 'hint' }, p.twoHand ? sample.twoHand.name : `${sample.mh.name} et ${sample.oh.name}`)),
+      h('p', { class: 'hint' }, 'Les armes d’exemple reprennent des stats de Classic : l’itemisation de Forever peut différer.')),
+    weaponBlock(p.twoHand ? 'Arme à deux mains' : 'Main droite', 'mh', p),
+    p.twoHand ? null : weaponBlock('Main gauche', 'oh', p),
+    section('Bijoux et procs', null,
+      trinketRows,
+      h('div', { class: 'fields' }, numField('Attaque suppl. (% par coup)', 'extraAttackChance', { min: 0, step: 0.5 })),
+      h('p', { class: 'hint' }, 'Bijoux utilisés dès que possible. Attaque supplémentaire : chance par coup qui touche, par exemple 2 % pour la Main de justice.')),
+    section('Familier et modificateurs', 'Le familier est un DPS fixe : ses stats Forever ne sont pas encore connues.',
+      h('div', { class: 'fields' },
+        checkField('Familier actif', 'pet.enabled'),
+        numField('DPS du familier', 'pet.dps', { min: 0, step: 5 }),
+        numField('Dégâts en plus (%)', 'custom.dmgPct', { step: 1 }),
+        numField('Crit en plus (%)', 'custom.crit', { step: 0.5 }),
+        numField('PA en plus', 'custom.ap', { step: 5 }))),
+  );
+}
+
+function talentPoints(p) {
+  return TALENTS.reduce((s, t) => s + (Number(p.talents[t.id]) || 0), 0);
+}
+
+function panelTalents(p) {
+  const available = p.level - 9;
+  const used = talentPoints(p);
+  const list = h('div', { class: 'talent-list' }, TALENTS.map((t) => {
+    const locked = t.minLevel && p.level < t.minLevel;
+    const v = locked ? 0 : Number(p.talents[t.id]) || 0;
+    const set = (nv) => { p.talents[t.id] = Math.max(0, Math.min(t.max, nv)); afterChange(true); };
+    return h('div', { class: `talent${v === 0 ? ' off' : ''}` },
+      h('div', {}, h('span', { class: 'name' }, t.name), h('span', { class: 'tree' }, `${t.tree} · ${t.need} pts requis`)),
+      h('div', { class: 'stepper' },
+        h('button', { type: 'button', 'aria-label': `Retirer un point à ${t.name}`, disabled: locked || v <= 0, onclick: () => set(v - 1) }, '−'),
+        h('span', { class: 'num', 'aria-live': 'polite' }, `${v}/${t.max}`),
+        h('button', { type: 'button', 'aria-label': `Ajouter un point à ${t.name}`, disabled: locked || v >= t.max, onclick: () => set(v + 1) }, '+')),
+      h('div', { class: 'desc' }, locked ? `Indisponible au niveau ${p.level} (31 points en Survie, niveau ${t.minLevel} minimum).` : t.desc));
+  }));
+  return h('div', { class: 'section-stack' },
+    section('Talents qui comptent pour le sim', null,
+      h('p', { class: 'hint' }, `${used} points dans ces talents, sur ${available} disponibles au niveau ${p.level}. Les autres points du build (défensifs, utilitaires) ne changent pas le DPS simulé.`),
+      h('div', { class: 'io-actions' },
+        h('button', { class: 'btn small', type: 'button', onclick: () => { p.talents = { ...TALENT_PRESETS[p.level] }; afterChange(true); } }, `Charger le build par défaut (niveau ${p.level})`)),
+      used > available ? h('div', { class: 'notice' }, `Trop de points : ${used} pour ${available} disponibles.`) : null,
+      list));
+}
+
+function panelBuffs(p) {
+  const cats = [...new Set(BUFFS.map((b) => b.cat))];
+  const notes = {
+    'Raid': 'Valeurs de Classic au niveau choisi.',
+    'Consommables': 'Un seul effet par famille (élixir d’agilité, de force, nourriture…).',
+    'Buffs de monde': 'Présence dans Forever non confirmée.',
+    'Débuffs': 'Réduisent l’armure du boss.',
+  };
+  return h('div', { class: 'section-stack' }, cats.map((cat) => section(cat, notes[cat],
+    h('div', { class: 'buff-grid' }, BUFFS.filter((b) => b.cat === cat).map((b) => {
+      const id = `buff-${b.id}`;
+      const input = h('input', { id, type: 'checkbox' });
+      input.checked = p.buffs.includes(b.id);
+      input.addEventListener('change', () => {
+        let list = p.buffs.filter((x) => x !== b.id);
+        if (input.checked) {
+          if (b.group) list = list.filter((x) => BUFFS.find((y) => y.id === x)?.group !== b.group);
+          list.push(b.id);
+        }
+        p.buffs = list;
+        afterChange(true);
+      });
+      return h('label', { class: 'check', for: id }, input, h('span', {}, b.name));
+    })))));
+}
+
+function panelRotation(p) {
+  const M = p.mechanics;
+  const modeLabel = MECHANICS.find((m) => m.key === 'raptorMode').options[M.raptorMode];
+  const move = (i, d) => {
+    const j = i + d;
+    if (j < 0 || j >= p.rotation.length) return;
+    [p.rotation[i], p.rotation[j]] = [p.rotation[j], p.rotation[i]];
+    afterChange(true);
+  };
+  const rows = p.rotation.map((r, i) => {
+    const def = ROTATION_ABILITIES[r.id];
+    const cb = h('input', { type: 'checkbox', id: `rot-${r.id}`, 'data-path': `rotation.${i}.enabled`, 'data-rerender': '1', 'aria-label': `Activer ${def.name}` });
+    cb.checked = r.enabled;
+    let note = def.desc;
+    if (r.id === 'striderKick' && !p.talents.striderKick) note = 'Talent non pris : ignoré.';
+    if (r.id === 'counterattack' && (!p.talents.counterattack || !p.fight.beingAttacked)) note = 'Ignoré tant que vous n’êtes pas attaqué (onglet Combat) ou sans le talent.';
+    if (r.id === 'raptor') note = `${def.desc} Mode : ${modeLabel}.`;
+    return h('div', { class: `rot-row${r.enabled ? '' : ' disabled'}` },
+      h('span', { class: 'rank' }, String(i + 1)),
+      cb,
+      h('label', { class: 'rot-name', for: `rot-${r.id}` }, h('span', {}, def.name), h('small', { class: 'muted' }, note)),
+      h('label', { class: 'mana', for: `rot-mana-${r.id}` }, 'Mana min.',
+        h('input', { id: `rot-mana-${r.id}`, type: 'number', min: 0, max: 100, step: 5, value: r.minMana, 'data-path': `rotation.${i}.minMana`, 'data-kind': 'num' }), '%'),
+      h('div', { class: 'moves' },
+        h('button', { class: 'btn small', type: 'button', 'aria-label': `Monter ${def.name}`, disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
+        h('button', { class: 'btn small', type: 'button', 'aria-label': `Descendre ${def.name}`, disabled: i === p.rotation.length - 1, onclick: () => move(i, 1) }, '↓')));
+  });
+  return h('div', { class: 'section-stack' },
+    section('Priorités', 'À chaque fin de GCD, le sim lance la première technique disponible de la liste.',
+      h('div', { class: 'rotation' }, rows),
+      h('p', { class: 'hint' }, 'Le seuil « Mana min. » garde du mana pour les techniques placées plus haut. Les recharges (racial, bijoux) et les potions sont utilisées dès que possible.'),
+      h('div', { class: 'io-actions' },
+        h('button', { class: 'btn small', type: 'button', onclick: () => { state.tab = 'hypo'; save(); renderTabs(); renderPanel(); } }, 'Changer le mode de Raptor Strike (Hypothèses)'))));
+}
+
+function panelCombat(p) {
+  return h('div', { class: 'section-stack' },
+    section('Rencontre', null,
+      h('div', { class: 'fields' },
+        numField('Durée (s)', 'fight.duration', { min: 10, step: 10 }),
+        numField('Variation de durée (±%)', 'fight.variance', { min: 0, max: 50, step: 5 }),
+        numField('Niveau du boss', 'fight.bossLevel', { min: 1, step: 1 }),
+        numField('Armure du boss', 'fight.bossArmor', { min: 0, step: 50 })),
+      h('div', { class: 'fields' },
+        checkField('Dans le dos du boss (pas de parade)', 'fight.behind'),
+        checkField('Boss d’un type pisté (Improved Tracking)', 'fight.trackedType'),
+        checkField('Vous êtes attaqué (solo, tank)', 'fight.beingAttacked', { rerender: true }))),
+    p.fight.beingAttacked ? section('Attaques subies', 'Vos esquives activent Mongoose Bite, vos parades Counterattack.',
+      h('div', { class: 'fields' },
+        numField('Vitesse du boss (s)', 'fight.bossSwing', { min: 0.5, step: 0.1 }),
+        numField('Votre esquive (%)', 'fight.playerDodge', { min: 0, step: 0.5 }),
+        numField('Votre parade (%)', 'fight.playerParry', { min: 0, step: 0.5 }))) : null);
+}
+
+function panelHypo(p) {
+  const groups = [...new Set(MECHANICS.map((m) => m.group))];
+  const resetAll = () => {
+    for (const def of MECHANICS) p.mechanics[def.key] = mechanicDefault(def, p.level);
+    afterChange(true);
+  };
+  const changed = MECHANICS.filter((def) => p.mechanics[def.key] !== mechanicDefault(def, p.level)).length;
+  return h('div', { class: 'section-stack' },
+    section('Hypothèses Forever', null,
+      h('p', { class: 'hint' }, 'Toutes les valeurs incertaines de la bêta sont ici. Corrigez-les dès qu’un tooltip change : chaque profil garde ses propres hypothèses.'),
+      h('div', { class: 'io-actions' },
+        h('button', { class: 'btn small', type: 'button', disabled: changed === 0, onclick: resetAll }, `Tout réinitialiser${changed ? ` (${changed} modifiée${changed > 1 ? 's' : ''})` : ''}`))),
+    groups.map((g) => section(g, null, h('div', { class: 'mech-group' }, MECHANICS.filter((m) => m.group === g).map((def) => mechRow(def, p))))));
+}
+
+function mechRow(def, p) {
+  const value = p.mechanics[def.key];
+  const dflt = mechanicDefault(def, p.level);
+  const id = fieldId(`mechanics.${def.key}`);
+  let control;
+  if (typeof dflt === 'boolean') {
+    control = h('input', { id, type: 'checkbox', 'data-path': `mechanics.${def.key}`, 'data-rerender': '1' });
+    control.checked = !!value;
+  } else if (def.options) {
+    control = selectEl(def.options, value, { id, 'data-path': `mechanics.${def.key}`, 'data-kind': 'str', 'data-rerender': '1' });
+  } else {
+    control = h('input', { id, type: 'number', step: def.step ?? 'any', value, 'data-path': `mechanics.${def.key}`, 'data-kind': 'num' });
+  }
+  const isChanged = value !== dflt;
+  const dfltText = typeof dflt === 'boolean' ? (dflt ? 'oui' : 'non') : def.options ? def.options[dflt] : fmt(dflt, Number.isInteger(dflt) ? 0 : 2);
+  return h('div', { class: `mech${isChanged ? ' changed' : ''}`, id: `mech-${def.key}` },
+    h('label', { class: 'label', for: id }, def.label),
+    h('div', { class: 'meta' },
+      chip(def.conf),
+      h('span', {}, `Défaut : ${dfltText}`),
+      def.note ? h('span', {}, def.note) : null,
+      (def.src || []).map((s) => SOURCES[s] ? h('a', { href: SOURCES[s].url, target: '_blank', rel: 'noopener' }, SOURCES[s].label.split(' — ')[0]) : null),
+      isChanged ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { p.mechanics[def.key] = dflt; afterChange(true); } }, 'Réinitialiser') : null),
+    h('div', { class: 'control' }, control));
+}
+
+// ---------- liaison des champs ----------
+
+function onFieldEvent(e) {
+  const el = e.target;
+  const path = el?.dataset?.path;
+  if (!path) return;
+  const isText = el.type === 'number' || el.type === 'text';
+  if (e.type === 'input' && !isText) return;
+  if (e.type === 'change' && isText) return;
+  let v;
+  if (el.type === 'checkbox') v = el.checked;
+  else if (el.dataset.kind === 'num') {
+    if (el.value === '') return;
+    v = Number(el.value);
+    if (!Number.isFinite(v)) return;
+  } else v = el.value;
+  setPath(current(), path, v);
+  if (path === 'name') {
+    const opt = $('profileSelect')?.selectedOptions?.[0];
+    if (opt) opt.textContent = `${v} (niv. ${current().level})`;
+  }
+  if (path.startsWith('mh.') || path.startsWith('oh.')) {
+    const key = path.split('.')[0];
+    const w = current()[key];
+    const out = $(`dps-${key}`);
+    if (out) out.textContent = `${fmt(((Number(w.min) + Number(w.max)) / 2) / (Number(w.speed) || 1))} DPS d’arme`;
+  }
+  if (path.startsWith('mechanics.')) {
+    const key = path.slice('mechanics.'.length);
+    const def = MECHANICS.find((m) => m.key === key);
+    const row = $(`mech-${key}`);
+    if (def && row && el.dataset.rerender !== '1') row.classList.toggle('changed', v !== mechanicDefault(def, current().level));
+  }
+  afterChange(el.dataset.rerender === '1');
+}
+
+function afterChange(rerender = false) {
+  state.confirmDelete = false;
+  save();
+  renderSheet();
+  renderStatus();
+  if (rerender) renderPanel();
+}
+
+// ---------- résultats ----------
+
+function isStale(p, stored) {
+  return !stored || stored.snapshot !== snapshot(p);
+}
+
+function renderStatus() {
+  const el = $('runStatus');
+  if (!el) return;
+  const p = current();
+  const res = state.results[p.id];
+  el.replaceChildren(!res ? h('span', { class: 'chip stale' }, 'Pas encore simulé')
+    : isStale(p, res) ? h('span', { class: 'chip stale' }, 'Profil modifié depuis le calcul')
+      : h('span', { class: 'chip fresh' }, 'À jour'));
+}
+
+async function simulateChunked(profile, iterations, onProgress) {
+  const C = buildCharacter(profile);
+  const acc = createAccumulator();
+  const chunk = 200;
+  for (let i = 0; i < iterations; i += chunk) {
+    simulateBatch(C, profile, acc, i, Math.min(chunk, iterations - i), SEED);
+    if (onProgress) onProgress(Math.min(1, (i + chunk) / iterations));
+    await tick();
+  }
+  return summarize(C, acc);
+}
+
+function setProgress(id, frac) {
+  const bar = $(id);
+  if (bar) bar.style.width = `${Math.round(frac * 100)}%`;
+}
+
+async function guarded(kind, fn) {
+  if (state.running) return;
+  state.running = kind;
+  renderResults();
+  try {
+    await fn();
+  } finally {
+    state.running = null;
+    renderResults();
+  }
+}
+
+function runMain() {
+  return guarded('main', async () => {
+    const p = current();
+    const summary = await simulateChunked(p, state.iterations, (f) => setProgress('progress-main', f));
+    state.results[p.id] = { summary, snapshot: snapshot(p) };
+  });
+}
+
+function runWeights() {
+  return guarded('weights', async () => {
+    const p = current();
+    const variants = profileVariants(p);
+    const n = Math.min(state.iterations, 3000);
+    const results = {};
+    for (let k = 0; k < variants.length; k++) {
+      const v = variants[k];
+      const s = await simulateChunked(v.profile, n, (f) => setProgress('progress-weights', (k + f) / variants.length));
+      results[v.key] = s.dps;
+    }
+    state.weights[p.id] = { rows: statWeightsFromRuns(results), snapshot: snapshot(p), iterations: n };
+  });
+}
+
+function runCompare() {
+  return guarded('compare', async () => {
+    const n = Math.min(state.iterations, 3000);
+    const rows = [];
+    for (let k = 0; k < state.profiles.length; k++) {
+      const p = state.profiles[k];
+      const s = await simulateChunked(p, n, (f) => setProgress('progress-compare', (k + f) / state.profiles.length));
+      rows.push({ id: p.id, name: p.name, level: p.level, mean: s.mean, se: s.se, oomPct: s.oomPct });
+    }
+    state.compare = { rows, iterations: n };
+  });
+}
+
+function runLog() {
+  const p = current();
+  state.log[p.id] = { rows: combatLog(p, { seconds: 60, seed: SEED }), snapshot: snapshot(p) };
+  renderResults();
+}
+
+function niceTicks(min, max, count = 5) {
+  const span = max - min || 1;
+  const raw = span / count;
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => span / s <= count) || 10 * pow;
+  const ticks = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) ticks.push(v);
+  return ticks;
+}
+
+function columnPath(x, y, w, hgt, r) {
+  const rr = Math.min(r, w / 2, hgt);
+  const b = y + hgt;
+  return `M${x},${b}V${y + rr}Q${x},${y} ${x + rr},${y}H${x + w - rr}Q${x + w},${y} ${x + w},${y + rr}V${b}Z`;
+}
+
+function histogram(dps, mean) {
+  const W = 560;
+  const H = 210;
+  const m = { l: 40, r: 12, t: 22, b: 28 };
+  let lo = Math.min(...dps);
+  let hi = Math.max(...dps);
+  if (hi - lo < 1) { lo -= 1; hi += 1; }
+  const bins = 24;
+  const width = (hi - lo) / bins;
+  const counts = new Array(bins).fill(0);
+  for (const v of dps) counts[Math.min(bins - 1, Math.floor((v - lo) / width))]++;
+  const shares = counts.map((c) => (c / dps.length) * 100);
+  const yMax = Math.max(...shares) * 1.1;
+  const x = (v) => m.l + ((v - lo) / (hi - lo)) * (W - m.l - m.r);
+  const y = (v) => H - m.b - (v / yMax) * (H - m.t - m.b);
+  const bw = (W - m.l - m.r) / bins;
+
+  const yTicks = niceTicks(0, yMax, 3);
+  const xTicks = niceTicks(lo, hi, 5);
+  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Distribution du DPS sur ${dps.length} combats, moyenne ${fmt0(mean)}` });
+  root.append(
+    svg('g', { class: 'grid' }, yTicks.map((t) => svg('line', { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t) }))),
+    svg('g', { class: 'axis' },
+      yTicks.map((t) => svg('text', { x: m.l - 6, y: y(t) + 4, 'text-anchor': 'end' }, `${fmt0(t)} %`)),
+      xTicks.map((t) => svg('text', { x: x(t), y: H - 8, 'text-anchor': 'middle' }, fmt0(t))),
+      svg('line', { x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b })),
+  );
+  const cols = svg('g', {});
+  shares.forEach((s, i) => {
+    if (s <= 0) return;
+    const x0 = m.l + i * bw + 1;
+    const top = y(s);
+    const col = svg('path', {
+      class: 'col', d: columnPath(x0, top, Math.max(1, bw - 2), H - m.b - top, 4),
+      tabindex: '0', 'data-tip-title': `${fmt(s)} % des combats`,
+      'data-tip': `${fmt0(lo + i * width)} à ${fmt0(lo + (i + 1) * width)} DPS`,
+    });
+    cols.append(col);
+  });
+  root.append(cols);
+  const mx = x(mean);
+  root.append(
+    svg('line', { class: 'mean-line', x1: mx, x2: mx, y1: m.t - 4, y2: H - m.b }),
+    svg('text', { class: 'mean-label', x: Math.min(W - m.r - 4, Math.max(m.l + 4, mx)), y: m.t - 8, 'text-anchor': mx > W - 90 ? 'end' : mx < m.l + 90 ? 'start' : 'middle' }, `moyenne ${fmt0(mean)}`),
+  );
+  return root;
+}
+
+function barChart(rows, { currentId } = {}) {
+  const max = Math.max(...rows.map((r) => r.value), 1e-9);
+  return h('div', { class: 'bars' }, rows.map((r) => {
+    const ratio = Math.max(0, r.value) / max;
+    return h('div', {
+      class: `bar-row${r.id && r.id === currentId ? ' current' : ''}`, tabindex: '0',
+      'data-tip-title': r.tipTitle || r.valueText, 'data-tip': r.tip || r.label,
+    },
+      h('span', { class: 'bar-label' }, r.label),
+      h('span', { class: 'bar-track' },
+        h('span', { class: 'bar-fill', style: `--ratio:${ratio.toFixed(4)}` }),
+        h('span', { class: 'bar-value' }, r.valueText)));
+  }));
+}
+
+function resultPanel(title, hint, ...content) {
+  return h('section', { class: 'panel' },
+    h('div', { class: 'panel-head' }, h('h2', {}, title), hint ? h('span', { class: 'hint' }, hint) : null),
+    content);
+}
+
+function renderResults() {
+  const box = $('results');
+  const p = current();
+  const res = state.results[p.id];
+  const s = res?.summary;
+  const busy = !!state.running;
+
+  const itSel = selectEl({ 500: '500', 1000: '1 000', 2000: '2 000', 5000: '5 000', 10000: '10 000' }, state.iterations, { id: 'iterations' });
+  itSel.addEventListener('change', () => { state.iterations = Number(itSel.value); save(); });
+
+  const main = resultPanel('Simulation', null,
+    h('div', { class: 'runbar' },
+      h('button', { class: 'btn primary', type: 'button', disabled: busy, onclick: runMain }, state.running === 'main' ? 'Calcul…' : 'Lancer la simulation'),
+      h('label', { for: 'iterations' }, 'Combats', itSel),
+      h('span', { id: 'runStatus' })),
+    h('div', { class: 'progress', 'aria-hidden': 'true', hidden: state.running !== 'main' }, h('i', { id: 'progress-main' })),
+    s ? [
+      h('div', { class: 'hero' },
+        h('span', { class: 'big' }, fmt(s.mean)),
+        h('span', { class: 'unit' }, 'DPS moyen'),
+        h('span', { class: 'ci' }, `± ${fmt(1.96 * s.se)} (IC 95 %) · ${s.iterations.toLocaleString('fr-FR')} combats de ${fmt0(s.avgDuration)} s`)),
+      h('div', { class: 'stats' },
+        stat('Écart-type', `${fmt(s.sd)} DPS`),
+        stat('5e – 95e centile', `${fmt0(s.p5)} – ${fmt0(s.p95)}`),
+        stat('Temps à sec de mana', `${fmt(s.oomPct)} %`),
+        stat('Procs Expose Prey', `${fmt(s.procs.exposePrey || 0)} / combat`),
+        stat('Mongoose Bite', `${fmt(s.breakdown.find((b) => b.id === 'mongoose')?.casts || 0)} / combat`),
+        stat('Potions et runes', `${fmt(s.procs.potions || 0)} / combat`)),
+    ] : h('p', { class: 'empty' }, 'Lancez la simulation pour obtenir le DPS moyen, la répartition des dégâts et la distribution.'),
+  );
+
+  const panels = [main];
+
+  if (s) {
+    const table = h('div', { class: 'table-wrap' }, h('table', {},
+      h('thead', {}, h('tr', {}, ['Technique', 'DPS', 'Part', 'Par combat', 'Moyenne', 'Crit', 'Raté', 'Esquivé', 'Érafle'].map((t, i) => h('th', { class: i ? 'num' : '' }, t)))),
+      h('tbody', {}, s.breakdown.map((b) => h('tr', {},
+        h('td', {}, b.name),
+        h('td', { class: 'num' }, fmt(b.dps)),
+        h('td', { class: 'num' }, `${fmt(b.share)} %`),
+        h('td', { class: 'num' }, b.id === 'pet' ? '—' : b.casts ? fmt(b.casts) : `${fmt(b.ticks)} tics`),
+        h('td', { class: 'num' }, b.avgHit ? fmt0(b.avgHit) : '—'),
+        h('td', { class: 'num' }, `${fmt(b.critPct)} %`),
+        h('td', { class: 'num' }, `${fmt(b.missPct)} %`),
+        h('td', { class: 'num' }, `${fmt(b.dodgePct)} %`),
+        h('td', { class: 'num' }, `${fmt(b.glancePct)} %`))))));
+    panels.push(resultPanel('Répartition des dégâts', 'DPS par source',
+      barChart(s.breakdown.map((b) => ({
+        label: b.name, value: b.dps, valueText: `${fmt(b.dps)} · ${fmt0(b.share)} %`,
+        tipTitle: `${fmt(b.dps)} DPS`,
+        tip: `${b.name}\n${b.casts ? `${fmt(b.casts)} par combat · ` : ''}crit ${fmt(b.critPct)} %`,
+      }))),
+      h('details', {}, h('summary', {}, 'Détail par technique (tableau)'), table)));
+
+    panels.push(resultPanel('Distribution du DPS', `${s.iterations.toLocaleString('fr-FR')} combats`,
+      h('div', { class: 'histo' }, histogram(s.dps, s.mean)),
+      h('p', { class: 'hint' }, 'Part des combats par tranche de DPS. L’écart vient des crits, des procs et de la durée variable des combats.')));
+  }
+
+  const w = state.weights[p.id];
+  panels.push(resultPanel('Poids des stats', 'Équivalence en PA (PA = 1)',
+    h('div', { class: 'runbar' },
+      h('button', { class: 'btn', type: 'button', disabled: busy, onclick: runWeights }, state.running === 'weights' ? 'Calcul…' : 'Calculer les poids'),
+      w && isStale(p, w) ? h('span', { class: 'chip stale' }, 'Profil modifié depuis le calcul') : null),
+    h('div', { class: 'progress', 'aria-hidden': 'true', hidden: state.running !== 'weights' }, h('i', { id: 'progress-weights' })),
+    w ? [
+      barChart(w.rows.map((r) => ({
+        label: r.label, value: r.ep, valueText: r.epError ? `${fmt(r.ep, 2)} ± ${fmt(r.epError, 1)}` : fmt(r.ep, 2),
+        tipTitle: `${fmt(r.ep, 2)} PA`,
+        tip: `${r.label}\n${fmt(r.dpsPerPoint, 3)} DPS par point${r.epError ? `\nMarge (IC 95 %) : ± ${fmt(r.epError, 2)} PA` : ''}`,
+      }))),
+      h('p', { class: 'hint' }, `${w.iterations.toLocaleString('fr-FR')} combats par variante avec les mêmes tirages aléatoires ; « ± » donne la marge à 95 %. Écarts testés : +100 PA, +50 Agilité ou Force, +2 % toucher, crit ou réduction, +5 compétence, +5 % hâte, +5 DPS d’arme. Le toucher vaut 0 une fois le plafond atteint.`),
+    ] : h('p', { class: 'empty' }, 'Mesure le gain de DPS de chaque stat (Agilité, Force, toucher, crit, hâte, compétence, arme) en relançant le profil avec un peu plus de cette stat.')));
+
+  const cmp = state.compare;
+  panels.push(resultPanel('Comparer les profils', 'Tous les profils enregistrés',
+    h('div', { class: 'runbar' },
+      h('button', { class: 'btn', type: 'button', disabled: busy, onclick: runCompare }, state.running === 'compare' ? 'Calcul…' : `Comparer les ${state.profiles.length} profils`)),
+    h('div', { class: 'progress', 'aria-hidden': 'true', hidden: state.running !== 'compare' }, h('i', { id: 'progress-compare' })),
+    cmp ? [
+      barChart([...cmp.rows].sort((a, b) => b.mean - a.mean).map((r) => ({
+        id: r.id, label: `${r.name} (niv. ${r.level})`, value: r.mean, valueText: fmt(r.mean),
+        tipTitle: `${fmt(r.mean)} DPS`, tip: `± ${fmt(1.96 * r.se)} (IC 95 %)\n${fmt(r.oomPct)} % du temps à sec de mana`,
+      })), { currentId: p.id }),
+      h('p', { class: 'hint' }, `${cmp.iterations.toLocaleString('fr-FR')} combats par profil. Pour comparer 2M et ambidextrie, dupliquez un profil et changez seulement les armes.`),
+    ] : h('p', { class: 'empty' }, 'Classe vos profils par DPS : pratique pour trancher entre arme à deux mains et ambidextrie, ou entre deux builds.')));
+
+  const lg = state.log[p.id];
+  panels.push(resultPanel('Journal de combat', '60 premières secondes d’un combat',
+    h('div', { class: 'runbar' },
+      h('button', { class: 'btn', type: 'button', disabled: busy, onclick: runLog }, lg ? 'Régénérer le journal' : 'Afficher le journal'),
+      lg && isStale(p, lg) ? h('span', { class: 'chip stale' }, 'Profil modifié depuis le calcul') : null),
+    lg ? h('div', { class: 'log', role: 'log' },
+      h('div', { class: 'log-row' }, h('span', { class: 't' }, 'Temps'), h('span', { class: 'm' }, 'Mana'), h('span', { class: 'txt muted' }, 'Événement')),
+      lg.rows.map((r) => {
+        const cls = r.text.startsWith('Lance') || r.text.startsWith('Utilise') ? ' cast'
+          : /^(Expose|Vous|Deadly|Furie|Potion|Rune)/.test(r.text) ? ' proc' : '';
+        return h('div', { class: `log-row${cls}` },
+          h('span', { class: 't' }, `${fmt(r.t, 2)} s`),
+          h('span', { class: 'm' }, fmt0(r.mana)),
+          h('span', { class: 'txt' }, r.text));
+      }))
+      : h('p', { class: 'empty' }, 'Montre chaque attaque, technique et proc : utile pour vérifier que la rotation fait ce que vous attendez.')));
+
+  box.replaceChildren(...panels);
+  renderStatus();
+}
+
+function stat(k, v) {
+  return h('div', { class: 'stat' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
+}
+
+// ---------- sources ----------
+
+function renderSources() {
+  const box = $('sources');
+  box.replaceChildren(
+    h('div', { class: 'panel-head' }, h('h2', {}, 'Sources et fiabilité'), h('span', { class: 'hint' }, `Données au ${new Date(DATA_INFO.updated).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} · build ${DATA_INFO.build}`)),
+    h('p', {}, DATA_INFO.note),
+    h('div', { class: 'legend' }, Object.entries(CONFIDENCE).map(([k, c]) => h('div', {}, chip(k), h('small', {}, c.desc)))),
+    h('div', { class: 'section' },
+      h('h3', {}, 'Comment le sim calcule'),
+      h('ul', {},
+        h('li', {}, 'Monte-Carlo événementiel : chaque itération joue un combat complet (attaques automatiques, GCD, recharges, mana, procs, saignement, piège).'),
+        h('li', {}, 'Table d’attaque de Classic : un seul jet pour les attaques automatiques (raté, esquive, parade, érafle, crit), deux jets pour les techniques. Formules reprises du code de wowsims et du wiki de magey.'),
+        h('li', {}, 'Changements Forever appliqués : Mongoose Bite et Raptor Strike basés sur l’arme, Expose Prey, Lacerating Strikes, Strider Kick, Predator’s Edge, Aspect of the Beast avec PA de mêlée, toucher et crit unifiés, stat de réduction d’esquive/parade.'),
+        h('li', {}, 'Pas simulé : déplacements, AoE, menace, Wing Clip, procs d’objets précis, détail des capacités du familier.'))),
+    h('div', { class: 'section' },
+      h('h3', {}, 'Sources'),
+      h('ul', {}, Object.values(SOURCES).map((s) => h('li', {}, h('a', { href: s.url, target: '_blank', rel: 'noopener' }, s.label))))),
+  );
+}
+
+// ---------- infobulle ----------
+
+function setupTooltip() {
+  const tip = $('tooltip');
+  const show = (el, x, y) => {
+    tip.replaceChildren(h('strong', {}, el.getAttribute('data-tip-title') || ''), ...(el.getAttribute('data-tip') || '').split('\n').map((l) => h('div', {}, l)));
+    tip.hidden = false;
+    const r = tip.getBoundingClientRect();
+    const left = Math.min(window.innerWidth - r.width - 8, x + 14);
+    const top = y + 14 + r.height > window.innerHeight ? y - r.height - 10 : y + 14;
+    tip.style.left = `${Math.max(8, left)}px`;
+    tip.style.top = `${Math.max(8, top)}px`;
+  };
+  document.addEventListener('pointermove', (e) => {
+    const el = e.target.closest?.('[data-tip-title]');
+    if (el) show(el, e.clientX, e.clientY);
+    else tip.hidden = true;
+  });
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest?.('[data-tip-title]');
+    if (!el) { tip.hidden = true; return; }
+    const r = el.getBoundingClientRect();
+    show(el, r.left + r.width / 2, r.bottom);
+  });
+  document.addEventListener('scroll', () => { tip.hidden = true; }, true);
+}
+
+// ---------- démarrage ----------
+
+function renderAll() {
+  renderProfileBar();
+  renderIO();
+  renderSheet();
+  renderTabs();
+  renderPanel();
+  renderResults();
+}
+
+function start() {
+  load();
+  const config = $('config');
+  config.addEventListener('input', onFieldEvent);
+  config.addEventListener('change', onFieldEvent);
+  setupTooltip();
+  renderSources();
+  renderAll();
+  runMain();
+}
+
+start();
+</script>
+</body>
+</html>

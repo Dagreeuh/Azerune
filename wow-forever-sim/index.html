@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sim Survie Forever</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=Marcellus+SC&display=swap">
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+<!-- BODY:START -->
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">WoW Forever · Chasseur Survie</span>
+      <h1>Sim Survie mêlée</h1>
+      <p>Simulateur de DPS du chasseur Survie au corps à corps, construit sur les données de la bêta. Chaque valeur incertaine est modifiable et indique sa fiabilité.</p>
+    </div>
+    <div class="profile-bar" id="profileBar"></div>
+  </header>
+
+  <section class="panel" id="io" hidden></section>
+
+  <main class="layout">
+    <div class="column" id="config">
+      <section class="panel" aria-labelledby="sheet-title">
+        <div class="panel-head">
+          <h2 id="sheet-title">Feuille de personnage</h2>
+          <span class="hint">Calculée en direct, buffs et talents compris</span>
+        </div>
+        <div class="sheet" id="sheet"></div>
+      </section>
+      <section class="panel">
+        <div class="tabs" id="tabs" role="tablist" aria-label="Réglages"></div>
+        <div id="panel"></div>
+      </section>
+    </div>
+    <div class="column" id="results" aria-live="polite"></div>
+  </main>
+
+  <footer class="panel sources" id="sources"></footer>
+</div>
+<div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+<!-- BODY:END -->
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
