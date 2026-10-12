@@ -132,3 +132,30 @@ test('Lacerate pose un saignement de 7 tics', () => {
   const ticks = tr.events.filter((e) => e.kind === 'tick' && e.id === 'lacerate');
   assert.ok(ticks.length >= 7, `${ticks.length} tics`);
 });
+
+test('PA contre un type de créature : comptée seulement contre ce type', () => {
+  const p = nakedProfile(60);
+  p.equipment = { chest: 'db3566' }; // Raptorbane Armor : +16 PA, +15 PA contre les bêtes
+  p.fight.creatureType = 'beast';
+  assert.equal(resolveProfile(p, []).gear.ap, 31);
+  p.fight.creatureType = 'humanoid';
+  assert.equal(resolveProfile(p, []).gear.ap, 16);
+  assert.ok(dbItem('db23206'), 'Mark of the Champion présent dans la base');
+});
+
+test('tooltip : PA contre un type de créature (anglais et français)', () => {
+  const en = parseTooltip('Raptorbane\nChest\nEquip: +15 Attack Power when fighting Beasts.\nEquip: +16 Attack Power.');
+  assert.deepEqual(en.stats, { apVsBeast: 15, ap: 16 });
+  const fr = parseTooltip('Marque\nBijou\nÉquipé : +150 à la puissance d’attaque contre les Morts-vivants.');
+  assert.deepEqual(fr.stats, { apVsUndead: 150 });
+});
+
+test('« +X dégâts d’arme » sur une arme ne compte que pour cette arme', () => {
+  const sword = { id: 'w1', name: 'Épée', type: 'weapon1h', stats: { weaponDmg: 5 }, weapon: { min: 50, max: 90, speed: 2.6, type: 'sword' } };
+  const ring = { id: 'r1', name: 'Anneau', type: 'finger', stats: { weaponDmg: 3 } };
+  const p = nakedProfile(60);
+  p.equipment = { mainHand: 'w1', finger1: 'r1' };
+  const r = resolveProfile(p, [sword, ring]);
+  assert.equal(r.mh.bonusDmg, 5);
+  assert.equal(r.gear.weaponDmg, 3);
+});

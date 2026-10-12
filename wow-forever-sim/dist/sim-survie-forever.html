@@ -833,6 +833,20 @@ const RACES = {
   },
 };
 
+// Types de créature : comptent pour Improved Tracking et les objets « PA contre… ».
+const CREATURE_TYPES = {
+  humanoid: 'Humanoïde',
+  beast: 'Bête',
+  dragonkin: 'Draconien',
+  demon: 'Démon',
+  undead: 'Mort-vivant',
+  elemental: 'Élémentaire',
+  giant: 'Géant',
+  mechanical: 'Machine',
+  other: 'Autre ou non spécifié',
+};
+const TRACKABLE = ['humanoid', 'beast', 'dragonkin', 'demon', 'undead', 'elemental', 'giant'];
+
 const WEAPON_TYPES = {
   axe: 'Hache',
   sword: 'Épée',
@@ -1115,7 +1129,7 @@ function defaultProfile(level = 60) {
       bossSwing: 2.0,
       playerDodge: 5,
       playerParry: 5,
-      trackedType: true,
+      creatureType: 'humanoid',
     },
     pet: { enabled: false, dps: 0 },
     custom: { dmgPct: 0, crit: 0, ap: 0 },
@@ -1130,7 +1144,7 @@ function defaultProfile(level = 60) {
 // i niveau d’objet, a armure, s stats (scores bruts), sf compétence limitée à, w arme [min, max, vitesse, type],
 // mh/oh main droite/gauche seulement, u effet à utiliser, uq unique, no effets non simulés.
 
-const ITEM_DB_INFO = {"build":"1.60.1.70338","date":"2026-10-12","hotfixes":"patches/1.60.1.70338/hotfix-16786617+1","source":"https://github.com/wowsims/gamedata","count":2731};
+const ITEM_DB_INFO = {"build":"1.60.1.70338","date":"2026-10-12","hotfixes":"patches/1.60.1.70338/hotfix-16786617+1","source":"https://github.com/wowsims/gamedata","count":2740};
 
 const ITEM_DB = [
 {"id":720,"n":"Brawler Gloves","t":"hands","q":3,"l":23,"i":28,"a":"leather","s":{"str":8,"sta":7}},
@@ -1150,7 +1164,7 @@ const ITEM_DB = [
 {"id":863,"n":"Gloom Reaper","t":"weapon1h","q":2,"l":32,"i":37,"w":[37,69,2.7,"axe"]},
 {"id":864,"n":"Knightly Longsword","t":"weapon1h","q":2,"l":33,"i":38,"w":[21,40,1.5,"sword"]},
 {"id":866,"n":"Monk's Staff","t":"weapon2h","q":2,"l":37,"i":42,"w":[60,90,2.4,"staff"]},
-{"id":867,"n":"Gloves of Holy Might","t":"hands","q":4,"l":37,"i":42,"a":"leather","s":{"critRating":14,"ap":20}},
+{"id":867,"n":"Gloves of Holy Might","t":"hands","q":4,"l":37,"i":42,"a":"leather","s":{"critRating":14,"ap":20,"apVsUndead":30}},
 {"id":869,"n":"Dazzling Longsword","t":"weapon1h","q":4,"l":36,"i":41,"w":[37,70,1.7,"sword"],"mh":1,"no":["Chance au toucher : Faerie Fire (non simulé)"]},
 {"id":870,"n":"Fiery War Axe","t":"weapon2h","q":4,"l":35,"i":40,"w":[93,141,2.9,"axe"],"no":["Chance au toucher : Fireball (non simulé)"]},
 {"id":871,"n":"Flurry Axe","t":"weapon1h","q":4,"l":42,"i":47,"w":[37,69,1.5,"axe"],"no":["Chance au toucher : Flurry Axe (non simulé)"]},
@@ -1204,7 +1218,7 @@ const ITEM_DB = [
 {"id":1459,"n":"Shadowhide Scalper","t":"weapon1h","q":2,"l":19,"i":24,"s":{"str":3},"w":[25,47,2.9,"axe"],"mh":1},
 {"id":1460,"n":"Shadowhide Two-handed Sword","t":"weapon2h","q":2,"l":15,"i":20,"s":{"str":4,"sta":4},"w":[30,46,2.9,"sword"]},
 {"id":1461,"n":"Slayer's Battle Axe","t":"weapon2h","q":2,"l":20,"i":25,"s":{"str":6,"agi":5},"w":[39,59,2.9,"axe"]},
-{"id":1465,"n":"Tigerbane","t":"weapon1h","q":2,"l":33,"i":38,"s":{"ap":10},"w":[27,51,1.9,"dagger"]},
+{"id":1465,"n":"Tigerbane","t":"weapon1h","q":2,"l":33,"i":38,"s":{"apVsBeast":9,"ap":10},"w":[27,51,1.9,"dagger"]},
 {"id":1469,"n":"Scimitar of Atun","t":"weapon1h","q":2,"l":16,"i":21,"s":{"agi":3},"w":[19,36,2.6,"sword"],"mh":1},
 {"id":1473,"n":"Riverside Staff","t":"weapon2h","q":2,"l":14,"i":19,"s":{"spi":6},"w":[31,47,3.1,"staff"]},
 {"id":1481,"n":"Grimclaw","t":"weapon1h","q":3,"l":22,"i":27,"w":[24,45,2,"axe"],"no":["Chance au toucher : Shadow Bolt (non simulé)"]},
@@ -1456,7 +1470,7 @@ const ITEM_DB = [
 {"id":3559,"n":"Night Watch Gauntlets","t":"hands","q":2,"l":16,"i":21,"e":1,"a":"mail","s":{"str":4,"agi":1}},
 {"id":3562,"n":"Belt of Vindication","t":"waist","q":3,"l":24,"i":29,"e":1,"a":"leather","s":{"sta":3,"agi":7}},
 {"id":3565,"n":"Beerstained Gloves","t":"hands","q":2,"l":15,"i":20,"e":1,"a":"cloth","s":{"str":3,"sta":3}},
-{"id":3566,"n":"Raptorbane Armor","t":"chest","q":2,"l":24,"i":29,"e":1,"a":"leather","s":{"sta":3,"ap":16}},
+{"id":3566,"n":"Raptorbane Armor","t":"chest","q":2,"l":24,"i":29,"e":1,"a":"leather","s":{"sta":3,"apVsBeast":15,"ap":16}},
 {"id":3567,"n":"Dwarven Fishing Pole","t":"ranged","q":2,"l":14,"i":19,"e":1,"s":{"str":2}},
 {"id":3572,"n":"Daryl's Shortsword","t":"weapon1h","q":2,"l":12,"i":17,"e":1,"s":{"agi":2},"w":[14,26,2.3,"sword"]},
 {"id":3578,"n":"Harvester's Pants","t":"legs","q":2,"l":10,"i":15,"e":1,"a":"leather","s":{"spi":3,"agi":2}},
@@ -1658,7 +1672,7 @@ const ITEM_DB = [
 {"id":5423,"n":"Boahn's Fang","t":"weapon2h","q":3,"l":17,"i":22,"s":{"str":10,"spi":4},"w":[38,57,2.5,"axe"]},
 {"id":5425,"n":"Runescale Girdle","t":"waist","q":2,"l":16,"i":21,"a":"mail","s":{"str":5}},
 {"id":5426,"n":"Serpent's Kiss","t":"weapon1h","q":3,"l":16,"i":21,"w":[24,46,2.5,"axe"],"no":["Chance au toucher : Poison (non simulé)"]},
-{"id":5444,"n":"Miner's Cape","t":"back","q":3,"l":17,"i":22,"a":"cloth","s":{"sta":5,"ap":4}},
+{"id":5444,"n":"Miner's Cape","t":"back","q":3,"l":17,"i":22,"a":"cloth","s":{"sta":5,"apVsElemental":6,"ap":4}},
 {"id":5459,"n":"Defender Axe","t":"weapon1h","q":2,"l":8,"i":13,"e":1,"w":[11,21,2.3,"axe"],"mh":1},
 {"id":5540,"n":"Pearl-handled Dagger","t":"weapon1h","q":2,"l":18,"i":23,"s":{"agi":2,"sta":2},"w":[13,26,1.7,"dagger"]},
 {"id":5609,"n":"Steadfast Cinch","t":"waist","q":2,"l":17,"i":22,"e":1,"a":"leather","s":{"str":4,"sta":3}},
@@ -1710,7 +1724,7 @@ const ITEM_DB = [
 {"id":6220,"n":"Meteor Shard","t":"weapon1h","q":3,"l":23,"i":28,"w":[22,42,1.8,"dagger"],"no":["Chance au toucher : Firebolt (non simulé)"]},
 {"id":6263,"n":"Blue Overalls","t":"chest","q":2,"l":15,"i":20,"a":"cloth","s":{"str":4,"sta":4}},
 {"id":6282,"n":"Sacred Burial Trousers","t":"legs","q":2,"l":27,"i":32,"e":1,"a":"cloth","s":{"str":3,"int":5,"spi":9}},
-{"id":6314,"n":"Wolfmaster Cape","t":"back","q":3,"l":22,"i":27,"a":"cloth","s":{"sta":3,"ap":10}},
+{"id":6314,"n":"Wolfmaster Cape","t":"back","q":3,"l":22,"i":27,"a":"cloth","s":{"sta":3,"apVsBeast":9,"ap":10}},
 {"id":6315,"n":"Steelarrow Crossbow","t":"ranged","q":2,"l":22,"i":27,"s":{"agi":3}},
 {"id":6318,"n":"Odo's Ley Staff","t":"weapon2h","q":3,"l":21,"i":26,"s":{"sta":5,"spi":12},"w":[50,76,2.9,"staff"]},
 {"id":6321,"n":"Silverlaine's Family Seal","t":"finger","q":3,"l":21,"i":26,"s":{"str":5,"sta":2},"no":["Équipé : Lord of Shadowfang Keep (non simulé)"]},
@@ -1827,10 +1841,11 @@ const ITEM_DB = [
 {"id":7378,"n":"Dusky Bracers","t":"wrists","q":2,"l":32,"i":37,"a":"leather","s":{"agi":8}},
 {"id":7387,"n":"Dusky Belt","t":"waist","q":2,"l":34,"i":39,"a":"leather","s":{"agi":8,"sta":8}},
 {"id":7390,"n":"Dusky Boots","t":"feet","q":2,"l":35,"i":40,"a":"leather","s":{"agi":11,"sta":3}},
+{"id":7506,"n":"Gnomish Universal Remote","t":"trinket","q":2,"l":20,"i":25,"e":1,"s":{"apVsMechanical":18},"no":["Utiliser : Universal Remote (non simulé)"]},
 {"id":7552,"n":"Falcon's Hook","t":"finger","q":2,"l":39,"i":44,"s":{"str":3,"agi":9}},
 {"id":7606,"n":"Polar Gauntlets","t":"hands","q":2,"l":17,"i":22,"e":1,"a":"mail","s":{"str":4,"spi":2}},
 {"id":7682,"n":"Torturing Poker","t":"weapon1h","q":3,"l":29,"i":34,"w":[22,45,1.7,"dagger"],"no":["Équipé : Torture (non simulé)"]},
-{"id":7683,"n":"Bloody Brass Knuckles","t":"weapon1h","q":3,"l":29,"i":34,"s":{"ap":12},"w":[24,46,1.6,"fist"]},
+{"id":7683,"n":"Bloody Brass Knuckles","t":"weapon1h","q":3,"l":29,"i":34,"s":{"apVsHumanoid":15,"ap":12},"w":[24,46,1.6,"fist"]},
 {"id":7686,"n":"Ironspine's Eye","t":"finger","q":3,"l":30,"i":35,"s":{"agi":9,"str":4}},
 {"id":7688,"n":"Ironspine's Ribcage","t":"chest","q":3,"l":30,"i":35,"a":"mail","s":{"sta":17,"str":6,"agi":3}},
 {"id":7689,"n":"Morbid Dawn","t":"weapon2h","q":3,"l":30,"i":35,"s":{"sta":15,"str":10},"w":[70,105,2.9,"sword"]},
@@ -1843,12 +1858,12 @@ const ITEM_DB = [
 {"id":7719,"n":"Raging Berserker's Helm","t":"head","q":3,"l":37,"i":42,"a":"mail","s":{"sta":8,"str":13,"critRating":14}},
 {"id":7724,"n":"Gauntlets of Divinity","t":"hands","q":3,"l":39,"i":44,"a":"mail","s":{"sta":7,"ap":32}},
 {"id":7727,"n":"Watchman Pauldrons","t":"shoulders","q":3,"l":27,"i":32,"a":"leather","s":{"str":3,"sta":11,"spi":4}},
-{"id":7731,"n":"Ghostshard Talisman","t":"neck","q":3,"l":30,"i":35,"s":{"sta":9,"ap":14}},
+{"id":7731,"n":"Ghostshard Talisman","t":"neck","q":3,"l":30,"i":35,"s":{"sta":9,"apVsUndead":12,"ap":14}},
 {"id":7751,"n":"Vorrel's Boots","t":"feet","q":2,"l":30,"i":35,"e":1,"a":"leather","s":{"sta":2,"agi":7,"spi":7}},
 {"id":7753,"n":"Bloodspiller","t":"weapon2h","q":3,"l":27,"i":32,"w":[57,87,2.7,"axe"],"no":["Chance au toucher : Rend (non simulé)"]},
 {"id":7754,"n":"Harbinger Boots","t":"feet","q":3,"l":25,"i":30,"a":"leather","s":{"sta":11,"spi":3,"str":2}},
 {"id":7755,"n":"Flintrock Shoulders","t":"shoulders","q":3,"l":33,"i":38,"a":"leather","s":{"str":5,"agi":10,"sta":10}},
-{"id":7756,"n":"Dog Training Gloves","t":"hands","q":3,"l":31,"i":36,"a":"leather","s":{"ap":24}},
+{"id":7756,"n":"Dog Training Gloves","t":"hands","q":3,"l":31,"i":36,"a":"leather","s":{"ap":24,"apVsBeast":21}},
 {"id":7757,"n":"Windweaver Staff","t":"weapon2h","q":3,"l":32,"i":37,"s":{"sta":17},"w":[80,121,3.1,"staff"]},
 {"id":7759,"n":"Archon Chestpiece","t":"chest","q":3,"l":33,"i":38,"a":"mail","s":{"str":12,"sta":12}},
 {"id":7760,"n":"Warchief Kilt","t":"legs","q":3,"l":34,"i":39,"a":"leather","s":{"int":6,"spi":14,"str":5}},
@@ -1888,6 +1903,7 @@ const ITEM_DB = [
 {"id":8175,"n":"Nightscape Tunic","t":"chest","q":2,"l":36,"i":41,"a":"leather","s":{"agi":15,"sta":6}},
 {"id":8176,"n":"Nightscape Headband","t":"head","q":2,"l":36,"i":41,"a":"leather","s":{"agi":12,"sta":11}},
 {"id":8178,"n":"Training Sword","t":"weapon2h","q":2,"l":5,"i":10,"w":[20,30,3.5,"sword"]},
+{"id":8180,"n":"Hunting Bow","t":"ranged","q":2,"l":6,"i":11,"s":{"apVsBeast":3}},
 {"id":8183,"n":"Precision Bow","t":"ranged","q":2,"l":22,"i":27,"s":{"hitRating":3}},
 {"id":8188,"n":"Explosive Shotgun","t":"ranged","q":2,"l":32,"i":37,"s":{"str":5}},
 {"id":8190,"n":"Hanzo Sword","t":"weapon1h","q":3,"l":50,"i":55,"w":[38,71,1.5,"sword"],"no":["Chance au toucher : Wound (non simulé)"]},
@@ -2018,15 +2034,16 @@ const ITEM_DB = [
 {"id":10545,"n":"Gnomish Goggles","t":"head","q":2,"l":37,"i":42,"e":1,"a":"cloth","s":{"agi":9,"sta":9,"spi":9}},
 {"id":10553,"n":"Foreman Vest","t":"chest","q":2,"l":8,"i":13,"a":"cloth","s":{"str":3}},
 {"id":10554,"n":"Foreman Pants","t":"legs","q":2,"l":8,"i":13,"a":"cloth","s":{"str":2,"sta":2}},
-{"id":10573,"n":"Boneslasher","t":"weapon2h","q":3,"l":32,"i":37,"s":{"sta":7,"str":16},"w":[70,106,2.7,"sword"]},
+{"id":10573,"n":"Boneslasher","t":"weapon2h","q":3,"l":32,"i":37,"s":{"sta":7,"str":16,"apVsUndead":15},"w":[70,106,2.7,"sword"]},
 {"id":10582,"n":"Briar Tredders","t":"feet","q":3,"l":31,"i":36,"a":"leather","s":{"spi":8,"agi":5,"int":9}},
 {"id":10584,"n":"Stormgale Fists","t":"hands","q":3,"l":31,"i":36,"a":"mail","s":{"str":10,"spi":7,"sta":3}},
 {"id":10637,"n":"Brewer's Gloves","t":"hands","q":2,"l":10,"i":15,"e":1,"a":"cloth","s":{"int":2,"str":2}},
 {"id":10652,"n":"Will of the Mountain Giant","t":"weapon2h","q":2,"l":46,"i":51,"e":1,"s":{"str":15,"sta":14},"w":[88,133,2.8,"axe"]},
 {"id":10653,"n":"Trailblazer Boots","t":"feet","q":2,"l":25,"i":30,"e":1,"a":"leather","s":{"sta":3,"agi":7}},
-{"id":10696,"n":"Enchanted Azsharite Felbane Sword","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"ap":18},"w":[50,93,2,"sword"],"mh":1},
-{"id":10697,"n":"Enchanted Azsharite Felbane Dagger","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"ap":18},"w":[37,70,1.5,"dagger"]},
-{"id":10698,"n":"Enchanted Azsharite Felbane Staff","t":"weapon2h","q":2,"l":55,"i":60,"e":1,"s":{"ap":40},"w":[104,157,2.8,"staff"]},
+{"id":10659,"n":"Shard of the Splithooves","t":"trinket","q":2,"l":52,"i":57,"e":1,"s":{"mp5":6,"apVsDemon":21}},
+{"id":10696,"n":"Enchanted Azsharite Felbane Sword","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"apVsDemon":15,"ap":18},"w":[50,93,2,"sword"],"mh":1},
+{"id":10697,"n":"Enchanted Azsharite Felbane Dagger","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"apVsDemon":15,"ap":18},"w":[37,70,1.5,"dagger"]},
+{"id":10698,"n":"Enchanted Azsharite Felbane Staff","t":"weapon2h","q":2,"l":55,"i":60,"e":1,"s":{"apVsDemon":39,"ap":40},"w":[104,157,2.8,"staff"]},
 {"id":10702,"n":"Enormous Ogre Boots","t":"feet","q":2,"l":38,"i":43,"e":1,"a":"leather","s":{"str":9,"sta":9}},
 {"id":10703,"n":"Fiendish Skiv","t":"weapon1h","q":2,"l":40,"i":45,"e":1,"s":{"str":8},"w":[35,66,1.9,"dagger"]},
 {"id":10705,"n":"Firwillow Wristbands","t":"wrists","q":2,"l":42,"i":47,"e":1,"a":"cloth","s":{"agi":2,"int":10}},
@@ -2062,7 +2079,7 @@ const ITEM_DB = [
 {"id":11876,"n":"Plainstalker Tunic","t":"chest","q":2,"l":51,"i":56,"e":1,"a":"leather","s":{"sta":23,"agi":4}},
 {"id":11882,"n":"Outrider Leggings","t":"legs","q":2,"l":51,"i":56,"e":1,"a":"mail","s":{"str":16,"sta":16}},
 {"id":11902,"n":"Linken's Sword of Mastery","t":"weapon1h","q":3,"l":51,"i":56,"e":1,"w":[46,87,1.8,"sword"],"mh":1,"no":["Chance au toucher : Lightning Bolt (non simulé)"]},
-{"id":11907,"n":"Beastslayer","t":"weapon2h","q":2,"l":50,"i":55,"e":1,"s":{"ap":36},"w":[112,169,3.3,"axe"]},
+{"id":11907,"n":"Beastslayer","t":"weapon2h","q":2,"l":50,"i":55,"e":1,"s":{"apVsBeast":36,"ap":36},"w":[112,169,3.3,"axe"]},
 {"id":11908,"n":"Archaeologist's Quarry Boots","t":"feet","q":2,"l":50,"i":55,"e":1,"a":"cloth","s":{"sta":10,"agi":9,"int":9}},
 {"id":11913,"n":"Clayridge Helm","t":"head","q":2,"l":50,"i":55,"e":1,"a":"mail","s":{"agi":16,"spi":15}},
 {"id":11916,"n":"Shizzle's Muzzle","t":"shoulders","q":2,"l":50,"i":55,"e":1,"a":"leather","s":{"str":6,"sta":6,"spi":12}},
@@ -2123,8 +2140,9 @@ const ITEM_DB = [
 {"id":13014,"n":"Axe of Rin'ji","t":"weapon1h","q":3,"l":48,"i":53,"s":{"sta":11,"agi":5},"w":[46,87,1.9,"axe"]},
 {"id":13015,"n":"Serathil","t":"weapon1h","q":3,"l":56,"i":61,"s":{"str":9},"w":[53,99,1.9,"axe"]},
 {"id":13016,"n":"Killmaim","t":"weapon2h","q":3,"l":21,"i":26,"w":[55,84,3.2,"axe"],"no":["Chance au toucher : Rend (non simulé)"]},
-{"id":13017,"n":"Hellslayer Battle Axe","t":"weapon2h","q":3,"l":35,"i":40,"s":{"ap":34},"w":[82,124,2.9,"axe"]},
+{"id":13017,"n":"Hellslayer Battle Axe","t":"weapon2h","q":3,"l":35,"i":40,"s":{"apVsUndead":33,"ap":34},"w":[82,124,2.9,"axe"]},
 {"id":13018,"n":"Executioner's Cleaver","t":"weapon2h","q":3,"l":43,"i":48,"s":{"str":23,"hitRating":10},"w":[127,191,3.8,"axe"]},
+{"id":13019,"n":"Harpyclaw Short Bow","t":"ranged","q":3,"l":27,"i":32,"s":{"apVsHumanoid":12,"int":4}},
 {"id":13020,"n":"Skystriker Bow","t":"ranged","q":3,"l":34,"i":39,"s":{"agi":5,"int":5}},
 {"id":13022,"n":"Gryphonwing Long Bow","t":"ranged","q":3,"l":50,"i":55,"s":{"agi":8,"sta":4}},
 {"id":13023,"n":"Eaglehorn Long Bow","t":"ranged","q":3,"l":58,"i":63,"s":{"agi":10,"sta":4}},
@@ -2140,7 +2158,7 @@ const ITEM_DB = [
 {"id":13041,"n":"Guardian Blade","t":"weapon2h","q":3,"l":21,"i":26,"w":[50,76,2.9,"sword"]},
 {"id":13042,"n":"Sword of the Magistrate","t":"weapon2h","q":3,"l":36,"i":41,"s":{"str":8,"spi":10,"sta":15},"w":[96,145,3.3,"sword"]},
 {"id":13043,"n":"Blade of the Titans","t":"weapon2h","q":3,"l":44,"i":49,"s":{"sta":24,"str":10},"w":[112,169,3.3,"sword"]},
-{"id":13044,"n":"Demonslayer","t":"weapon2h","q":3,"l":52,"i":57,"s":{"ap":52},"w":[121,182,3.1,"sword"]},
+{"id":13044,"n":"Demonslayer","t":"weapon2h","q":3,"l":52,"i":57,"s":{"apVsDemon":48,"ap":52},"w":[121,182,3.1,"sword"]},
 {"id":13049,"n":"Deanship Claymore","t":"weapon2h","q":3,"l":26,"i":29,"s":{"spi":4},"w":[53,80,2.8,"sword"]},
 {"id":13051,"n":"Witchfury","t":"weapon2h","q":3,"l":39,"i":44,"w":[87,131,2.8,"sword"],"no":["Chance au toucher : Shadow Bolt (non simulé)"]},
 {"id":13052,"n":"Warmonger","t":"weapon2h","q":3,"l":47,"i":52,"s":{"str":3,"hitRating":30},"w":[108,162,3,"sword"]},
@@ -2440,8 +2458,8 @@ const ITEM_DB = [
 {"id":15705,"n":"Tidecrest Blade","t":"weapon1h","q":2,"l":52,"i":57,"e":1,"s":{"str":8,"spi":5},"w":[62,115,2.6,"sword"]},
 {"id":15706,"n":"Hunt Tracker Blade","t":"weapon1h","q":2,"l":52,"i":57,"e":1,"s":{"spi":5,"agi":8},"w":[35,66,1.5,"dagger"]},
 {"id":15708,"n":"Blight Leather Gloves","t":"hands","q":2,"l":53,"i":58,"e":1,"a":"leather","s":{"agi":13,"str":8,"sta":8}},
-{"id":15782,"n":"Beaststalker Blade","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"ap":18},"w":[55,103,2.2,"sword"]},
-{"id":15783,"n":"Beasthunter Dagger","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"ap":18},"w":[42,79,1.7,"dagger"]},
+{"id":15782,"n":"Beaststalker Blade","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"apVsBeast":15,"ap":18},"w":[55,103,2.2,"sword"]},
+{"id":15783,"n":"Beasthunter Dagger","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"apVsBeast":15,"ap":18},"w":[42,79,1.7,"dagger"]},
 {"id":15787,"n":"Willow Band Hauberk","t":"chest","q":2,"l":54,"i":59,"e":1,"a":"mail","s":{"int":6,"sta":10,"agi":20}},
 {"id":15789,"n":"Deep River Cloak","t":"back","q":2,"l":51,"i":56,"e":1,"a":"cloth","s":{"sta":7,"agi":11}},
 {"id":15791,"n":"Turquoise Sash","t":"waist","q":2,"l":53,"i":58,"e":1,"a":"cloth","s":{"spi":6,"int":15,"agi":6}},
@@ -2489,7 +2507,7 @@ const ITEM_DB = [
 {"id":16571,"n":"General's Chain Gloves","t":"hands","q":4,"l":60,"i":71,"a":"mail","s":{"agi":21,"sta":20,"int":4,"critRating":14},"uq":1,"no":["Équipé : Multi-Shot Damage Increase (non simulé)"]},
 {"id":16572,"n":"General's Chain Girdle","t":"waist","q":4,"l":60,"i":65,"a":"mail","s":{"int":18,"agi":18,"str":5,"sta":18},"uq":1},
 {"id":16622,"n":"Thornflinger","t":"ranged","q":2,"l":52,"i":57,"e":1,"s":{"agi":8}},
-{"id":16658,"n":"Wildhunter Cloak","t":"back","q":2,"l":27,"i":32,"e":1,"a":"cloth","s":{"sta":2,"ap":10}},
+{"id":16658,"n":"Wildhunter Cloak","t":"back","q":2,"l":27,"i":32,"e":1,"a":"cloth","s":{"sta":2,"apVsBeast":9,"ap":10}},
 {"id":16659,"n":"Deftkin Belt","t":"waist","q":2,"l":22,"i":27,"e":1,"a":"leather","s":{"agi":4,"sta":3,"ap":12}},
 {"id":16667,"n":"Coif of Elements","t":"head","q":3,"l":57,"i":62,"a":"mail","s":{"int":23,"sta":13,"spi":12,"str":7},"no":["Ensemble : The Elements (bonus non simulés)"]},
 {"id":16669,"n":"Pauldrons of Elements","t":"shoulders","q":3,"l":55,"i":60,"a":"mail","s":{"int":15,"sta":14,"spi":6,"str":5},"no":["Ensemble : The Elements (bonus non simulés)"]},
@@ -2571,7 +2589,7 @@ const ITEM_DB = [
 {"id":18710,"n":"Arena Bracers","t":"wrists","q":3,"l":45,"i":50,"a":"leather","s":{"sta":14,"agi":6}},
 {"id":18711,"n":"Arena Bands","t":"wrists","q":3,"l":45,"i":50,"a":"mail","s":{"sta":6,"ap":28}},
 {"id":18713,"n":"Rhok'delar, Longbow of the Ancient Keepers","t":"ranged","q":4,"l":60,"i":75,"s":{"critRating":14},"uq":1},
-{"id":18715,"n":"Lok'delar, Stave of the Ancient Keepers","t":"weapon2h","q":4,"l":60,"i":75,"s":{"sta":26,"int":15,"critRating":28},"w":[187,282,3.2,"staff"],"uq":1},
+{"id":18715,"n":"Lok'delar, Stave of the Ancient Keepers","t":"weapon2h","q":4,"l":60,"i":75,"s":{"sta":26,"int":15,"critRating":28,"apVsDemon":45},"w":[187,282,3.2,"staff"],"uq":1},
 {"id":18807,"n":"Helm of Latent Power","t":"head","q":3,"l":57,"i":62,"e":1,"a":"mail","s":{"int":14,"spi":12,"sta":12,"critRating":14}},
 {"id":18821,"n":"Quick Strike Ring","t":"finger","q":4,"l":60,"i":67,"s":{"sta":8,"str":5,"critRating":14,"ap":30},"uq":1},
 {"id":18827,"n":"Grand Marshal's Handaxe","t":"weapon1h","q":4,"l":60,"i":78,"s":{"sta":7,"critRating":14,"ap":28},"w":[138,207,2.9,"axe"]},
@@ -2822,7 +2840,7 @@ const ITEM_DB = [
 {"id":20479,"n":"Spitfire Breastplate","t":"chest","q":3,"l":57,"i":62,"a":"mail","s":{"agi":16,"int":16,"spi":15}},
 {"id":20480,"n":"Spitfire Gauntlets","t":"hands","q":3,"l":57,"i":62,"a":"mail","s":{"agi":12,"int":12,"spi":12}},
 {"id":20481,"n":"Spitfire Bracers","t":"wrists","q":3,"l":57,"i":62,"a":"mail","s":{"agi":9,"int":9,"spi":9}},
-{"id":20487,"n":"Lok'delar, Stave of the Ancient Keepers DEP","t":"weapon2h","q":4,"l":60,"i":75,"s":{"sta":26,"int":15,"critRating":28},"w":[187,282,3.2,"staff"],"uq":1},
+{"id":20487,"n":"Lok'delar, Stave of the Ancient Keepers DEP","t":"weapon2h","q":4,"l":60,"i":75,"s":{"sta":26,"int":15,"critRating":28,"apVsDemon":45},"w":[187,282,3.2,"staff"],"uq":1},
 {"id":20488,"n":"Rhok'delar, Longbow of the Ancient Keepers DEP","t":"ranged","q":4,"l":60,"i":75,"s":{"critRating":14},"uq":1},
 {"id":20522,"n":"Feral Staff","t":"weapon2h","q":3,"l":47,"i":52,"e":1,"s":{"str":17,"agi":16},"w":[108,162,3,"staff"],"uq":1},
 {"id":20622,"n":"Dragonheart Necklace","t":"neck","q":4,"l":60,"i":71,"s":{"sta":21,"int":6,"spi":6,"ap":24}},
@@ -3037,8 +3055,9 @@ const ITEM_DB = [
 {"id":23053,"n":"Stormrage's Talisman of Seething","t":"neck","q":4,"l":60,"i":92,"s":{"sta":12,"critRating":28,"ap":26}},
 {"id":23057,"n":"Gem of Trapped Innocents","t":"neck","q":4,"l":60,"i":92,"s":{"sta":9,"int":7,"critRating":28}},
 {"id":23067,"n":"Ring of the Cryptstalker","t":"finger","q":4,"l":60,"i":92,"s":{"agi":30,"mp5":6},"uq":1,"no":["Ensemble : Cryptstalker Armor (bonus non simulés)"]},
-{"id":23081,"n":"Handwraps of Undead Slaying","t":"hands","q":3,"l":58,"i":63,"e":1,"a":"leather","s":{"sta":15,"ap":30},"no":["Ensemble : Undead Slayer's Armor (bonus non simulés)"]},
-{"id":23082,"n":"Handguards of Undead Slaying","t":"hands","q":3,"l":58,"i":63,"e":1,"a":"mail","s":{"sta":15,"ap":30},"no":["Ensemble : Garb of the Undead Slayer (bonus non simulés)"]},
+{"id":23081,"n":"Handwraps of Undead Slaying","t":"hands","q":3,"l":58,"i":63,"e":1,"a":"leather","s":{"sta":15,"apVsUndead":30,"ap":30},"no":["Ensemble : Undead Slayer's Armor (bonus non simulés)"]},
+{"id":23082,"n":"Handguards of Undead Slaying","t":"hands","q":3,"l":58,"i":63,"e":1,"a":"mail","s":{"sta":15,"apVsUndead":30,"ap":30},"no":["Ensemble : Garb of the Undead Slayer (bonus non simulés)"]},
+{"id":23206,"n":"Mark of the Champion","t":"trinket","q":4,"l":60,"i":90,"e":1,"s":{"apVsDemon":150,"apVsUndead":150},"uq":1},
 {"id":23237,"n":"Ring of the Eternal Flame","t":"finger","q":4,"l":60,"i":83,"s":{"int":10,"critRating":14},"uq":1},
 {"id":23251,"n":"Champion's Chain Helm","t":"head","q":3,"l":60,"i":71,"a":"mail","s":{"agi":18,"sta":14,"int":9,"critRating":28},"uq":1,"no":["Ensemble : Champion's Pursuance (bonus non simulés)"]},
 {"id":23252,"n":"Champion's Chain Shoulders","t":"shoulders","q":3,"l":60,"i":71,"a":"mail","s":{"agi":18,"sta":13,"critRating":14},"uq":1,"no":["Ensemble : Champion's Pursuance (bonus non simulés)"]},
@@ -3462,7 +3481,7 @@ const ITEM_DB = [
 {"id":272851,"n":"Premier Grand Marshal's Claymore","t":"weapon2h","q":4,"l":60,"i":65,"s":{"sta":35,"str":23,"critRating":14},"w":[187,281,3.8,"sword"]},
 {"id":272856,"n":"Premier Grand Marshal's Mageblade","t":"weapon1h","q":4,"l":60,"i":65,"s":{"sta":8,"int":7,"critRating":14},"w":[66,123,2,"dagger"],"mh":1},
 {"id":272859,"n":"Premier Grand Marshal's Swiftblade","t":"weapon1h","q":4,"l":60,"i":65,"s":{"sta":2,"ap":24,"critRating":14},"w":[68,102,1.8,"sword"]},
-{"id":272998,"n":"Bone Knuckles","t":"weapon1h","q":3,"l":13,"i":18,"s":{"ap":6},"w":[17,32,2,"fist"],"mh":1},
+{"id":272998,"n":"Bone Knuckles","t":"weapon1h","q":3,"l":13,"i":18,"s":{"apVsBeast":6,"ap":6},"w":[17,32,2,"fist"],"mh":1},
 {"id":273003,"n":"Searing Dagger","t":"weapon1h","q":3,"l":13,"i":18,"s":{"spi":4},"w":[13,26,1.6,"dagger"],"mh":1,"no":["Équipé : Sear (non simulé)"]},
 {"id":273007,"n":"Chasm Walkers","t":"feet","q":3,"l":13,"i":18,"a":"leather","s":{"spi":5,"ap":4}},
 {"id":273022,"n":"Supple Bellyskin Leggings","t":"legs","q":3,"l":26,"i":31,"a":"leather","s":{"sta":14,"str":6}},
@@ -3472,7 +3491,7 @@ const ITEM_DB = [
 {"id":273028,"n":"Reliquary Mantle","t":"shoulders","q":3,"l":28,"i":33,"a":"mail","s":{"sta":12,"hitRating":4}},
 {"id":273029,"n":"Golemsight Long Gun","t":"ranged","q":3,"l":28,"i":33,"s":{"agi":6}},
 {"id":273032,"n":"Bonebinder's Signet","t":"finger","q":3,"l":25,"i":31,"s":{"spi":6,"str":5}},
-{"id":273033,"n":"Gravespike Repeater","t":"ranged","q":3,"l":26,"i":31,"s":{"ap":8}},
+{"id":273033,"n":"Gravespike Repeater","t":"ranged","q":3,"l":26,"i":31,"s":{"ap":8,"apVsHumanoid":9}},
 {"id":273035,"n":"Mana-Warped Chain Shirt","t":"chest","q":3,"l":27,"i":32,"a":"mail","s":{"sta":8,"str":12,"mp5":3}},
 {"id":273036,"n":"Graveweave Bindings","t":"wrists","q":3,"l":26,"i":31,"a":"cloth","s":{"str":6,"mp5":2}},
 {"id":273037,"n":"Felbough Arm","t":"weapon2h","q":3,"l":29,"i":34,"s":{"agi":10,"hitRating":10},"w":[69,104,3,"polearm"]},
@@ -3489,7 +3508,7 @@ const ITEM_DB = [
 {"id":273054,"n":"Cartilage Shapers","t":"hands","q":3,"l":28,"i":33,"a":"leather","s":{"agi":9,"spi":8}},
 {"id":273088,"n":"Snake Eye Kaleidoscope","t":"neck","q":3,"l":17,"i":22,"s":{"str":1,"agi":1,"sta":1,"int":1,"spi":1}},
 {"id":273289,"n":"Ogre Loincloth","t":"legs","q":3,"l":17,"i":22,"a":"cloth","s":{"str":4,"sta":6}},
-{"id":273456,"n":"Cell Keeper's Claws","t":"weapon1h","q":3,"l":17,"i":22,"s":{"agi":2,"ap":6},"w":[25,48,2.5,"fist"],"mh":1},
+{"id":273456,"n":"Cell Keeper's Claws","t":"weapon1h","q":3,"l":17,"i":22,"s":{"agi":2,"apVsHumanoid":6,"ap":6},"w":[25,48,2.5,"fist"],"mh":1},
 {"id":273637,"n":"Blade of Silverlaine","t":"weapon1h","q":3,"l":21,"i":26,"w":[26,50,2.3,"sword"],"mh":1},
 {"id":273646,"n":"Half-Eaten Boots","t":"feet","q":3,"l":22,"i":27,"a":"mail","s":{"str":8}},
 {"id":273647,"n":"Worgpelt Leggings","t":"legs","q":3,"l":21,"i":26,"a":"leather","s":{"agi":10,"str":5}},
@@ -3497,7 +3516,7 @@ const ITEM_DB = [
 {"id":273804,"n":"Executioner Mantle","t":"shoulders","q":3,"l":21,"i":26,"a":"leather","s":{"ap":10,"spi":9}},
 {"id":273805,"n":"Blackrock Harness","t":"chest","q":3,"l":21,"i":26,"a":"leather","s":{"sta":8,"ap":14}},
 {"id":273807,"n":"Demolition Girdle","t":"waist","q":3,"l":24,"i":29,"a":"leather","s":{"str":8}},
-{"id":273809,"n":"Hamhock's Cleaver","t":"weapon1h","q":3,"l":25,"i":30,"s":{"str":4,"ap":8},"w":[29,54,2.2,"axe"],"mh":1},
+{"id":273809,"n":"Hamhock's Cleaver","t":"weapon1h","q":3,"l":25,"i":30,"s":{"str":4,"apVsHumanoid":9,"ap":8},"w":[29,54,2.2,"axe"],"mh":1},
 {"id":273810,"n":"Ogre Grips","t":"hands","q":3,"l":25,"i":30,"a":"mail","s":{"sta":10,"str":4}},
 {"id":273819,"n":"Boneslicer","t":"weapon2h","q":3,"l":23,"i":28,"w":[36,55,2,"polearm"],"no":["Chance au toucher : Wound (non simulé)"]},
 {"id":273824,"n":"Defias Jailbreakers","t":"hands","q":3,"l":26,"i":31,"a":"leather","s":{"sta":7,"agi":6},"no":["Équipé : Lockpicking 04 (non simulé)"]},
@@ -3514,10 +3533,10 @@ const ITEM_DB = [
 {"id":274159,"n":"Thorncursed Grips","t":"hands","q":3,"l":27,"i":33,"a":"leather","s":{"ap":18},"no":["Équipé : Thorncurse - Add Nature Dam - Weap 02 (non simulé)"]},
 {"id":274160,"n":"Quilrager Throwing Axe","t":"ranged","q":3,"l":31,"i":36,"s":{"str":4}},
 {"id":274291,"n":"Polished Skullcap","t":"head","q":3,"l":31,"i":36,"a":"mail","s":{"sta":8,"str":7}},
-{"id":274292,"n":"Houndmaster Boomerang","t":"ranged","q":3,"l":31,"i":36,"s":{"sta":4,"ap":4}},
+{"id":274292,"n":"Houndmaster Boomerang","t":"ranged","q":3,"l":31,"i":36,"s":{"sta":4,"ap":4,"apVsBeast":9}},
 {"id":274293,"n":"Spellsever Crossbow","t":"ranged","q":3,"l":34,"i":39,"s":{"ap":8},"no":["Chance au toucher : Spellsever (non simulé)"]},
 {"id":274383,"n":"Kanai's Knife","t":"weapon1h","q":2,"l":53,"i":58,"e":1,"s":{"ap":10,"agi":9},"w":[41,77,1.7,"dagger"]},
-{"id":274385,"n":"Abomination Chain","t":"neck","q":3,"l":37,"i":42,"s":{"sta":10,"ap":6}},
+{"id":274385,"n":"Abomination Chain","t":"neck","q":3,"l":37,"i":42,"s":{"sta":10,"apVsHumanoid":6,"ap":6}},
 {"id":274419,"n":"Bear Poking Stick","t":"weapon2h","q":3,"l":53,"i":58,"s":{"sta":9,"agi":24,"ap":27},"w":[127,191,3.2,"polearm"]},
 {"id":274420,"n":"Wisepaw Totem","t":"weapon2h","q":3,"l":53,"i":58,"s":{"int":23,"sta":19},"w":[127,191,3.2,"staff"]},
 {"id":274430,"n":"Rock Sentinel Slicer","t":"weapon2h","q":3,"l":39,"i":44,"s":{"int":12},"w":[87,131,2.8,"axe"],"no":["Équipé : Rock Sentinel (non simulé)"]},
@@ -3553,7 +3572,7 @@ const ITEM_DB = [
 {"id":275044,"n":"Bloodsport Band","t":"finger","q":3,"l":40,"i":45,"e":1,"s":{"sta":6,"ap":22}},
 {"id":275045,"n":"Ogre Horn Ring","t":"finger","q":3,"l":40,"i":45,"e":1,"s":{"sta":10,"str":4,"agi":3}},
 {"id":275291,"n":"Staff of the Deeproar","t":"weapon2h","q":2,"l":53,"i":58,"e":1,"s":{"int":12,"sta":13,"spi":14},"w":[118,178,3.3,"staff"]},
-{"id":275296,"n":"Deadwood Boomstick","t":"ranged","q":2,"l":53,"i":58,"e":1,"s":{"sta":6,"ap":8}},
+{"id":275296,"n":"Deadwood Boomstick","t":"ranged","q":2,"l":53,"i":58,"e":1,"s":{"sta":6,"apVsBeast":6,"ap":8}},
 {"id":275434,"n":"Murkborn Girdle","t":"waist","q":2,"l":53,"i":58,"e":1,"a":"mail","s":{"ap":18,"int":10,"sta":10}},
 {"id":275613,"n":"Hivethrasher's Claws","t":"hands","q":3,"l":53,"i":58,"a":"leather","s":{"sta":20,"agi":7}},
 {"id":275614,"n":"Hivethrasher's Girdle","t":"waist","q":3,"l":53,"i":58,"a":"leather","s":{"sta":21,"agi":7}},
@@ -3573,7 +3592,7 @@ const ITEM_DB = [
 {"id":275736,"n":"Horn of Ve'ho","t":"neck","q":3,"l":56,"i":61,"e":1,"s":{"sta":10,"hitRating":13}},
 {"id":275737,"n":"Horned Pauldron","t":"shoulders","q":3,"l":56,"i":61,"e":1,"a":"mail","s":{"ap":26,"spi":13,"hitRating":13}},
 {"id":275739,"n":"Wild Wristguards","t":"wrists","q":3,"l":56,"i":61,"e":1,"a":"leather","s":{"str":14,"sta":7,"spi":7}},
-{"id":275742,"n":"Demonbane Blade","t":"weapon2h","q":2,"l":54,"i":59,"e":1,"s":{"ap":38},"w":[124,187,3.4,"polearm"]},
+{"id":275742,"n":"Demonbane Blade","t":"weapon2h","q":2,"l":54,"i":59,"e":1,"s":{"ap":38,"apVsDemon":45},"w":[124,187,3.4,"polearm"]},
 {"id":275824,"n":"Wardcleaver","t":"weapon2h","q":3,"l":43,"i":48,"e":1,"w":[117,176,3.5,"axe"]},
 {"id":275831,"n":"Highfeather Bangle","t":"finger","q":2,"l":53,"i":58,"e":1,"s":{"agi":12,"int":5}},
 {"id":275832,"n":"Crowfeather Tunic","t":"chest","q":2,"l":53,"i":58,"e":1,"a":"leather","s":{"int":10,"agi":11}},
@@ -3598,7 +3617,7 @@ const ITEM_DB = [
 {"id":276332,"n":"Abigail's Hope","t":"ranged","q":2,"l":55,"i":60,"e":1,"s":{"sta":6,"str":5}},
 {"id":276335,"n":"Polished Doomguard Edge","t":"weapon2h","q":2,"l":55,"i":60,"e":1,"s":{"ap":44,"sta":5},"w":[126,190,3.4,"sword"]},
 {"id":276337,"n":"Thaelemaches' Talisman","t":"trinket","q":2,"l":55,"i":60,"e":1,"s":{"ap":18},"no":["Utiliser : Demonbane (non simulé)"]},
-{"id":276338,"n":"Claw of Shalla'kal","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"ap":10},"w":[62,117,2.5,"fist"]},
+{"id":276338,"n":"Claw of Shalla'kal","t":"weapon1h","q":2,"l":55,"i":60,"e":1,"s":{"apVsBeast":27,"ap":10},"w":[62,117,2.5,"fist"]},
 {"id":276339,"n":"Cured Staghide Leggings","t":"legs","q":2,"l":55,"i":60,"e":1,"a":"leather","s":{"agi":15,"sta":13}},
 {"id":276340,"n":"Blademaster Hakama","t":"legs","q":2,"l":55,"i":60,"e":1,"a":"leather","s":{"str":7,"agi":22,"spi":5}},
 {"id":276685,"n":"Militia Bow","t":"ranged","q":2,"l":9,"i":14,"e":1,"s":{"agi":1}},
@@ -3680,7 +3699,7 @@ const ITEM_DB = [
 {"id":279388,"n":"Brewer's Bracers","t":"wrists","q":2,"l":20,"i":25,"e":1,"a":"mail","s":{"str":4,"sta":2}},
 {"id":279392,"n":"Glimmer","t":"weapon1h","q":3,"l":25,"i":30,"e":1,"w":[26,49,2,"sword"]},
 {"id":279393,"n":"Frostfall","t":"weapon1h","q":3,"l":25,"i":30,"e":1,"w":[38,72,2.9,"sword"]},
-{"id":279836,"n":"Thorn Protecting Girdle","t":"waist","q":2,"l":31,"i":36,"e":1,"a":"mail","s":{"sta":8,"ap":12}},
+{"id":279836,"n":"Thorn Protecting Girdle","t":"waist","q":2,"l":31,"i":36,"e":1,"a":"mail","s":{"sta":8,"apVsElemental":9,"ap":12}},
 {"id":279837,"n":"Fallen Guard's Pendant","t":"neck","q":2,"l":31,"i":36,"e":1,"s":{"str":3}},
 {"id":279839,"n":"Spellguard Pauldrons","t":"shoulders","q":3,"l":31,"i":36,"e":1,"a":"mail","s":{"sta":11,"int":7,"str":4}},
 {"id":279842,"n":"Battle Spaulders","t":"shoulders","q":3,"l":31,"i":36,"e":1,"a":"mail","s":{"sta":11,"spi":7,"str":4}},
@@ -3688,15 +3707,15 @@ const ITEM_DB = [
 {"id":279846,"n":"Larcenist's Belt","t":"waist","q":2,"l":31,"i":36,"e":1,"a":"leather","s":{"sta":8,"agi":6}},
 {"id":279848,"n":"Construct Cloak","t":"back","q":2,"l":31,"i":36,"e":1,"a":"cloth","s":{"str":5,"spi":5}},
 {"id":279849,"n":"Runebound Gloves","t":"hands","q":2,"l":31,"i":36,"e":1,"a":"leather","s":{"sta":7,"spi":4,"ap":12}},
-{"id":279864,"n":"Monstrous Cleaver","t":"weapon2h","q":2,"l":18,"i":23,"e":1,"s":{"sta":6,"ap":4},"w":[40,60,3.3,"sword"]},
+{"id":279864,"n":"Monstrous Cleaver","t":"weapon2h","q":2,"l":18,"i":23,"e":1,"s":{"apVsUndead":6,"sta":6,"ap":4},"w":[40,60,3.3,"sword"]},
 {"id":279865,"n":"Grave Shroud","t":"back","q":2,"l":18,"i":23,"e":1,"a":"cloth","s":{"sta":3,"str":3}},
 {"id":279868,"n":"Duty Bound Leggings","t":"legs","q":2,"l":19,"i":24,"e":1,"a":"leather","s":{"agi":6,"int":4}},
 {"id":279869,"n":"Remembrance Armor","t":"chest","q":2,"l":19,"i":24,"e":1,"a":"mail","s":{"sta":5,"str":3,"int":3}},
 {"id":279875,"n":"Spare Part Bindings","t":"wrists","q":2,"l":19,"i":24,"e":1,"a":"leather","s":{"sta":3,"agi":3}},
 {"id":279876,"n":"Plaguefang","t":"weapon1h","q":2,"l":19,"i":24,"e":1,"w":[18,34,2.1,"sword"],"no":["Chance au toucher : Poison (non simulé)"]},
-{"id":279888,"n":"Tidesoaked Leggings","t":"legs","q":2,"l":35,"i":40,"e":1,"a":"leather","s":{"sta":8,"str":5,"spi":7}},
+{"id":279888,"n":"Tidesoaked Leggings","t":"legs","q":2,"l":35,"i":40,"e":1,"a":"leather","s":{"sta":8,"str":5,"spi":7,"apVsUndead":14}},
 {"id":279897,"n":"Dusty Belt","t":"waist","q":2,"l":1,"i":17,"a":"leather","s":{"agi":2,"spi":2}},
-{"id":279899,"n":"Catacomb Cloak","t":"back","q":2,"l":1,"i":17,"a":"cloth","s":{"sta":2,"ap":3}},
+{"id":279899,"n":"Catacomb Cloak","t":"back","q":2,"l":1,"i":17,"a":"cloth","s":{"sta":2,"apVsHumanoid":4,"ap":3}},
 {"id":279900,"n":"Deepgrave Trousers","t":"legs","q":2,"l":1,"i":17,"a":"leather","s":{"agi":3,"spi":3}},
 {"id":280095,"n":"Cryptwalker Bracers","t":"wrists","q":2,"l":12,"i":17,"e":1,"a":"mail","s":{"str":2,"spi":2}},
 {"id":280304,"n":"Invisible Dagger","t":"weapon1h","q":4,"l":1,"i":1,"w":[9,18,2,"dagger"]},
@@ -3775,6 +3794,7 @@ const ITEM_DB = [
 {"id":282716,"n":"Imbued Scaled Cuffs","t":"wrists","q":2,"l":27,"i":32,"a":"mail","s":{"str":5}},
 {"id":282717,"n":"Durable Bearhide Pauldrons","t":"shoulders","q":2,"l":24,"i":29,"a":"leather","s":{"sta":7,"str":2}},
 {"id":282721,"n":"Gnoll Shaman's Staff","t":"weapon2h","q":2,"l":25,"i":30,"s":{"str":7,"mp5":3},"w":[58,88,3.6,"staff"]},
+{"id":282778,"n":"Mark of the Red Flight","t":"trinket","q":3,"l":41,"i":46,"s":{"apVsDragonkin":12},"no":["Utiliser : Renewing Flame (non simulé)"]},
 {"id":283253,"n":"Denmother's Hide","t":"back","q":2,"l":32,"i":37,"a":"cloth","s":{"str":5,"spi":5}},
 {"id":283255,"n":"Syndicate Executioner's Slicer","t":"weapon1h","q":2,"l":33,"i":38,"s":{"agi":4,"str":4},"w":[37,70,2.6,"sword"],"mh":1},
 {"id":283259,"n":"Bearhide Vicegrips","t":"hands","q":2,"l":11,"i":16,"a":"leather","s":{"str":3}},
@@ -3807,9 +3827,10 @@ const ITEM_DB = [
 {"id":284399,"n":"Seared Grove Shoulderpads","t":"shoulders","q":3,"l":25,"i":30,"a":"cloth","s":{"sta":8,"critRating":7,"int":3}},
 {"id":284400,"n":"Foreman's Helm","t":"head","q":3,"l":21,"i":26,"a":"mail","s":{"sta":9,"str":8}},
 {"id":284403,"n":"Shapeshifting Sentinel's Strides","t":"feet","q":3,"l":24,"i":29,"a":"leather","s":{"agi":8,"ap":16}},
+{"id":284573,"n":"Ursol'lok's Paws","t":"hands","q":2,"l":28,"i":33,"a":"leather","s":{"sta":6,"apVsBeast":18}},
 {"id":284667,"n":"Flame Seared Sword","t":"weapon1h","q":3,"l":23,"i":28,"w":[32,60,2.6,"sword"],"no":["Chance au toucher : Immolate (non simulé)"]},
 {"id":284696,"n":"Carved Furbolg Tooth","t":"ranged","q":2,"l":24,"i":29,"s":{"agi":2,"str":2}},
-{"id":284702,"n":"Slimy Sword","t":"weapon1h","q":2,"l":20,"i":25,"s":{"sta":3},"w":[14,27,1.6,"sword"]},
+{"id":284702,"n":"Slimy Sword","t":"weapon1h","q":2,"l":20,"i":25,"s":{"sta":3,"apVsHumanoid":5},"w":[14,27,1.6,"sword"]},
 {"id":284704,"n":"Frostbitten Staff","t":"weapon2h","q":2,"l":19,"i":24,"s":{"spi":6},"w":[30,46,2.4,"staff"]},
 {"id":284712,"n":"Hyena Hide Helm","t":"head","q":2,"l":31,"i":36,"a":"leather","s":{"str":10}},
 {"id":284713,"n":"Accursed Legguards","t":"legs","q":2,"l":32,"i":37,"a":"mail","s":{"str":6,"spi":6,"sta":11}},
@@ -3819,7 +3840,8 @@ const ITEM_DB = [
 {"id":284866,"n":"Windserpent Scaled Cloak","t":"back","q":2,"l":46,"i":51,"a":"cloth","s":{"agi":10,"hitRating":5}},
 {"id":285043,"n":"Snarling Fang","t":"weapon1h","q":2,"l":42,"i":47,"s":{"sta":6,"ap":9},"w":[35,66,1.8,"dagger"]},
 {"id":285093,"n":"Ripscaled Cuffs","t":"wrists","q":2,"l":36,"i":41,"a":"leather","s":{"sta":6,"agi":6}},
-{"id":285100,"n":"Serrated Raptor Teeth","t":"ranged","q":2,"l":35,"i":40,"s":{"agi":4}},
+{"id":285095,"n":"Twitching Eye","t":"neck","q":2,"l":35,"i":40,"s":{"sta":6,"apVsHumanoid":18}},
+{"id":285100,"n":"Serrated Raptor Teeth","t":"ranged","q":2,"l":35,"i":40,"s":{"agi":4,"apVsBeast":6}},
 {"id":285102,"n":"Darkmist Dirk","t":"weapon1h","q":2,"l":37,"i":42,"s":{"sta":5,"ap":8},"w":[27,50,1.6,"dagger"],"no":["Chance au toucher : Poison (non simulé)"]},
 {"id":285103,"n":"Marsh Serpent's Scales","t":"waist","q":2,"l":38,"i":43,"a":"mail","s":{"int":7,"agi":10}},
 {"id":285190,"n":"Wyvern Heart Band","t":"finger","q":3,"l":29,"i":34,"s":{"ap":15,"agi":5,"sta":5}},
@@ -3835,7 +3857,7 @@ const ITEM_DB = [
 {"id":285280,"n":"Mithril Blacksmith Hammer","t":"ranged","q":2,"l":34,"i":39,"s":{"str":5},"no":["Chance au toucher : Concussed (non simulé)"]},
 {"id":285281,"n":"Arcanite Blacksmith Hammer","t":"ranged","q":3,"l":49,"i":54,"s":{"spi":4,"str":6},"no":["Chance au toucher : Cracked Skull (non simulé)"]},
 {"id":285292,"n":"Dull Sawblade","t":"ranged","q":3,"l":16,"i":21,"s":{"ap":6,"sta":2}},
-{"id":285328,"n":"Taurenbane's Family Cleaver","t":"weapon2h","q":3,"l":23,"i":28,"s":{"sta":9},"w":[62,94,3.4,"axe"]},
+{"id":285328,"n":"Taurenbane's Family Cleaver","t":"weapon2h","q":3,"l":23,"i":28,"s":{"sta":9,"apVsHumanoid":32},"w":[62,94,3.4,"axe"]},
 {"id":285330,"n":"Signet of the Zhevra","t":"finger","q":3,"l":18,"i":23,"s":{"agi":6,"spi":2},"no":["Ensemble : Blessing of Kalimdor (bonus non simulés)"]},
 {"id":285331,"n":"Mark of the Pack Leader","t":"neck","q":3,"l":20,"i":25,"s":{"str":5,"int":5},"no":["Ensemble : Blessing of Kalimdor (bonus non simulés)"]},
 {"id":285332,"n":"Puncturing Spear","t":"weapon2h","q":3,"l":19,"i":24,"w":[50,76,3.1,"polearm"],"no":["Chance au toucher : Puncture (non simulé)"]},
@@ -3848,11 +3870,12 @@ const ITEM_DB = [
 {"id":286426,"n":"Honorbound Cloak","t":"back","q":2,"l":10,"i":15,"e":1,"a":"cloth","s":{"ap":1,"sta":1}},
 {"id":286427,"n":"Cloak of the Honored Guest","t":"back","q":2,"l":10,"i":15,"e":1,"a":"cloth","s":{"ap":1,"sta":1}},
 {"id":286533,"n":"Cheetah Hide Grips","t":"hands","q":2,"l":10,"i":15,"a":"leather","s":{"agi":3}},
-{"id":286534,"n":"Silithid Piercer","t":"weapon1h","q":2,"l":21,"i":26,"s":{"agi":3},"w":[15,28,1.6,"dagger"]},
+{"id":286534,"n":"Silithid Piercer","t":"weapon1h","q":2,"l":21,"i":26,"s":{"agi":3,"apVsBeast":5},"w":[15,28,1.6,"dagger"]},
 {"id":286536,"n":"Heckler's Hide","t":"chest","q":2,"l":14,"i":19,"a":"leather","s":{"agi":5,"spi":3}},
 {"id":286540,"n":"The Skyblade","t":"weapon2h","q":3,"l":22,"i":27,"s":{"sta":8,"str":10},"w":[56,105,3.6,"sword"]},
 {"id":286554,"n":"Warleader's Signet","t":"finger","q":3,"l":42,"i":47,"s":{"sta":6,"str":12}},
 {"id":286556,"n":"Winds of Tanaris","t":"trinket","q":3,"l":48,"i":53,"s":{"ap":16},"no":["Utiliser : Desert Winds (non simulé)"]},
+{"id":286568,"n":"Blisterpaw Bones","t":"neck","q":2,"l":40,"i":45,"s":{"apVsHumanoid":20,"apVsBeast":20}},
 {"id":286572,"n":"Ogre Casting Cloak","t":"back","q":2,"l":46,"i":51,"a":"cloth","s":{"str":10}},
 {"id":286730,"n":"Pristine Orcish Dagger","t":"weapon1h","q":2,"l":7,"i":12,"e":1,"s":{"agi":1},"w":[10,20,2.4,"dagger"]},
 {"id":286742,"n":"Riptear's Cleaver","t":"weapon2h","q":2,"l":8,"i":13,"e":1,"s":{"str":3},"w":[23,36,3.3,"axe"]},
@@ -3929,7 +3952,18 @@ const ITEM_STATS = [
   { key: 'weaponDmg', label: 'Dégâts d’arme (+ par coup)', short: 'dégâts d’arme' },
   { key: 'mp5', label: 'Mana toutes les 5 s', short: 'mp5' },
   { key: 'extraAttack', label: 'Attaque suppl. (% par coup)', short: 'att. suppl.', pct: true },
+  // PA qui ne compte que contre un type de créature (saisi dans l’éditeur par un seul champ).
+  { key: 'apVsHumanoid', label: 'PA contre les humanoïdes', short: 'PA contre humanoïdes', creature: 'humanoid' },
+  { key: 'apVsBeast', label: 'PA contre les bêtes', short: 'PA contre bêtes', creature: 'beast' },
+  { key: 'apVsDragonkin', label: 'PA contre les draconiens', short: 'PA contre draconiens', creature: 'dragonkin' },
+  { key: 'apVsDemon', label: 'PA contre les démons', short: 'PA contre démons', creature: 'demon' },
+  { key: 'apVsUndead', label: 'PA contre les morts-vivants', short: 'PA contre morts-vivants', creature: 'undead' },
+  { key: 'apVsElemental', label: 'PA contre les élémentaires', short: 'PA contre élémentaires', creature: 'elemental' },
+  { key: 'apVsGiant', label: 'PA contre les géants', short: 'PA contre géants', creature: 'giant' },
+  { key: 'apVsMechanical', label: 'PA contre les machines', short: 'PA contre machines', creature: 'mechanical' },
 ];
+
+const CREATURE_AP_KEYS = Object.fromEntries(ITEM_STATS.filter((s) => s.creature).map((s) => [s.creature, s.key]));
 
 // Conversion des scores en pourcentage, selon le niveau et les hypothèses du profil.
 const RATING_KEYS = { hit: 'hitRatingPerPct', crit: 'critRatingPerPct', haste: 'hasteRatingPerPct', expertise: 'expertiseRatingPerPct' };
@@ -4052,11 +4086,18 @@ function resolveProfile(profile, items = []) {
   }
 
   const factors = ratingFactors(p);
-  for (const it of Object.values(eq)) {
+  const target = p.fight?.creatureType;
+  for (const [slotId, it] of Object.entries(eq)) {
     for (const s of ITEM_STATS) {
       const v = Number(it.stats?.[s.key]) || 0;
       if (!v) continue;
-      if (s.rating) p.gear[s.rating] = (Number(p.gear[s.rating]) || 0) + v / factors[s.rating];
+      if (s.creature) {
+        if (s.creature === target) p.gear.ap = (Number(p.gear.ap) || 0) + v;
+      } else if (s.key === 'weaponDmg' && it.weapon && (slotId === 'mainHand' || slotId === 'offHand')) {
+        // « +X dégâts d’arme » sur une arme ne compte que pour elle.
+        const w = slotId === 'mainHand' ? p.mh : p.oh;
+        if (w) w.bonusDmg = (Number(w.bonusDmg) || 0) + v;
+      } else if (s.rating) p.gear[s.rating] = (Number(p.gear[s.rating]) || 0) + v / factors[s.rating];
       else if (s.key === 'extraAttack') extra += v;
       else if (s.key === 'skill' && Array.isArray(it.skillFor) && it.skillFor.length) {
         if (it.skillFor.includes(p.mh?.type)) p.gear.skill = (Number(p.gear.skill) || 0) + v;
@@ -4118,6 +4159,17 @@ const PRIMARY = [
 const IGNORE = /soulbound|binds when|lié quand|^lié|^unique|durability|durabilité|requires|^niveau|item level|niveau d['’]objet|sell price|prix de vente|^classes?\s*:|^\d+\s*(armor|armure)$|^armor|^armure|^"/i;
 
 const PCT = '(\\d+(?:[.,]\\d+)?)\\s*%';
+
+const CREATURE_WORDS = {
+  humanoid: /^(humanoids?|humanoïdes?)$/,
+  beast: /^(beasts?|bêtes?)$/,
+  dragonkin: /^(dragonkin|draconiens?|dragons?)$/,
+  demon: /^(demons?|démons?)$/,
+  undead: /^(undead|morts-vivants?)$/,
+  elemental: /^(elementals?|élémentaires?)$/,
+  giant: /^(giants?|géants?)$/,
+  mechanical: /^(mechanicals?|machines?|mécaniques?)$/,
+};
 
 function weaponWord(line) {
   for (const [re, type] of WEAPON_WORDS) if (re.test(line)) return type;
@@ -4202,6 +4254,14 @@ function parseTooltip(text) {
     if ((m = line.match(/^\+\s*(\d+)\s+(.+?)\.?$/))) {
       const stat = PRIMARY.find(([re]) => re.test(m[2].trim()));
       if (stat) { add(stat[1], num(m[1])); continue; }
+    }
+    if ((m = line.match(/(\d+).*(?:attack power|puissance d['’]attaque).*(?:when fighting|contre les?)\s+([\p{L}-]+)/iu))) {
+      const word = m[2].toLowerCase();
+      const creature = Object.entries(CREATURE_WORDS).find(([, re]) => re.test(word));
+      if (creature) {
+        add(CREATURE_AP_KEYS[creature[0]], num(m[1]));
+        continue;
+      }
     }
     if ((m = line.match(/\+?\s*(\d+)\s*(?:attack power|à la puissance d['’]attaque|puissance d['’]attaque)/i) || line.match(/(?:attack power by|puissance d['’]attaque de)\s*(\d+)/i))) {
       add('ap', num(m[1]));
@@ -4313,11 +4373,24 @@ function wearable(item, level) {
 
 // Poids par défaut (PA = 1), mesurés sur le profil d’exemple niveau 60. Toucher, crit,
 // hâte et réduction d’esquive en points de % ; arme en DPS d’arme.
-const DEFAULT_EP = { agi: 1.6, str: 1, ap: 1, hit: 12, crit: 24, haste: 10, expertise: 23, skill: 8, weapon: 14, weaponDmg: 4 };
+// Mana (mp5, Intelligence) : 0 tant que le profil ne manque pas de mana, ce qui est le cas avec Resourcefulness.
+const DEFAULT_EP = { agi: 1.6, str: 1, ap: 1, hit: 12, crit: 24, haste: 10, expertise: 23, skill: 8, weapon: 14, weaponDmg: 4, mp5: 0, int: 0, spi: 0 };
 
-// Poids issus du calcul « Poids des stats » quand il existe.
-function epFromWeights(rows) {
+// Poids par défaut adaptés au profil : sans Resourcefulness 2/2, le mana manque et le mp5
+// et l’Intelligence prennent de la valeur (mesuré : ~4,4 et ~2 PA au niveau 60, ~3 et ~1,5 au niveau 30).
+function defaultEp(profile) {
   const ep = { ...DEFAULT_EP };
+  if ((Number(profile?.talents?.resourcefulness) || 0) < 2) {
+    const lvl30 = Number(profile?.level) === 30;
+    ep.mp5 = lvl30 ? 3 : 4.4;
+    ep.int = lvl30 ? 1.5 : 2;
+  }
+  return ep;
+}
+
+// Poids issus du calcul « Poids des stats » quand il existe, sinon poids par défaut du profil.
+function epFromWeights(rows, profile = null) {
+  const ep = defaultEp(profile);
   for (const r of rows || []) if (Number.isFinite(r.ep) && r.key in ep) ep[r.key] = Math.max(0, r.ep);
   return ep;
 }
@@ -4328,7 +4401,8 @@ function raceSkill(profile) {
 }
 
 // Valeur d’un objet en PA. `offHand` : une arme en main gauche ne compte que pour les attaques auto.
-function itemScore(item, ep, factors, { offHand = false, raceSkill: racial = {} } = {}) {
+// `creature` : type de la cible, pour les objets « PA contre… ».
+function itemScore(item, ep, factors, { offHand = false, raceSkill: racial = {}, creature = null } = {}) {
   const st = item.stats || {};
   const n = (k) => Number(st[k]) || 0;
   let v = n('agi') * ep.agi + n('str') * ep.str + n('ap') * ep.ap
@@ -4336,7 +4410,9 @@ function itemScore(item, ep, factors, { offHand = false, raceSkill: racial = {} 
     + (n('crit') + n('critRating') / factors.crit) * ep.crit
     + (n('haste') + n('hasteRating') / factors.haste) * ep.haste
     + (n('expertise') + n('expertiseRating') / factors.expertise) * ep.expertise
-    + n('skill') * ep.skill + n('weaponDmg') * ep.weaponDmg;
+    + n('skill') * ep.skill + n('weaponDmg') * ep.weaponDmg
+    + n('mp5') * (ep.mp5 || 0) + n('int') * (ep.int || 0) + n('spi') * (ep.spi || 0)
+    + (creature && CREATURE_AP_KEYS[creature] ? n(CREATURE_AP_KEYS[creature]) * ep.ap : 0);
   const u = item.onUse;
   if (u && Number(u.value) && Number(u.cd)) {
     const uptime = Math.min(1, (Number(u.duration) || 0) / Number(u.cd));
@@ -4352,7 +4428,7 @@ function itemScore(item, ep, factors, { offHand = false, raceSkill: racial = {} 
 
 // Meilleur objet de la base pour chaque emplacement, selon les poids.
 // `style` : '2h' ou 'dw' ; `maxQuality` : 2 vert, 3 bleu, 4 épique, 5 légendaire.
-function bestEquipment(profile, { ep = DEFAULT_EP, factors = ratingFactors(profile), maxQuality = 4, style = '2h', pool = null } = {}) {
+function bestEquipment(profile, { ep = defaultEp(profile), factors = ratingFactors(profile), maxQuality = 4, style = '2h', pool = null } = {}) {
   const level = Number(profile.level) === 30 ? 30 : 60;
   const items = (pool || dbItems()).filter((i) => wearable(i, level) && (!i.quality || i.quality <= maxQuality));
   const racial = raceSkill(profile);
@@ -4361,7 +4437,7 @@ function bestEquipment(profile, { ep = DEFAULT_EP, factors = ratingFactors(profi
     let topV = 0;
     for (const i of items) {
       if (i.type !== type || exclude.has(i.id) || !filter(i)) continue;
-      const v = itemScore(i, ep, factors, { offHand, raceSkill: racial });
+      const v = itemScore(i, ep, factors, { offHand, raceSkill: racial, creature: profile.fight?.creatureType });
       if (v > topV) { topV = v; top = i; }
     }
     return top;
@@ -4565,7 +4641,8 @@ function buildCharacter(profile) {
   const critMultSpecial = M.predatorCritMode === 'total' ? 2 * (1 + peCrit) : 1 + (1 + peCrit);
   const critMultWhite = M.predatorScope === 'all' ? critMultSpecial : 2;
 
-  const trackMult = fight.trackedType !== false ? 1 + (T.improvedTracking * M.improvedTrackingPerRank) / 100 : 1;
+  const trackable = fight.creatureType ? TRACKABLE.includes(fight.creatureType) : fight.trackedType !== false;
+  const trackMult = trackable ? 1 + (T.improvedTracking * M.improvedTrackingPerRank) / 100 : 1;
   const petActive = !!profile.pet?.enabled;
   const ffMult = petActive ? 1 + (T.focusedFire * M.focusedFirePerRank) / 100 : 1;
   const dmgMult = (1 + (Number(custom.dmgPct) || 0) / 100) * trackMult * ffMult;
@@ -4586,7 +4663,7 @@ function buildCharacter(profile) {
     const mult = isOH ? (M.ohPenalty / 100) * (1 + (T.predatorsEdge * M.predatorOhPerRank) / 100) : 1;
     const normSpeed = twoHand ? M.normSpeed2h : w.type === 'dagger' ? M.normSpeedDagger : M.normSpeed1h;
     return {
-      isOH, min, max, speed, normSpeed, type: w.type, enchant: w.enchant || 'none', flat: add.weaponDmg, mult,
+      isOH, min, max, speed, normSpeed, type: w.type, enchant: w.enchant || 'none', flat: add.weaponDmg + (Number(w.bonusDmg) || 0), mult,
       table: attackTable(L, bossLevel, skillBonus, add.expertise, M),
     };
   }
@@ -5475,6 +5552,8 @@ const STAT_DELTAS = [
   { key: 'expertise', label: 'Réduction esquive/parade (par %)', delta: 2, apply: addGear('expertise', 2) },
   { key: 'skill', label: 'Compétence d’arme (par point)', delta: 5, apply: addGear('skill', 5) },
   { key: 'haste', label: 'Hâte (par %)', delta: 5, apply: addGear('haste', 5) },
+  { key: 'mp5', label: 'Mana toutes les 5 s (par point)', delta: 20, apply: addGear('mp5', 20) },
+  { key: 'int', label: 'Intelligence (par point)', delta: 50, apply: addGear('int', 50) },
   {
     key: 'weapon', label: 'DPS d’arme MD (par point)', delta: 5,
     apply: (p) => { const s = Number(p.mh.speed) || 2; p.mh.min = (Number(p.mh.min) || 0) + 5 * s; p.mh.max = (Number(p.mh.max) || 0) + 5 * s; },
@@ -6283,11 +6362,16 @@ function itemsForProfile(p) {
 
 function currentEp(p = current()) {
   const w = state.weights[p.id];
-  return { ep: epFromWeights(w ? w.rows : null), measured: !!w };
+  return { ep: epFromWeights(w ? w.rows : null, p), measured: !!w };
+}
+
+// Ce qui dépend du profil dans la valeur d’un objet : compétence raciale et type de la cible.
+function scoreOpts(p) {
+  return { raceSkill: raceSkill(p), creature: p.fight?.creatureType };
 }
 
 function itemValue(item, p = current(), opts = {}) {
-  return itemScore(item, currentEp(p).ep, ratingFactors(p), { raceSkill: raceSkill(p), ...opts });
+  return itemScore(item, currentEp(p).ep, ratingFactors(p), { ...scoreOpts(p), ...opts });
 }
 
 function itemTitle(item) {
@@ -6325,9 +6409,17 @@ function equipNow(p, item) {
   afterChange(true);
 }
 
+// L’éditeur saisit la « PA contre… » en un seul couple valeur + type.
+function withCreatureFields(draft) {
+  const entry = Object.entries(CREATURE_AP_KEYS).find(([, key]) => Number(draft.stats?.[key]));
+  draft.creatureType = entry ? entry[0] : 'beast';
+  draft.creatureValue = entry ? Number(draft.stats[entry[1]]) : 0;
+  return draft;
+}
+
 function newDraft(type = 'head') {
   return {
-    id: null, name: '', type, stats: {}, source: 'manuel', skillFor: null,
+    id: null, name: '', type, stats: {}, source: 'manuel', skillFor: null, creatureType: 'beast', creatureValue: 0,
     weapon: { min: 0, max: 0, speed: type === 'weapon2h' ? 3.5 : 2.6, type: 'axe' },
     onUse: { type: 'ap', value: 0, duration: 20, cd: 120 },
   };
@@ -6342,6 +6434,7 @@ function editItem(item) {
     weapon: item.weapon ? { ...item.weapon } : newDraft(item.type).weapon,
     onUse: item.onUse ? { ...item.onUse } : newDraft(item.type).onUse,
   };
+  withCreatureFields(state.editor);
   if (fromDb) {
     Object.assign(state.editor, { id: null, dbId: undefined, source: 'manuel', name: `${item.name} (copie)`, level: current().level });
     state.editorMessage = `Copie de « ${item.name} » : les objets de la base ne se modifient pas, la copie ira dans votre bibliothèque.`;
@@ -6362,7 +6455,10 @@ function saveDraft(equip) {
     renderPanel();
     return;
   }
-  const item = sanitizeItem({ ...d, id: d.id || uid('i'), level: d.level ?? current().level, source: d.source || 'manuel' });
+  const stats = { ...d.stats };
+  for (const key of Object.values(CREATURE_AP_KEYS)) delete stats[key];
+  if (Number(d.creatureValue) && CREATURE_AP_KEYS[d.creatureType]) stats[CREATURE_AP_KEYS[d.creatureType]] = Number(d.creatureValue);
+  const item = sanitizeItem({ ...d, stats, id: d.id || uid('i'), level: d.level ?? current().level, source: d.source || 'manuel' });
   const idx = state.items.findIndex((i) => i.id === item.id);
   if (idx >= 0) state.items[idx] = item;
   else state.items.push(item);
@@ -6501,8 +6597,8 @@ function renderDbResults(p) {
     && (!state.dbQuality || i.quality <= state.dbQuality)
     && (!state.dbUsable || wearable(i, p.level))
     && words.every((w) => dbNames.get(i.id).includes(w)));
-  const racial = raceSkill(p);
-  const scored = found.map((i) => ({ i, v: itemScore(i, ep, factors, { raceSkill: racial }) })).sort((a, b) => b.v - a.v).slice(0, 25);
+  const opts = scoreOpts(p);
+  const scored = found.map((i) => ({ i, v: itemScore(i, ep, factors, opts) })).sort((a, b) => b.v - a.v).slice(0, 25);
   const equipped = new Set(Object.values(p.equipment || {}));
   box.replaceChildren(
     h('p', { class: 'hint' }, found.length
@@ -6539,10 +6635,10 @@ function itemEditor(p) {
       return;
     }
     const base = newDraft(r.type || 'head');
-    state.editor = {
+    state.editor = withCreatureFields({
       ...base, name: r.name, type: r.type || 'head', stats: r.stats, source: 'tooltip', skillFor: r.skillFor,
       weapon: r.weapon || base.weapon, onUse: r.onUse || base.onUse,
-    };
+    });
     const lines = [];
     if (!r.type) lines.push('Type d’objet non trouvé : choisissez-le.');
     if (r.unparsed.length) lines.push(`Lignes non reconnues, à reporter à la main si besoin : ${r.unparsed.join(' / ')}`);
@@ -6564,7 +6660,10 @@ function itemEditor(p) {
     h('div', { class: 'fields' },
       textField('Nom', 'name', { draft: true, target: d }),
       h('label', { class: 'field', for: 'd-type' }, h('span', {}, 'Type'), typeSel)),
-    h('div', { class: 'fields' }, ITEM_STATS.map((s) => numField(s.label, `stats.${s.key}`, { draft: true, target: d, step: s.pct ? 0.5 : 1 }))),
+    h('div', { class: 'fields' },
+      ITEM_STATS.filter((s) => !s.creature).map((s) => numField(s.label, `stats.${s.key}`, { draft: true, target: d, step: s.pct ? 0.5 : 1 })),
+      numField('PA contre un type de créature', 'creatureValue', { draft: true, target: d, step: 1 }),
+      selectField('Type de créature', 'creatureType', Object.fromEntries(Object.entries(CREATURE_TYPES).filter(([k]) => CREATURE_AP_KEYS[k])), { draft: true, target: d })),
     isWeaponType(d.type) ? h('div', { class: 'fields' },
       numField('Dégâts min', 'weapon.min', { draft: true, target: d, step: 1, min: 0 }),
       numField('Dégâts max', 'weapon.max', { draft: true, target: d, step: 1, min: 0 }),
@@ -6839,7 +6938,7 @@ function panelRotation(p) {
 
 function panelCombat(p) {
   return h('div', { class: 'section-stack' },
-    section('Rencontre', null,
+    section('Rencontre', 'Le type de la cible compte pour Improved Tracking et pour les objets « PA contre… ».',
       h('div', { class: 'fields' },
         numField('Durée (s)', 'fight.duration', { min: 10, step: 10 }),
         numField('Variation de durée (±%)', 'fight.variance', { min: 0, max: 50, step: 5 }),
@@ -6847,7 +6946,7 @@ function panelCombat(p) {
         numField('Armure du boss', 'fight.bossArmor', { min: 0, step: 50 })),
       h('div', { class: 'fields' },
         checkField('Dans le dos du boss (pas de parade)', 'fight.behind'),
-        checkField('Boss d’un type pisté (Improved Tracking)', 'fight.trackedType'),
+        selectField('Type de créature de la cible', 'fight.creatureType', CREATURE_TYPES),
         checkField('Vous êtes attaqué (solo, tank)', 'fight.beingAttacked', { rerender: true }))),
     p.fight.beingAttacked ? section('Attaques subies', 'Vos esquives activent Mongoose Bite, vos parades Counterattack.',
       h('div', { class: 'fields' },
@@ -7049,7 +7148,7 @@ function compareCandidates(p, slotId, extraIds = []) {
     const offHand = slotId === 'offHand';
     dbItems()
       .filter((i) => canEquip(i, slotId) && wearable(i, p.level) && i.quality <= state.autoQuality && !others.has(i.id))
-      .map((i) => ({ i, v: itemScore(i, ep, factors, { offHand, raceSkill: raceSkill(p) }) }))
+      .map((i) => ({ i, v: itemScore(i, ep, factors, { offHand, ...scoreOpts(p) }) }))
       .sort((a, b) => b.v - a.v)
       .slice(0, 10)
       .forEach(({ i }) => out.set(i.id, i));
@@ -7449,7 +7548,7 @@ function resultsWeights(p, s, busy) {
         tipTitle: `${fmt(r.ep, 2)} PA`,
         tip: `${r.label}\n${fmt(r.dpsPerPoint, 3)} DPS par point${r.epError ? `\nMarge (IC 95 %) : ± ${fmt(r.epError, 2)} PA` : ''}`,
       }))),
-      h('p', { class: 'hint' }, `${w.iterations.toLocaleString('fr-FR')} combats par variante avec les mêmes tirages aléatoires ; « ± » donne la marge à 95 %. Écarts testés : +100 PA, +50 Agilité ou Force, +2 % toucher, crit ou réduction, +5 compétence, +5 % hâte, +5 DPS d’arme. Le toucher vaut 0 une fois le plafond atteint. Ces poids donnent aussi une « valeur PA » à chaque objet de la bibliothèque.`),
+      h('p', { class: 'hint' }, `${w.iterations.toLocaleString('fr-FR')} combats par variante avec les mêmes tirages aléatoires ; « ± » donne la marge à 95 %. Écarts testés : +100 PA, +50 Agilité ou Force, +2 % toucher, crit ou réduction, +5 compétence, +5 % hâte, +5 DPS d’arme, +20 mp5, +50 Intelligence. Le toucher vaut 0 une fois le plafond atteint ; le mp5 et l’Intelligence valent 0 tant que vous ne manquez pas de mana. Ces poids donnent aussi une « valeur PA » à chaque objet de la bibliothèque.`),
     ] : h('p', { class: 'empty' }, 'Mesure le gain de DPS de chaque stat en relançant le profil avec un peu plus de cette stat. Utile pour départager deux objets d’un coup d’œil.'));
 }
 

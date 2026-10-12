@@ -61,7 +61,18 @@ export const ITEM_STATS = [
   { key: 'weaponDmg', label: 'Dégâts d’arme (+ par coup)', short: 'dégâts d’arme' },
   { key: 'mp5', label: 'Mana toutes les 5 s', short: 'mp5' },
   { key: 'extraAttack', label: 'Attaque suppl. (% par coup)', short: 'att. suppl.', pct: true },
+  // PA qui ne compte que contre un type de créature (saisi dans l’éditeur par un seul champ).
+  { key: 'apVsHumanoid', label: 'PA contre les humanoïdes', short: 'PA contre humanoïdes', creature: 'humanoid' },
+  { key: 'apVsBeast', label: 'PA contre les bêtes', short: 'PA contre bêtes', creature: 'beast' },
+  { key: 'apVsDragonkin', label: 'PA contre les draconiens', short: 'PA contre draconiens', creature: 'dragonkin' },
+  { key: 'apVsDemon', label: 'PA contre les démons', short: 'PA contre démons', creature: 'demon' },
+  { key: 'apVsUndead', label: 'PA contre les morts-vivants', short: 'PA contre morts-vivants', creature: 'undead' },
+  { key: 'apVsElemental', label: 'PA contre les élémentaires', short: 'PA contre élémentaires', creature: 'elemental' },
+  { key: 'apVsGiant', label: 'PA contre les géants', short: 'PA contre géants', creature: 'giant' },
+  { key: 'apVsMechanical', label: 'PA contre les machines', short: 'PA contre machines', creature: 'mechanical' },
 ];
+
+export const CREATURE_AP_KEYS = Object.fromEntries(ITEM_STATS.filter((s) => s.creature).map((s) => [s.creature, s.key]));
 
 // Conversion des scores en pourcentage, selon le niveau et les hypothèses du profil.
 const RATING_KEYS = { hit: 'hitRatingPerPct', crit: 'critRatingPerPct', haste: 'hasteRatingPerPct', expertise: 'expertiseRatingPerPct' };
@@ -184,11 +195,18 @@ export function resolveProfile(profile, items = []) {
   }
 
   const factors = ratingFactors(p);
-  for (const it of Object.values(eq)) {
+  const target = p.fight?.creatureType;
+  for (const [slotId, it] of Object.entries(eq)) {
     for (const s of ITEM_STATS) {
       const v = Number(it.stats?.[s.key]) || 0;
       if (!v) continue;
-      if (s.rating) p.gear[s.rating] = (Number(p.gear[s.rating]) || 0) + v / factors[s.rating];
+      if (s.creature) {
+        if (s.creature === target) p.gear.ap = (Number(p.gear.ap) || 0) + v;
+      } else if (s.key === 'weaponDmg' && it.weapon && (slotId === 'mainHand' || slotId === 'offHand')) {
+        // « +X dégâts d’arme » sur une arme ne compte que pour elle.
+        const w = slotId === 'mainHand' ? p.mh : p.oh;
+        if (w) w.bonusDmg = (Number(w.bonusDmg) || 0) + v;
+      } else if (s.rating) p.gear[s.rating] = (Number(p.gear[s.rating]) || 0) + v / factors[s.rating];
       else if (s.key === 'extraAttack') extra += v;
       else if (s.key === 'skill' && Array.isArray(it.skillFor) && it.skillFor.length) {
         if (it.skillFor.includes(p.mh?.type)) p.gear.skill = (Number(p.gear.skill) || 0) + v;
@@ -250,6 +268,17 @@ const PRIMARY = [
 const IGNORE = /soulbound|binds when|lié quand|^lié|^unique|durability|durabilité|requires|^niveau|item level|niveau d['’]objet|sell price|prix de vente|^classes?\s*:|^\d+\s*(armor|armure)$|^armor|^armure|^"/i;
 
 const PCT = '(\\d+(?:[.,]\\d+)?)\\s*%';
+
+const CREATURE_WORDS = {
+  humanoid: /^(humanoids?|humanoïdes?)$/,
+  beast: /^(beasts?|bêtes?)$/,
+  dragonkin: /^(dragonkin|draconiens?|dragons?)$/,
+  demon: /^(demons?|démons?)$/,
+  undead: /^(undead|morts-vivants?)$/,
+  elemental: /^(elementals?|élémentaires?)$/,
+  giant: /^(giants?|géants?)$/,
+  mechanical: /^(mechanicals?|machines?|mécaniques?)$/,
+};
 
 function weaponWord(line) {
   for (const [re, type] of WEAPON_WORDS) if (re.test(line)) return type;
@@ -334,6 +363,14 @@ export function parseTooltip(text) {
     if ((m = line.match(/^\+\s*(\d+)\s+(.+?)\.?$/))) {
       const stat = PRIMARY.find(([re]) => re.test(m[2].trim()));
       if (stat) { add(stat[1], num(m[1])); continue; }
+    }
+    if ((m = line.match(/(\d+).*(?:attack power|puissance d['’]attaque).*(?:when fighting|contre les?)\s+([\p{L}-]+)/iu))) {
+      const word = m[2].toLowerCase();
+      const creature = Object.entries(CREATURE_WORDS).find(([, re]) => re.test(word));
+      if (creature) {
+        add(CREATURE_AP_KEYS[creature[0]], num(m[1]));
+        continue;
+      }
     }
     if ((m = line.match(/\+?\s*(\d+)\s*(?:attack power|à la puissance d['’]attaque|puissance d['’]attaque)/i) || line.match(/(?:attack power by|puissance d['’]attaque de)\s*(\d+)/i))) {
       add('ap', num(m[1]));
@@ -445,11 +482,24 @@ export function wearable(item, level) {
 
 // Poids par défaut (PA = 1), mesurés sur le profil d’exemple niveau 60. Toucher, crit,
 // hâte et réduction d’esquive en points de % ; arme en DPS d’arme.
-export const DEFAULT_EP = { agi: 1.6, str: 1, ap: 1, hit: 12, crit: 24, haste: 10, expertise: 23, skill: 8, weapon: 14, weaponDmg: 4 };
+// Mana (mp5, Intelligence) : 0 tant que le profil ne manque pas de mana, ce qui est le cas avec Resourcefulness.
+export const DEFAULT_EP = { agi: 1.6, str: 1, ap: 1, hit: 12, crit: 24, haste: 10, expertise: 23, skill: 8, weapon: 14, weaponDmg: 4, mp5: 0, int: 0, spi: 0 };
 
-// Poids issus du calcul « Poids des stats » quand il existe.
-export function epFromWeights(rows) {
+// Poids par défaut adaptés au profil : sans Resourcefulness 2/2, le mana manque et le mp5
+// et l’Intelligence prennent de la valeur (mesuré : ~4,4 et ~2 PA au niveau 60, ~3 et ~1,5 au niveau 30).
+export function defaultEp(profile) {
   const ep = { ...DEFAULT_EP };
+  if ((Number(profile?.talents?.resourcefulness) || 0) < 2) {
+    const lvl30 = Number(profile?.level) === 30;
+    ep.mp5 = lvl30 ? 3 : 4.4;
+    ep.int = lvl30 ? 1.5 : 2;
+  }
+  return ep;
+}
+
+// Poids issus du calcul « Poids des stats » quand il existe, sinon poids par défaut du profil.
+export function epFromWeights(rows, profile = null) {
+  const ep = defaultEp(profile);
   for (const r of rows || []) if (Number.isFinite(r.ep) && r.key in ep) ep[r.key] = Math.max(0, r.ep);
   return ep;
 }
@@ -460,7 +510,8 @@ export function raceSkill(profile) {
 }
 
 // Valeur d’un objet en PA. `offHand` : une arme en main gauche ne compte que pour les attaques auto.
-export function itemScore(item, ep, factors, { offHand = false, raceSkill: racial = {} } = {}) {
+// `creature` : type de la cible, pour les objets « PA contre… ».
+export function itemScore(item, ep, factors, { offHand = false, raceSkill: racial = {}, creature = null } = {}) {
   const st = item.stats || {};
   const n = (k) => Number(st[k]) || 0;
   let v = n('agi') * ep.agi + n('str') * ep.str + n('ap') * ep.ap
@@ -468,7 +519,9 @@ export function itemScore(item, ep, factors, { offHand = false, raceSkill: racia
     + (n('crit') + n('critRating') / factors.crit) * ep.crit
     + (n('haste') + n('hasteRating') / factors.haste) * ep.haste
     + (n('expertise') + n('expertiseRating') / factors.expertise) * ep.expertise
-    + n('skill') * ep.skill + n('weaponDmg') * ep.weaponDmg;
+    + n('skill') * ep.skill + n('weaponDmg') * ep.weaponDmg
+    + n('mp5') * (ep.mp5 || 0) + n('int') * (ep.int || 0) + n('spi') * (ep.spi || 0)
+    + (creature && CREATURE_AP_KEYS[creature] ? n(CREATURE_AP_KEYS[creature]) * ep.ap : 0);
   const u = item.onUse;
   if (u && Number(u.value) && Number(u.cd)) {
     const uptime = Math.min(1, (Number(u.duration) || 0) / Number(u.cd));
@@ -484,7 +537,7 @@ export function itemScore(item, ep, factors, { offHand = false, raceSkill: racia
 
 // Meilleur objet de la base pour chaque emplacement, selon les poids.
 // `style` : '2h' ou 'dw' ; `maxQuality` : 2 vert, 3 bleu, 4 épique, 5 légendaire.
-export function bestEquipment(profile, { ep = DEFAULT_EP, factors = ratingFactors(profile), maxQuality = 4, style = '2h', pool = null } = {}) {
+export function bestEquipment(profile, { ep = defaultEp(profile), factors = ratingFactors(profile), maxQuality = 4, style = '2h', pool = null } = {}) {
   const level = Number(profile.level) === 30 ? 30 : 60;
   const items = (pool || dbItems()).filter((i) => wearable(i, level) && (!i.quality || i.quality <= maxQuality));
   const racial = raceSkill(profile);
@@ -493,7 +546,7 @@ export function bestEquipment(profile, { ep = DEFAULT_EP, factors = ratingFactor
     let topV = 0;
     for (const i of items) {
       if (i.type !== type || exclude.has(i.id) || !filter(i)) continue;
-      const v = itemScore(i, ep, factors, { offHand, raceSkill: racial });
+      const v = itemScore(i, ep, factors, { offHand, raceSkill: racial, creature: profile.fight?.creatureType });
       if (v > topV) { topV = v; top = i; }
     }
     return top;

@@ -1,12 +1,12 @@
 // Interface du sim Survie mêlée (WoW Forever). Aucune dépendance.
 
 import {
-  BUFFS, CONFIDENCE, DATA_INFO, ENCHANTS, FIGHT_PRESETS, MECHANICS, ON_USE_PRESETS, RACES,
+  BUFFS, CONFIDENCE, CREATURE_TYPES, DATA_INFO, ENCHANTS, FIGHT_PRESETS, MECHANICS, ON_USE_PRESETS, RACES,
   ROTATION_ABILITIES, SAMPLE_WEAPONS, SOURCES, TALENTS, TALENT_PRESETS, WEAPON_TYPES,
   defaultProfile, mechanicDefault,
 } from './data.js';
 import {
-  ARMOR_NAMES, ITEM_STATS, ITEM_TYPES, ON_USE_TYPES, QUALITY_NAMES, SLOTS, bestEquipment, canEquip, dbItem, dbItems,
+  ARMOR_NAMES, CREATURE_AP_KEYS, ITEM_STATS, ITEM_TYPES, ON_USE_TYPES, QUALITY_NAMES, SLOTS, bestEquipment, canEquip, dbItem, dbItems,
   epFromWeights, equipItem, equipmentTotals, findItem, isWeaponType, itemScore, itemSummary, parseTooltip,
   raceSkill, ratingFactors, resolveProfile, slotDef, wearable, weaponDps, wowheadUrl,
 } from './gear.js';
@@ -456,11 +456,16 @@ function itemsForProfile(p) {
 
 function currentEp(p = current()) {
   const w = state.weights[p.id];
-  return { ep: epFromWeights(w ? w.rows : null), measured: !!w };
+  return { ep: epFromWeights(w ? w.rows : null, p), measured: !!w };
+}
+
+// Ce qui dépend du profil dans la valeur d’un objet : compétence raciale et type de la cible.
+function scoreOpts(p) {
+  return { raceSkill: raceSkill(p), creature: p.fight?.creatureType };
 }
 
 function itemValue(item, p = current(), opts = {}) {
-  return itemScore(item, currentEp(p).ep, ratingFactors(p), { raceSkill: raceSkill(p), ...opts });
+  return itemScore(item, currentEp(p).ep, ratingFactors(p), { ...scoreOpts(p), ...opts });
 }
 
 function itemTitle(item) {
@@ -498,9 +503,17 @@ function equipNow(p, item) {
   afterChange(true);
 }
 
+// L’éditeur saisit la « PA contre… » en un seul couple valeur + type.
+function withCreatureFields(draft) {
+  const entry = Object.entries(CREATURE_AP_KEYS).find(([, key]) => Number(draft.stats?.[key]));
+  draft.creatureType = entry ? entry[0] : 'beast';
+  draft.creatureValue = entry ? Number(draft.stats[entry[1]]) : 0;
+  return draft;
+}
+
 function newDraft(type = 'head') {
   return {
-    id: null, name: '', type, stats: {}, source: 'manuel', skillFor: null,
+    id: null, name: '', type, stats: {}, source: 'manuel', skillFor: null, creatureType: 'beast', creatureValue: 0,
     weapon: { min: 0, max: 0, speed: type === 'weapon2h' ? 3.5 : 2.6, type: 'axe' },
     onUse: { type: 'ap', value: 0, duration: 20, cd: 120 },
   };
@@ -515,6 +528,7 @@ function editItem(item) {
     weapon: item.weapon ? { ...item.weapon } : newDraft(item.type).weapon,
     onUse: item.onUse ? { ...item.onUse } : newDraft(item.type).onUse,
   };
+  withCreatureFields(state.editor);
   if (fromDb) {
     Object.assign(state.editor, { id: null, dbId: undefined, source: 'manuel', name: `${item.name} (copie)`, level: current().level });
     state.editorMessage = `Copie de « ${item.name} » : les objets de la base ne se modifient pas, la copie ira dans votre bibliothèque.`;
@@ -535,7 +549,10 @@ function saveDraft(equip) {
     renderPanel();
     return;
   }
-  const item = sanitizeItem({ ...d, id: d.id || uid('i'), level: d.level ?? current().level, source: d.source || 'manuel' });
+  const stats = { ...d.stats };
+  for (const key of Object.values(CREATURE_AP_KEYS)) delete stats[key];
+  if (Number(d.creatureValue) && CREATURE_AP_KEYS[d.creatureType]) stats[CREATURE_AP_KEYS[d.creatureType]] = Number(d.creatureValue);
+  const item = sanitizeItem({ ...d, stats, id: d.id || uid('i'), level: d.level ?? current().level, source: d.source || 'manuel' });
   const idx = state.items.findIndex((i) => i.id === item.id);
   if (idx >= 0) state.items[idx] = item;
   else state.items.push(item);
@@ -674,8 +691,8 @@ function renderDbResults(p) {
     && (!state.dbQuality || i.quality <= state.dbQuality)
     && (!state.dbUsable || wearable(i, p.level))
     && words.every((w) => dbNames.get(i.id).includes(w)));
-  const racial = raceSkill(p);
-  const scored = found.map((i) => ({ i, v: itemScore(i, ep, factors, { raceSkill: racial }) })).sort((a, b) => b.v - a.v).slice(0, 25);
+  const opts = scoreOpts(p);
+  const scored = found.map((i) => ({ i, v: itemScore(i, ep, factors, opts) })).sort((a, b) => b.v - a.v).slice(0, 25);
   const equipped = new Set(Object.values(p.equipment || {}));
   box.replaceChildren(
     h('p', { class: 'hint' }, found.length
@@ -712,10 +729,10 @@ function itemEditor(p) {
       return;
     }
     const base = newDraft(r.type || 'head');
-    state.editor = {
+    state.editor = withCreatureFields({
       ...base, name: r.name, type: r.type || 'head', stats: r.stats, source: 'tooltip', skillFor: r.skillFor,
       weapon: r.weapon || base.weapon, onUse: r.onUse || base.onUse,
-    };
+    });
     const lines = [];
     if (!r.type) lines.push('Type d’objet non trouvé : choisissez-le.');
     if (r.unparsed.length) lines.push(`Lignes non reconnues, à reporter à la main si besoin : ${r.unparsed.join(' / ')}`);
@@ -737,7 +754,10 @@ function itemEditor(p) {
     h('div', { class: 'fields' },
       textField('Nom', 'name', { draft: true, target: d }),
       h('label', { class: 'field', for: 'd-type' }, h('span', {}, 'Type'), typeSel)),
-    h('div', { class: 'fields' }, ITEM_STATS.map((s) => numField(s.label, `stats.${s.key}`, { draft: true, target: d, step: s.pct ? 0.5 : 1 }))),
+    h('div', { class: 'fields' },
+      ITEM_STATS.filter((s) => !s.creature).map((s) => numField(s.label, `stats.${s.key}`, { draft: true, target: d, step: s.pct ? 0.5 : 1 })),
+      numField('PA contre un type de créature', 'creatureValue', { draft: true, target: d, step: 1 }),
+      selectField('Type de créature', 'creatureType', Object.fromEntries(Object.entries(CREATURE_TYPES).filter(([k]) => CREATURE_AP_KEYS[k])), { draft: true, target: d })),
     isWeaponType(d.type) ? h('div', { class: 'fields' },
       numField('Dégâts min', 'weapon.min', { draft: true, target: d, step: 1, min: 0 }),
       numField('Dégâts max', 'weapon.max', { draft: true, target: d, step: 1, min: 0 }),
@@ -1012,7 +1032,7 @@ function panelRotation(p) {
 
 function panelCombat(p) {
   return h('div', { class: 'section-stack' },
-    section('Rencontre', null,
+    section('Rencontre', 'Le type de la cible compte pour Improved Tracking et pour les objets « PA contre… ».',
       h('div', { class: 'fields' },
         numField('Durée (s)', 'fight.duration', { min: 10, step: 10 }),
         numField('Variation de durée (±%)', 'fight.variance', { min: 0, max: 50, step: 5 }),
@@ -1020,7 +1040,7 @@ function panelCombat(p) {
         numField('Armure du boss', 'fight.bossArmor', { min: 0, step: 50 })),
       h('div', { class: 'fields' },
         checkField('Dans le dos du boss (pas de parade)', 'fight.behind'),
-        checkField('Boss d’un type pisté (Improved Tracking)', 'fight.trackedType'),
+        selectField('Type de créature de la cible', 'fight.creatureType', CREATURE_TYPES),
         checkField('Vous êtes attaqué (solo, tank)', 'fight.beingAttacked', { rerender: true }))),
     p.fight.beingAttacked ? section('Attaques subies', 'Vos esquives activent Mongoose Bite, vos parades Counterattack.',
       h('div', { class: 'fields' },
@@ -1222,7 +1242,7 @@ function compareCandidates(p, slotId, extraIds = []) {
     const offHand = slotId === 'offHand';
     dbItems()
       .filter((i) => canEquip(i, slotId) && wearable(i, p.level) && i.quality <= state.autoQuality && !others.has(i.id))
-      .map((i) => ({ i, v: itemScore(i, ep, factors, { offHand, raceSkill: raceSkill(p) }) }))
+      .map((i) => ({ i, v: itemScore(i, ep, factors, { offHand, ...scoreOpts(p) }) }))
       .sort((a, b) => b.v - a.v)
       .slice(0, 10)
       .forEach(({ i }) => out.set(i.id, i));
@@ -1622,7 +1642,7 @@ function resultsWeights(p, s, busy) {
         tipTitle: `${fmt(r.ep, 2)} PA`,
         tip: `${r.label}\n${fmt(r.dpsPerPoint, 3)} DPS par point${r.epError ? `\nMarge (IC 95 %) : ± ${fmt(r.epError, 2)} PA` : ''}`,
       }))),
-      h('p', { class: 'hint' }, `${w.iterations.toLocaleString('fr-FR')} combats par variante avec les mêmes tirages aléatoires ; « ± » donne la marge à 95 %. Écarts testés : +100 PA, +50 Agilité ou Force, +2 % toucher, crit ou réduction, +5 compétence, +5 % hâte, +5 DPS d’arme. Le toucher vaut 0 une fois le plafond atteint. Ces poids donnent aussi une « valeur PA » à chaque objet de la bibliothèque.`),
+      h('p', { class: 'hint' }, `${w.iterations.toLocaleString('fr-FR')} combats par variante avec les mêmes tirages aléatoires ; « ± » donne la marge à 95 %. Écarts testés : +100 PA, +50 Agilité ou Force, +2 % toucher, crit ou réduction, +5 compétence, +5 % hâte, +5 DPS d’arme, +20 mp5, +50 Intelligence. Le toucher vaut 0 une fois le plafond atteint ; le mp5 et l’Intelligence valent 0 tant que vous ne manquez pas de mana. Ces poids donnent aussi une « valeur PA » à chaque objet de la bibliothèque.`),
     ] : h('p', { class: 'empty' }, 'Mesure le gain de DPS de chaque stat en relançant le profil avec un peu plus de cette stat. Utile pour départager deux objets d’un coup d’œil.'));
 }
 

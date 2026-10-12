@@ -2,7 +2,7 @@
 // Table d’attaque et formules reprises de Classic (wowsims/sod, magey),
 // modifiées par les changements Forever décrits dans data.js.
 
-import { BASE_STATS, BUFFS, ON_USE_PRESETS, RACES, TALENTS, defaultMechanics } from './data.js';
+import { BASE_STATS, BUFFS, ON_USE_PRESETS, RACES, TALENTS, TRACKABLE, defaultMechanics } from './data.js';
 
 // Générateur pseudo-aléatoire déterministe (mulberry32).
 export function makeRng(seed) {
@@ -171,7 +171,8 @@ export function buildCharacter(profile) {
   const critMultSpecial = M.predatorCritMode === 'total' ? 2 * (1 + peCrit) : 1 + (1 + peCrit);
   const critMultWhite = M.predatorScope === 'all' ? critMultSpecial : 2;
 
-  const trackMult = fight.trackedType !== false ? 1 + (T.improvedTracking * M.improvedTrackingPerRank) / 100 : 1;
+  const trackable = fight.creatureType ? TRACKABLE.includes(fight.creatureType) : fight.trackedType !== false;
+  const trackMult = trackable ? 1 + (T.improvedTracking * M.improvedTrackingPerRank) / 100 : 1;
   const petActive = !!profile.pet?.enabled;
   const ffMult = petActive ? 1 + (T.focusedFire * M.focusedFirePerRank) / 100 : 1;
   const dmgMult = (1 + (Number(custom.dmgPct) || 0) / 100) * trackMult * ffMult;
@@ -192,7 +193,7 @@ export function buildCharacter(profile) {
     const mult = isOH ? (M.ohPenalty / 100) * (1 + (T.predatorsEdge * M.predatorOhPerRank) / 100) : 1;
     const normSpeed = twoHand ? M.normSpeed2h : w.type === 'dagger' ? M.normSpeedDagger : M.normSpeed1h;
     return {
-      isOH, min, max, speed, normSpeed, type: w.type, enchant: w.enchant || 'none', flat: add.weaponDmg, mult,
+      isOH, min, max, speed, normSpeed, type: w.type, enchant: w.enchant || 'none', flat: add.weaponDmg + (Number(w.bonusDmg) || 0), mult,
       table: attackTable(L, bossLevel, skillBonus, add.expertise, M),
     };
   }
@@ -1081,6 +1082,8 @@ export const STAT_DELTAS = [
   { key: 'expertise', label: 'Réduction esquive/parade (par %)', delta: 2, apply: addGear('expertise', 2) },
   { key: 'skill', label: 'Compétence d’arme (par point)', delta: 5, apply: addGear('skill', 5) },
   { key: 'haste', label: 'Hâte (par %)', delta: 5, apply: addGear('haste', 5) },
+  { key: 'mp5', label: 'Mana toutes les 5 s (par point)', delta: 20, apply: addGear('mp5', 20) },
+  { key: 'int', label: 'Intelligence (par point)', delta: 50, apply: addGear('int', 50) },
   {
     key: 'weapon', label: 'DPS d’arme MD (par point)', delta: 5,
     apply: (p) => { const s = Number(p.mh.speed) || 2; p.mh.min = (Number(p.mh.min) || 0) + 5 * s; p.mh.max = (Number(p.mh.max) || 0) + 5 * s; },

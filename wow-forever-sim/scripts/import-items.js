@@ -39,7 +39,15 @@ const STAT = {
 };
 // Compétences d’arme : identifiants de stat lus sur des objets connus (Hurley’s Felling Axe → hache, etc.).
 const SKILL_STAT = { 90: 'axe', 91: 'mace', 92: 'sword', 96: 'dagger', 98: 'fist', 101: 'fist' };
-const USEFUL = ['agi', 'str', 'ap', 'hitRating', 'critRating', 'hasteRating', 'expertiseRating', 'skill', 'weaponDmg'];
+// PA contre un type de créature, déduit d’objets connus : Taurenbane’s Family Cleaver (125, humanoïdes),
+// Thorn Protecting Girdle (126, élémentaires), Mark of the Champion et Felbane (127, démons ; 128, morts-vivants),
+// Mark of the Red Flight (129, draconiens), Tigerbane et Raptorbane Armor (131, bêtes),
+// Gnomish Universal Remote (132, machines). 130 (géants) suit l’ordre, sans objet pour le vérifier.
+const CREATURE_STAT = {
+  125: 'apVsHumanoid', 126: 'apVsElemental', 127: 'apVsDemon', 128: 'apVsUndead',
+  129: 'apVsDragonkin', 130: 'apVsGiant', 131: 'apVsBeast', 132: 'apVsMechanical',
+};
+const USEFUL = ['agi', 'str', 'ap', 'hitRating', 'critRating', 'hasteRating', 'expertiseRating', 'skill', 'weaponDmg', ...Object.values(CREATURE_STAT)];
 
 // Effets « Utiliser » connus (valeurs de Classic pour le même sort) : type, valeur, durée.
 const KNOWN_USE = {
@@ -104,7 +112,9 @@ function convert(raw) {
     const v = Number(m[1]);
     const name = m[2].trim();
     const sk = name.match(/^stat (\d+)$/);
-    if (sk && SKILL_STAT[sk[1]]) {
+    if (sk && CREATURE_STAT[sk[1]]) {
+      stats[CREATURE_STAT[sk[1]]] = (stats[CREATURE_STAT[sk[1]]] || 0) + v;
+    } else if (sk && SKILL_STAT[sk[1]]) {
       stats.skill = (stats.skill || 0) + v;
       skillFor = [SKILL_STAT[sk[1]]];
     } else if (STAT[name]) {

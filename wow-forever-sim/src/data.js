@@ -144,6 +144,20 @@ export const RACES = {
   },
 };
 
+// Types de créature : comptent pour Improved Tracking et les objets « PA contre… ».
+export const CREATURE_TYPES = {
+  humanoid: 'Humanoïde',
+  beast: 'Bête',
+  dragonkin: 'Draconien',
+  demon: 'Démon',
+  undead: 'Mort-vivant',
+  elemental: 'Élémentaire',
+  giant: 'Géant',
+  mechanical: 'Machine',
+  other: 'Autre ou non spécifié',
+};
+export const TRACKABLE = ['humanoid', 'beast', 'dragonkin', 'demon', 'undead', 'elemental', 'giant'];
+
 export const WEAPON_TYPES = {
   axe: 'Hache',
   sword: 'Épée',
@@ -426,7 +440,7 @@ export function defaultProfile(level = 60) {
       bossSwing: 2.0,
       playerDodge: 5,
       playerParry: 5,
-      trackedType: true,
+      creatureType: 'humanoid',
     },
     pet: { enabled: false, dps: 0 },
     custom: { dmgPct: 0, crit: 0, ap: 0 },

@@ -79,6 +79,24 @@ Edge appliqué au total…) se règlent dans l’onglet **Hypothèses**.
 **Pas simulé** : déplacements, AoE, menace, Wing Clip, procs d’objets précis, capacités détaillées du familier
 (son DPS est une valeur fixe à saisir).
 
+## Stats des objets prises en compte
+
+| Stat | Effet dans le sim |
+|---|---|
+| Agilité, Force, puissance d’attaque | PA de mêlée ; l’Agilité donne aussi du crit |
+| Scores de toucher, crit, hâte, expertise | Convertis en % selon le niveau (onglet Hypothèses) |
+| PA contre un type de créature (bêtes, morts-vivants, démons…) | Ajoutée seulement si la cible est de ce type (onglet Combat) |
+| Compétence d’arme | Raté, esquive et érafles ; limitée au type d’arme indiqué |
+| Dégâts d’arme (+X) | Sur une arme : pour cette arme seulement ; ailleurs : pour les deux armes |
+| Intelligence, Esprit, mp5 | Réserve et régénération de mana (l’Esprit seulement hors de la règle des 5 s) |
+| Effets « Utiliser » de Frappe-terre, Baiser de l’araignée, Slayer’s Crest, Devilsaur Eye | Simulés |
+| Endurance, armure, résistances, défense, esquive, parade, puissance des sorts | Sans effet sur le DPS simulé |
+| Autres effets « Utiliser », « Chance au toucher », bonus d’ensemble | Non simulés, signalés sur l’objet |
+
+Le mp5 et l’Intelligence ne valent rien tant que le mana ne manque pas, ce qui est le cas avec Resourcefulness
+2/2. Sans ce talent, ils valent plus que l’Agilité (environ 4,4 et 2 PA au niveau 60). Les poids par défaut
+et le calcul « Poids des stats » en tiennent compte.
+
 ## Mettre à jour une valeur
 
 1. Dans l’interface : onglet **Hypothèses**. Chaque profil garde ses propres valeurs.

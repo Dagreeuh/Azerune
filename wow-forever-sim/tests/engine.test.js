@@ -110,3 +110,11 @@ test('poids des stats : l’Agilité vaut plus que la Force', () => {
   assert.ok(ep.agi > ep.str, JSON.stringify(ep));
   assert.ok(ep.crit > 5, JSON.stringify(ep));
 });
+
+test('poids des stats : mp5 et Intelligence mesurés (nuls sans manque de mana)', () => {
+  const rows = computeStatWeights(defaultProfile(60), { iterations: 300 });
+  const keys = rows.map((r) => r.key);
+  assert.ok(keys.includes('mp5') && keys.includes('int'));
+  const mp5 = rows.find((r) => r.key === 'mp5');
+  assert.ok(Math.abs(mp5.ep) < 0.5, `mp5 ${mp5.ep}`);
+});
