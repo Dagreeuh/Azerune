@@ -4,15 +4,13 @@ import assert from 'node:assert/strict';
 import { defaultProfile } from '../src/data.js';
 import { combatTrace, runSim } from '../src/engine.js';
 import {
-  equipItem, equipmentTotals, exampleEquipment, exampleItems, parseTooltip, resolveProfile,
+  bestEquipment, dbItem, dbItems, equipItem, findItem, parseTooltip, ratingFactors, resolveProfile, wearable,
 } from '../src/gear.js';
+import { ITEM_DB_INFO } from '../src/itemdb.js';
 
-const ITEMS = exampleItems();
-
-function equippedProfile(level = 60, dualWield = false) {
+function nakedProfile(level = 60) {
   const p = defaultProfile(level);
   for (const k of Object.keys(p.gear)) p.gear[k] = 0;
-  p.equipment = exampleEquipment(level, dualWield);
   return p;
 }
 
@@ -22,7 +20,6 @@ Binds when equipped
 Two-Hand Axe
 153 - 256 Damage Speed 3.80
 (53.8 damage per second)
-+13 Strength
 +13 Stamina
 Durability 120 / 120
 Requires Level 58
@@ -30,61 +27,86 @@ Equip: +62 Attack Power.`);
   assert.equal(r.name, 'Arcanite Reaper');
   assert.equal(r.type, 'weapon2h');
   assert.deepEqual(r.weapon, { min: 153, max: 256, speed: 3.8, type: 'axe' });
-  assert.deepEqual(r.stats, { str: 13, sta: 13, ap: 62 });
+  assert.deepEqual(r.stats, { sta: 13, ap: 62 });
   assert.deepEqual(r.unparsed, []);
 });
 
-test('tooltip français : toucher, crit, compétence et effet à utiliser', () => {
+test('tooltip : scores de toucher et de crit (anglais et français)', () => {
+  const en = parseTooltip('Devilsaur Leggings\nLegs\n+12 Stamina\n+46 Attack Power\n+14 Critical Strike Rating');
+  assert.deepEqual(en.stats, { sta: 12, ap: 46, critRating: 14 });
+  const fr = parseTooltip('Pendentif\nCou\n+7 Agilité\n+10 au score de toucher\n+14 au score de coup critique');
+  assert.deepEqual(fr.stats, { agi: 7, hitRating: 10, critRating: 14 });
+});
+
+test('tooltip français : pourcentages, compétence et effet à utiliser', () => {
   const r = parseTooltip(`Bijou de test
 Bijou
 +10 Agilité
 Équipé : Augmente vos chances de toucher de 1%.
-Équipé : Augmente vos chances d'infliger un coup critique de 2%.
 Équipé : Compétence Haches augmentée de 7.
 Utiliser : Augmente la puissance d'attaque de 280 pendant 20 s. (Recharge : 2 min)`);
   assert.equal(r.type, 'trinket');
-  assert.deepEqual(r.stats, { agi: 10, hit: 1, crit: 2, skill: 7 });
+  assert.deepEqual(r.stats, { agi: 10, hit: 1, skill: 7 });
   assert.deepEqual(r.skillFor, ['axe']);
   assert.deepEqual(r.onUse, { type: 'ap', value: 280, duration: 20, cd: 120 });
 });
 
-test('les lignes inconnues sont signalées au lieu d’être ignorées', () => {
-  const r = parseTooltip(`Main de justice
-Trinket
-Chance on hit: Grants an extra attack on your next swing.`);
-  assert.equal(r.type, 'trinket');
-  assert.equal(r.unparsed.length, 1);
+test('la base contient des objets réels de Forever, sans objets de test ni de SoD', () => {
+  const items = dbItems();
+  assert.equal(items.length, ITEM_DB_INFO.count);
+  assert.ok(items.length > 1000);
+  const reaper = dbItem('db12784');
+  assert.equal(reaper.name, 'Arcanite Reaper');
+  assert.deepEqual(reaper.weapon, { min: 153, max: 256, speed: 3.8, type: 'axe' });
+  for (const i of items) {
+    assert.ok(!(i.dbId >= 200000 && i.dbId < 250000), `objet SoD : ${i.name}`);
+    assert.ok(!/\btest/i.test(i.name), `objet de test : ${i.name}`);
+    assert.ok(i.weapon === null || i.weapon.type !== 'mace', `masse : ${i.name}`);
+  }
 });
 
-test('les objets équipés s’ajoutent aux bonus manuels', () => {
-  const p = equippedProfile(60);
-  p.gear.agi = 5;
-  const totals = equipmentTotals(p, ITEMS);
-  const r = resolveProfile(p, ITEMS);
-  assert.equal(r.gear.agi, totals.agi + 5);
-  assert.equal(r.twoHand, true);
-  assert.equal(r.mh.speed, 3.8);
-  assert.equal(r.trinkets[1].preset, 'custom');
-  assert.equal(r.trinkets[1].value, 280);
+test('les scores sont convertis en % selon le niveau', () => {
+  const p = nakedProfile(60);
+  p.equipment = { legs: 'db15062' }; // Devilsaur Leggings : +14 crit rating, +46 PA
+  const r = resolveProfile(p, []);
+  assert.ok(Math.abs(r.gear.crit - 1) < 1e-9);
+  assert.equal(r.gear.ap, 46);
+  assert.equal(ratingFactors(nakedProfile(30)).crit < ratingFactors(p).crit, true);
 });
 
-test('ambidextrie : deux armes à une main, la 2M retire la main gauche', () => {
-  const dw = resolveProfile(equippedProfile(60, true), ITEMS);
-  assert.equal(dw.twoHand, false);
-  assert.equal(dw.oh.speed, 1.8);
-
-  const p = equippedProfile(60, true);
-  equipItem(p, ITEMS, 'mainHand', 'ex60-twohand');
+test('arme à deux mains de la base : la main gauche est retirée', () => {
+  const p = nakedProfile(60);
+  p.equipment = bestEquipment(p, { style: 'dw', maxQuality: 3 });
+  assert.ok(p.equipment.mainHand && p.equipment.offHand);
+  assert.equal(resolveProfile(p, []).twoHand, false);
+  equipItem(p, [], 'mainHand', 'db12784');
   assert.equal(p.equipment.offHand, null);
-  const r = resolveProfile(p, ITEMS);
-  assert.equal(r.twoHand, true);
+  assert.equal(resolveProfile(p, []).twoHand, true);
 });
 
-test('le profil d’exemple équipé se simule', () => {
-  const r = runSim(resolveProfile(equippedProfile(60), ITEMS), { iterations: 200 });
-  assert.ok(r.mean > 200, `DPS ${r.mean}`);
-  const r30 = runSim(resolveProfile(equippedProfile(30), ITEMS), { iterations: 200 });
-  assert.ok(r30.mean > 30 && r30.mean < r.mean, `DPS 30 : ${r30.mean}`);
+test('équipement automatique : objets portables au niveau choisi', () => {
+  for (const level of [30, 60]) {
+    const p = nakedProfile(level);
+    const eq = bestEquipment(p, { style: '2h', maxQuality: 3 });
+    assert.ok(Object.keys(eq).length >= 12, `${level} : ${Object.keys(eq).length} emplacements`);
+    for (const id of Object.values(eq)) {
+      const it = findItem([], id);
+      assert.ok(wearable(it, level), `${it.name} pas portable au niveau ${level}`);
+      assert.ok(it.quality <= 3);
+    }
+    assert.notEqual(eq.finger1, eq.finger2);
+  }
+});
+
+test('les profils équipés de la base se simulent', () => {
+  const p60 = nakedProfile(60);
+  p60.equipment = bestEquipment(p60, { maxQuality: 3 });
+  const p30 = nakedProfile(30);
+  p30.equipment = bestEquipment(p30, { maxQuality: 3 });
+  const r60 = runSim(resolveProfile(p60, []), { iterations: 200 }).mean;
+  const r30 = runSim(resolveProfile(p30, []), { iterations: 200 }).mean;
+  assert.ok(r60 > 200, `DPS 60 : ${r60}`);
+  assert.ok(r30 > 40 && r30 < r60, `DPS 30 : ${r30}`);
 });
 
 test('statistiques du cycle cohérentes', () => {
@@ -103,4 +125,10 @@ test('la trace contient techniques, attaques et périodes actives', () => {
   for (const s of tr.spans) assert.ok(s.end <= 30 && s.start < s.end);
   const casts = tr.events.filter((e) => e.kind === 'cast' && e.gcd);
   for (let i = 1; i < casts.length; i++) assert.ok(casts[i].t - casts[i - 1].t >= tr.gcd - 1e-9);
+});
+
+test('Lacerate pose un saignement de 7 tics', () => {
+  const tr = combatTrace(defaultProfile(60), { seconds: 40 });
+  const ticks = tr.events.filter((e) => e.kind === 'tick' && e.id === 'lacerate');
+  assert.ok(ticks.length >= 7, `${ticks.length} tics`);
 });

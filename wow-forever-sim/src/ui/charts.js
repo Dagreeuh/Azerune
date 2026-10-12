@@ -9,9 +9,10 @@ export const CAST_STYLE = {
   striderKick: { n: 3, abbr: 'SK' },
   counterattack: { n: 4, abbr: 'CA' },
   immolation: { n: 5, abbr: 'PI' },
+  lacerate: { n: 6, abbr: 'LA' },
 };
 
-const SPAN_ORDER = ['mbWindow', 'caWindow', 'bleed', 'trap', 'bloodFury', 'berserking', 'trinket0', 'trinket1', 'deadlyAspects', 'crusaderMH', 'crusaderOH', 'resourcefulness'];
+const SPAN_ORDER = ['mbWindow', 'caWindow', 'bleed', 'lacerateDot', 'trap', 'bloodFury', 'berserking', 'trinket0', 'trinket1', 'deadlyAspects', 'crusaderMH', 'crusaderOH', 'resourcefulness'];
 
 export function niceTicks(min, max, count = 5) {
   const span = max - min || 1;

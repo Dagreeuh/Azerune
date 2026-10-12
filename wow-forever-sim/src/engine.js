@@ -146,6 +146,7 @@ export function buildCharacter(profile) {
 
   if (profile.aspect === 'beast') add.ap += Number(M.beastAp) || 0;
   add.hit += T.surefooted * M.surefootedPerRank;
+  add.crit += T.lethalAttacks * M.lethalAttacksPerRank;
 
   const statMult = statPct.reduce((m, p) => m * (1 + p / 100), 1);
   const agiMult = statMult * (1 + (T.lightningReflexes * M.lightningReflexesPerRank) / 100);
@@ -167,7 +168,8 @@ export function buildCharacter(profile) {
   const spiritTick = 15 + spi / 5;
 
   const peCrit = (T.predatorsEdge * M.predatorCritPerRank) / 100;
-  const critMult = M.predatorCritMode === 'total' ? 2 * (1 + peCrit) : 1 + (1 + peCrit);
+  const critMultSpecial = M.predatorCritMode === 'total' ? 2 * (1 + peCrit) : 1 + (1 + peCrit);
+  const critMultWhite = M.predatorScope === 'all' ? critMultSpecial : 2;
 
   const trackMult = fight.trackedType !== false ? 1 + (T.improvedTracking * M.improvedTrackingPerRank) / 100 : 1;
   const petActive = !!profile.pet?.enabled;
@@ -188,8 +190,9 @@ export function buildCharacter(profile) {
     const speed = Math.max(0.5, Number(w.speed) || 2);
     const skillBonus = add.skill + (race.skill[w.type] || 0);
     const mult = isOH ? (M.ohPenalty / 100) * (1 + (T.predatorsEdge * M.predatorOhPerRank) / 100) : 1;
+    const normSpeed = twoHand ? M.normSpeed2h : w.type === 'dagger' ? M.normSpeedDagger : M.normSpeed1h;
     return {
-      isOH, min, max, speed, type: w.type, enchant: w.enchant || 'none', flat: add.weaponDmg, mult,
+      isOH, min, max, speed, normSpeed, type: w.type, enchant: w.enchant || 'none', flat: add.weaponDmg, mult,
       table: attackTable(L, bossLevel, skillBonus, add.expertise, M),
     };
   }
@@ -202,6 +205,7 @@ export function buildCharacter(profile) {
     mongoose: M.mongooseMana * resourceful,
     striderKick: ((classBase.mana * M.striderManaPct) / 100) * resourceful,
     counterattack: M.counterMana * resourceful,
+    lacerate: M.lacerateMana * resourceful,
     immolation: M.trapMana * resourceful,
   };
 
@@ -211,6 +215,7 @@ export function buildCharacter(profile) {
     raptor: true,
     striderKick: T.striderKick > 0,
     counterattack: T.counterattack > 0 && beingAttacked,
+    lacerate: true,
     immolation: true,
   };
   const rotation = (profile.rotation || [])
@@ -245,7 +250,8 @@ export function buildCharacter(profile) {
     strMult, agiMult, baseApForRacial,
     manaMax, spiritTick, baseMana: classBase.mana,
     mh, oh, dw, twoHand, behind,
-    critMult, dmgMult, meleeMult, specialCritBonus, armor, armorMult,
+    critMult: critMultSpecial, critMultSpecial, critMultWhite, dmgMult, meleeMult, specialCritBonus, armor, armorMult,
+    lacerateTicks: Math.max(1, Math.round(M.lacerateDuration / 3)),
     costs, rotation, gcdRotation, raptorEnabled, minCost, cooldowns,
     huntersMark, exposePreyChance,
     lacerating: T.laceratingStrikes > 0,
@@ -263,7 +269,7 @@ export function buildCharacter(profile) {
   };
 }
 
-const METRIC_IDS = ['mh', 'oh', 'extra', 'raptor', 'mongoose', 'striderKick', 'counterattack', 'lacerating', 'immolation'];
+const METRIC_IDS = ['mh', 'oh', 'extra', 'raptor', 'mongoose', 'striderKick', 'counterattack', 'lacerate', 'lacerating', 'immolation'];
 
 function newMetrics() {
   const m = {};
@@ -285,7 +291,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
   let mana = C.manaMax;
   let lastSpend = -100;
   let gcdReady = 0;
-  const cdReady = { raptor: 0, mongoose: 0, striderKick: 0, counterattack: 0, immolation: 0 };
+  const cdReady = { raptor: 0, mongoose: 0, striderKick: 0, counterattack: 0, lacerate: 0, immolation: 0 };
   let mbUntil = -1;
   let mbAvail = 0;
   let mbOpenAt = -1;
@@ -314,6 +320,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
   let nextDecide = 0;
   const bleed = { perTick: 0, ticksLeft: 0, next: Infinity, start: -1 };
   const trap = { triggerAt: Infinity, perTick: 0, ticksLeft: 0, next: Infinity, start: -1 };
+  const lac = { perTick: 0, ticksLeft: 0, next: Infinity, start: -1 };
 
   // Trace détaillée (uniquement pour la chronologie et le journal).
   const limit = trace ? (trace.limit ?? duration) : 0;
@@ -436,6 +443,12 @@ export function simulateOnce(C, rng, duration, trace = null) {
     return (base + ((currentAP() + extraAp) / M.apPerDps) * w.speed + w.flat) * w.mult;
   }
 
+  // « Dégâts d’arme normalisés » : la PA compte pour une vitesse fixe selon le type d’arme.
+  function normWeaponDamage(w) {
+    const base = w.min + rng() * (w.max - w.min);
+    return (base + (currentAP() / M.apPerDps) * w.normSpeed + w.flat) * w.mult;
+  }
+
   function onHit(w, isWhite, isCrit, isExtra) {
     if (C.exposePreyChance > 0 && (isWhite || M.exposePreyOn === 'all')) {
       if (rng() * 100 < C.exposePreyChance) {
@@ -493,7 +506,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
       outcome = 'glance';
     } else {
       acc += Math.max(0, currentCrit() - tbl.critSuppression);
-      if (r < acc) { dmg *= C.critMult; m.crits++; outcome = 'crit'; } else m.hits++;
+      if (r < acc) { dmg *= C.critMultWhite; m.crits++; outcome = 'crit'; } else m.hits++;
     }
     m.dmg += dmg;
     if (e) { e.outcome = outcome; e.dmg = dmg; }
@@ -517,10 +530,29 @@ export function simulateOnce(C, rng, duration, trace = null) {
     }
     const isCrit = rng() * 100 < currentCrit() + C.specialCritBonus - tbl.critSuppression;
     let dmg = raw() * C.meleeMult * C.armorMult;
-    if (isCrit) { dmg *= C.critMult; m.crits++; } else m.hits++;
+    if (isCrit) { dmg *= C.critMultSpecial; m.crits++; } else m.hits++;
     m.dmg += dmg;
     onHit(C.mh, false, isCrit, false);
     return { outcome: isCrit ? 'crit' : 'hit', dmg };
+  }
+
+  // Jet de toucher d’une technique sans dégâts directs (pose d’un saignement).
+  function applyRoll(id) {
+    const m = metrics[id];
+    const tbl = C.mh.table;
+    m.casts++;
+    const r = rng() * 100;
+    let acc = Math.max(0, tbl.miss - effHit(tbl));
+    if (r < acc) { m.miss++; return 'miss'; }
+    acc += tbl.dodge;
+    if (r < acc) { m.dodge++; return 'dodge'; }
+    if (!C.behind) {
+      acc += tbl.parry;
+      if (r < acc) { m.parry++; return 'parry'; }
+    }
+    m.hits++;
+    onHit(C.mh, false, false, false);
+    return 'hit';
   }
 
   function applyBleed(dmg) {
@@ -545,7 +577,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
       case 'mongoose': {
         consumeMongooseWindow();
         cdReady.mongoose = t + M.mongooseCd;
-        const res = yellowAttack('mongoose', () => weaponDamage(C.mh) + M.mongooseBonus);
+        const res = yellowAttack('mongoose', () => normWeaponDamage(C.mh) + M.mongooseBonus);
         if (res.dmg > 0 && C.lacerating) applyBleed(res.dmg);
         return res;
       }
@@ -554,12 +586,28 @@ export function simulateOnce(C, rng, duration, trace = null) {
         return yellowAttack('raptor', () => weaponDamage(C.mh) + M.raptorBonus);
       case 'striderKick':
         cdReady.striderKick = t + M.striderCd;
-        return yellowAttack('striderKick', () => (weaponDamage(C.mh) * M.striderWeaponPct) / 100);
+        return yellowAttack('striderKick', () => (normWeaponDamage(C.mh) * M.striderWeaponPct) / 100);
       case 'counterattack':
         caUntil = -1;
         spanEnd('caWindow', t);
         cdReady.counterattack = t + M.counterCd;
-        return yellowAttack('counterattack', () => (weaponDamage(C.mh) * M.counterWeaponPct) / 100 + M.counterBonus, true);
+        return yellowAttack('counterattack', () => ((normWeaponDamage(C.mh) + M.counterBonus) * M.counterWeaponPct) / 100, true);
+      case 'lacerate': {
+        cdReady.lacerate = t;
+        const outcome = applyRoll('lacerate');
+        if (outcome === 'hit') {
+          if (lac.ticksLeft === 0) {
+            lac.start = t;
+            spanOpen('lacerateDot', t + C.lacerateTicks * 3);
+          } else {
+            spanEnd('lacerateDot', t + C.lacerateTicks * 3);
+          }
+          lac.perTick = M.lacerateTick * C.meleeMult;
+          lac.ticksLeft = C.lacerateTicks;
+          lac.next = t + 3;
+        }
+        return { outcome, dmg: 0 };
+      }
       case 'immolation':
         cdReady.immolation = t + C.trapCd;
         metrics.immolation.casts++;
@@ -593,6 +641,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
     if (id === 'mongoose') return t < mbUntil && t >= mbAvail;
     if (id === 'counterattack') return t < caUntil && t >= caAvail;
     if (id === 'immolation') return trap.ticksLeft === 0 && trap.triggerAt === Infinity;
+    if (id === 'lacerate') return lac.ticksLeft === 0;
     return true;
   }
 
@@ -640,6 +689,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
     consider(gcdReady);
     for (const r of C.rotation) consider(cdReady[r.id]);
     if (mbUntil > t) consider(mbAvail);
+    if (lac.ticksLeft > 0) consider(lac.next + 3 * (lac.ticksLeft - 1));
     if (caUntil > t) consider(caAvail);
     for (const x of cdReadyAt) consider(x);
     if (C.manaPotion) consider(potionReady);
@@ -714,7 +764,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
   while (true) {
     let nextExpire = Infinity;
     for (const a of auras) if (a.until < nextExpire) nextExpire = a.until;
-    const tn = Math.min(nextExpire, nextRegen, bleed.next, trap.triggerAt, trap.next, nextBoss, nextMH, nextOH, nextDecide);
+    const tn = Math.min(nextExpire, nextRegen, bleed.next, lac.next, trap.triggerAt, trap.next, nextBoss, nextMH, nextOH, nextDecide);
     if (tn > duration) {
       if (mana < C.minCost) oomTime += duration - t;
       break;
@@ -728,7 +778,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
       let dmg = bleed.perTick;
       let crit = false;
       if (M.laceratingCanCrit && rng() * 100 < currentCrit() + C.specialCritBonus - C.mh.table.critSuppression) {
-        dmg *= C.critMult;
+        dmg *= C.critMultSpecial;
         metrics.lacerating.crits++;
         crit = true;
       }
@@ -741,11 +791,35 @@ export function simulateOnce(C, rng, duration, trace = null) {
         bleed.next = Infinity;
         addUptime('bleed', t - bleed.start);
       }
+    } else if (tn === lac.next) {
+      let dmg = lac.perTick;
+      let crit = false;
+      if (rng() * 100 < currentCrit() - C.mh.table.critSuppression) {
+        dmg *= C.critMultSpecial;
+        metrics.lacerate.crits++;
+        crit = true;
+      }
+      metrics.lacerate.dmg += dmg;
+      metrics.lacerate.ticks++;
+      if (ev) ev('tick', 'lacerate', { dmg, outcome: crit ? 'crit' : 'hit' });
+      lac.ticksLeft--;
+      if (lac.ticksLeft > 0) lac.next = t + 3;
+      else {
+        lac.next = Infinity;
+        addUptime('lacerateDot', t - lac.start);
+      }
     } else if (tn === trap.triggerAt) trapTrigger();
     else if (tn === trap.next) {
-      metrics.immolation.dmg += trap.perTick;
+      let dmg = trap.perTick;
+      let crit = false;
+      if (M.trapCanCrit && rng() * 100 < currentCrit() - 2.1) {
+        dmg *= 1.5;
+        crit = true;
+        metrics.immolation.crits++;
+      }
+      metrics.immolation.dmg += dmg;
       metrics.immolation.ticks++;
-      if (ev) ev('tick', 'immolation', { dmg: trap.perTick, outcome: 'hit' });
+      if (ev) ev('tick', 'immolation', { dmg, outcome: crit ? 'crit' : 'hit' });
       trap.ticksLeft--;
       if (trap.ticksLeft > 0) trap.next = t + M.trapDuration / C.trapTicks;
       else {
@@ -765,6 +839,7 @@ export function simulateOnce(C, rng, duration, trace = null) {
   // Clôture des périodes encore actives à la fin du combat.
   for (const a of auras) addUptime(a.id, duration - auraStart[a.id]);
   if (bleed.ticksLeft > 0) addUptime('bleed', duration - bleed.start);
+  if (lac.ticksLeft > 0) addUptime('lacerateDot', duration - lac.start);
   if (trap.ticksLeft > 0) addUptime('trap', duration - trap.start);
   if (!mbUsed) {
     addUptime('mbWindow', Math.min(mbUntil, duration) - mbOpenAt);
@@ -785,6 +860,8 @@ const LABELS = {
   mongoose: 'Mongoose Bite',
   striderKick: 'Strider Kick',
   counterattack: 'Counterattack',
+  lacerate: 'Lacerate (saignement)',
+  lacerateDot: 'Lacerate (actif)',
   lacerating: 'Lacerating Strikes (saignement)',
   immolation: 'Piège d’immolation',
   pet: 'Familier (estimation)',
@@ -808,7 +885,7 @@ const LABELS = {
   trapResist: 'Piège résisté',
 };
 
-export const CAST_IDS = ['raptor', 'mongoose', 'striderKick', 'counterattack', 'immolation'];
+export const CAST_IDS = ['raptor', 'mongoose', 'striderKick', 'counterattack', 'lacerate', 'immolation'];
 
 export function label(id) {
   return LABELS[id] || id;
@@ -979,7 +1056,8 @@ export function characterSheet(profile) {
     skill: tbl.skill,
     armor: C.armor,
     armorReduction: (1 - C.armorMult) * 100,
-    critMult: C.critMult,
+    critMult: C.critMultSpecial,
+    critMultWhite: C.critMultWhite,
     mana: C.manaMax,
     costs: C.costs,
     haste: (C.stats.hasteStatic - 1) * 100,

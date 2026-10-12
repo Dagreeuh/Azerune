@@ -1,4 +1,8 @@
-// Équipement : emplacements, objets, analyse de tooltip et fusion des objets dans le profil.
+// Équipement : emplacements, objets, base de données Forever, analyse de tooltip
+// et fusion des objets dans le profil.
+
+import { RACES, defaultMechanics } from './data.js';
+import { ITEM_DB } from './itemdb.js';
 
 export const ITEM_TYPES = {
   head: 'Tête',
@@ -45,14 +49,30 @@ export const ITEM_STATS = [
   { key: 'int', label: 'Intelligence', short: 'Int' },
   { key: 'spi', label: 'Esprit', short: 'Esp' },
   { key: 'ap', label: 'Puissance d’attaque', short: 'PA' },
+  { key: 'hitRating', label: 'Score de toucher', short: 'score toucher', rating: 'hit' },
+  { key: 'critRating', label: 'Score de crit', short: 'score crit', rating: 'crit' },
+  { key: 'hasteRating', label: 'Score de hâte', short: 'score hâte', rating: 'haste' },
+  { key: 'expertiseRating', label: 'Score d’expertise', short: 'score expertise', rating: 'expertise' },
   { key: 'hit', label: 'Toucher (%)', short: 'toucher', pct: true },
   { key: 'crit', label: 'Critique (%)', short: 'crit', pct: true },
   { key: 'haste', label: 'Hâte (%)', short: 'hâte', pct: true },
   { key: 'expertise', label: 'Réduction esquive/parade (%)', short: 'réd. esq./par.', pct: true },
   { key: 'skill', label: 'Compétence d’arme', short: 'compétence' },
+  { key: 'weaponDmg', label: 'Dégâts d’arme (+ par coup)', short: 'dégâts d’arme' },
   { key: 'mp5', label: 'Mana toutes les 5 s', short: 'mp5' },
   { key: 'extraAttack', label: 'Attaque suppl. (% par coup)', short: 'att. suppl.', pct: true },
 ];
+
+// Conversion des scores en pourcentage, selon le niveau et les hypothèses du profil.
+const RATING_KEYS = { hit: 'hitRatingPerPct', crit: 'critRatingPerPct', haste: 'hasteRatingPerPct', expertise: 'expertiseRatingPerPct' };
+
+export function ratingFactors(profile) {
+  const level = Number(profile?.level) === 30 ? 30 : 60;
+  const M = { ...defaultMechanics(level), ...(profile?.mechanics || {}) };
+  const out = {};
+  for (const [stat, key] of Object.entries(RATING_KEYS)) out[stat] = Number(M[key]) || 1;
+  return out;
+}
 
 export const ON_USE_TYPES = {
   ap: 'Puissance d’attaque',
@@ -68,7 +88,10 @@ export function slotDef(slotId) {
 
 export function canEquip(item, slotId) {
   const slot = slotDef(slotId);
-  return !!(item && slot && slot.accepts.includes(item.type));
+  if (!item || !slot || !slot.accepts.includes(item.type)) return false;
+  if (item.mhOnly && slotId === 'offHand') return false;
+  if (item.ohOnly && slotId === 'mainHand') return false;
+  return true;
 }
 
 export function isWeaponType(type) {
@@ -84,12 +107,15 @@ function fmtNum(v) {
   return Number(v).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
 }
 
-export function itemSummary(item) {
+// `factors` (facultatif) : conversion des scores en %, pour afficher l’équivalent.
+export function itemSummary(item, factors = null) {
   const parts = [];
   if (item.weapon) parts.push(`${fmtNum(item.weapon.min)}–${fmtNum(item.weapon.max)} · ${fmtNum(item.weapon.speed)} s · ${fmtNum(Math.round(weaponDps(item.weapon) * 10) / 10)} DPS`);
   for (const s of ITEM_STATS) {
     const v = Number(item.stats?.[s.key]) || 0;
-    if (v) parts.push(s.pct ? `${fmtNum(v)} % ${s.short}` : `${fmtNum(v)} ${s.short}`);
+    if (!v) continue;
+    if (s.rating && factors) parts.push(`${fmtNum(v)} ${s.short} (${fmtNum(Math.round((v / factors[s.rating]) * 100) / 100)} %)`);
+    else parts.push(s.pct ? `${fmtNum(v)} % ${s.short}` : `${fmtNum(v)} ${s.short}`);
   }
   if (item.onUse?.value) {
     const u = item.onUse;
@@ -98,14 +124,20 @@ export function itemSummary(item) {
   return parts.join(' · ') || 'Aucune stat';
 }
 
+// Un identifiant d’objet désigne la bibliothèque de l’utilisateur ou la base Forever (« db12345 »).
+export function findItem(items, id) {
+  if (!id) return null;
+  return items.find((i) => i.id === id) || (String(id).startsWith('db') ? dbItem(id) : null);
+}
+
 // Équipe un objet en gardant un ensemble cohérent (2M ↔ main gauche).
 export function equipItem(profile, items, slotId, itemId) {
   const eq = { ...(profile.equipment || {}) };
-  const item = items.find((i) => i.id === itemId);
+  const item = findItem(items, itemId);
   eq[slotId] = itemId || null;
   if (item && item.type === 'weapon2h' && slotId === 'mainHand') eq.offHand = null;
   if (item && slotId === 'offHand') {
-    const main = items.find((i) => i.id === eq.mainHand);
+    const main = findItem(items, eq.mainHand);
     if (main && main.type === 'weapon2h') eq.mainHand = null;
   }
   profile.equipment = eq;
@@ -114,10 +146,9 @@ export function equipItem(profile, items, slotId, itemId) {
 
 function equippedItems(profile, items) {
   const eq = profile.equipment || {};
-  const byId = new Map(items.map((i) => [i.id, i]));
   const out = {};
   for (const slot of SLOTS) {
-    const it = byId.get(eq[slot.id]);
+    const it = findItem(items, eq[slot.id]);
     if (it && canEquip(it, slot.id)) out[slot.id] = it;
   }
   if (out.mainHand && out.mainHand.type === 'weapon2h') delete out.offHand;
@@ -152,11 +183,13 @@ export function resolveProfile(profile, items = []) {
     p.oh = off ? { ...off.weapon, enchant: p.oh?.enchant || 'none' } : null;
   }
 
+  const factors = ratingFactors(p);
   for (const it of Object.values(eq)) {
     for (const s of ITEM_STATS) {
       const v = Number(it.stats?.[s.key]) || 0;
       if (!v) continue;
-      if (s.key === 'extraAttack') extra += v;
+      if (s.rating) p.gear[s.rating] = (Number(p.gear[s.rating]) || 0) + v / factors[s.rating];
+      else if (s.key === 'extraAttack') extra += v;
       else if (s.key === 'skill' && Array.isArray(it.skillFor) && it.skillFor.length) {
         if (it.skillFor.includes(p.mh?.type)) p.gear.skill = (Number(p.gear.skill) || 0) + v;
       } else p.gear[s.key] = (Number(p.gear[s.key]) || 0) + v;
@@ -306,6 +339,12 @@ export function parseTooltip(text) {
       add('ap', num(m[1]));
       continue;
     }
+    if ((m = line.match(/^\+?\s*(\d+)\s+(hit|critical strike|crit|haste|expertise) rating/i) || line.match(/^\+?\s*(\d+)\s+(?:au |en )?score (?:de |d['’])(toucher|coup critique|critique|hâte|expertise)/i))) {
+      const word = m[2].toLowerCase();
+      const key = /hit|toucher/.test(word) ? 'hitRating' : /crit/.test(word) ? 'critRating' : /haste|hâte/.test(word) ? 'hasteRating' : 'expertiseRating';
+      add(key, num(m[1]));
+      continue;
+    }
     if ((m = line.match(new RegExp(`(?:chance to hit|chances de toucher)[^0-9]*${PCT}`, 'i')) || line.match(new RegExp(`^\\+?${PCT}\\s*(?:hit|toucher)`, 'i')))) {
       add('hit', num(m[1]));
       continue;
@@ -348,74 +387,139 @@ export function parseTooltip(text) {
   return result;
 }
 
-// ---------- objets d’exemple ----------
+// ---------- base de données Forever ----------
 
-const EXAMPLE_60 = [
-  { key: 'head', type: 'head', name: 'Heaume de pisteur', stats: { agi: 20, str: 10, sta: 15, hit: 1 } },
-  { key: 'neck', type: 'neck', name: 'Collier de crocs', stats: { agi: 10, sta: 6, ap: 20 } },
-  { key: 'shoulders', type: 'shoulders', name: 'Épaulières de traque', stats: { agi: 16, str: 8, sta: 12 } },
-  { key: 'back', type: 'back', name: 'Cape du rôdeur', stats: { agi: 12, sta: 8, ap: 10, hit: 1 } },
-  { key: 'chest', type: 'chest', name: 'Plastron de chasseur', stats: { agi: 22, str: 12, sta: 18, int: 10, crit: 1 } },
-  { key: 'wrists', type: 'wrists', name: 'Brassards à lanières', stats: { agi: 10, str: 6, sta: 8 } },
-  { key: 'hands', type: 'hands', name: 'Gants de dépeceur', stats: { agi: 12, str: 8, ap: 20, crit: 1 } },
-  { key: 'waist', type: 'waist', name: 'Ceinture à crochets', stats: { agi: 14, str: 8, sta: 12, hit: 1 } },
-  { key: 'legs', type: 'legs', name: 'Jambières de traqueur', stats: { agi: 20, str: 12, sta: 20, ap: 30 } },
-  { key: 'feet', type: 'feet', name: 'Bottes de piste', stats: { agi: 14, str: 8, sta: 14, int: 10 } },
-  { key: 'ring1', type: 'finger', name: 'Anneau de griffe', stats: { agi: 8, sta: 10, hit: 1 } },
-  { key: 'ring2', type: 'finger', name: 'Chevalière du clan', stats: { str: 8, sta: 8, ap: 10, crit: 1 } },
-  { key: 'trinket1', type: 'trinket', name: 'Talisman de chasse', stats: { ap: 30, hit: 1 } },
-  { key: 'trinket2', type: 'trinket', name: 'Insigne de rage', stats: {}, onUse: { type: 'ap', value: 280, duration: 20, cd: 120 } },
-  { key: 'twohand', type: 'weapon2h', name: 'Grande hache de guerre', stats: { str: 10, sta: 13 }, weapon: { min: 153, max: 256, speed: 3.8, type: 'axe' } },
-  { key: 'mh', type: 'weapon1h', name: 'Épée longue du clan', stats: { agi: 6, sta: 6 }, weapon: { min: 81, max: 151, speed: 2.8, type: 'sword' } },
-  { key: 'oh', type: 'weapon1h', name: 'Épée courte du clan', stats: { agi: 5 }, weapon: { min: 52, max: 98, speed: 1.8, type: 'sword' } },
-  { key: 'ranged', type: 'ranged', name: 'Arc en if', stats: { agi: 10, hit: 1 } },
-  // Alternatives pour essayer le comparateur.
-  { key: 'head-alt', type: 'head', name: 'Casque de précision', stats: { agi: 14, sta: 10, hit: 2, crit: 1 } },
-  { key: 'hands-alt', type: 'hands', name: 'Gantelets de force', stats: { str: 22, sta: 10, crit: 1 } },
-  { key: 'trinket-alt', type: 'trinket', name: 'Œil du faucon', stats: { crit: 2 } },
-  { key: 'staff', type: 'weapon2h', name: 'Bâton de la bête', stats: { agi: 22, sta: 15 }, weapon: { min: 140, max: 211, speed: 3.2, type: 'staff' } },
-];
+export const QUALITY_NAMES = { 2: 'Vert', 3: 'Bleu', 4: 'Épique', 5: 'Légendaire' };
+export const ARMOR_NAMES = { cloth: 'Tissu', leather: 'Cuir', mail: 'Mailles' };
 
-const WEAPONS_30 = {
-  twohand: { min: 60, max: 91, speed: 3.4, type: 'axe' },
-  mh: { min: 26, max: 49, speed: 2.6, type: 'sword' },
-  oh: { min: 19, max: 36, speed: 1.9, type: 'sword' },
-  staff: { min: 55, max: 84, speed: 3.0, type: 'staff' },
-};
-
-function scaleStats(stats) {
-  const out = {};
-  for (const s of ITEM_STATS) {
-    const v = Number(stats[s.key]) || 0;
-    if (!v) continue;
-    const scaled = s.pct ? Math.floor(v / 2) : Math.round(v * (s.key === 'ap' ? 0.2 : 0.35));
-    if (scaled) out[s.key] = scaled;
-  }
-  return out;
+export function itemFromDb(rec) {
+  return {
+    id: `db${rec.id}`,
+    dbId: rec.id,
+    name: rec.n,
+    type: rec.t,
+    level: null,
+    reqLevel: rec.l,
+    reqEstimated: !!rec.e,
+    ilvl: rec.i,
+    quality: rec.q,
+    armor: rec.a || null,
+    source: 'base',
+    stats: { ...(rec.s || {}) },
+    weapon: rec.w ? { min: rec.w[0], max: rec.w[1], speed: rec.w[2], type: rec.w[3] } : null,
+    onUse: rec.u ? { ...rec.u } : null,
+    skillFor: rec.sf || null,
+    mhOnly: !!rec.mh,
+    ohOnly: !!rec.oh,
+    unique: !!rec.uq,
+    notes: rec.no || [],
+  };
 }
 
-export function exampleItems() {
-  const items = [];
-  for (const e of EXAMPLE_60) {
-    items.push({ id: `ex60-${e.key}`, name: `${e.name} (exemple)`, type: e.type, level: 60, source: 'exemple', stats: { ...e.stats }, weapon: e.weapon ? { ...e.weapon } : null, onUse: e.onUse ? { ...e.onUse } : null });
+let dbList = null;
+let dbIndex = null;
+
+export function dbItems() {
+  if (!dbList) {
+    dbList = ITEM_DB.map(itemFromDb);
+    dbIndex = new Map(dbList.map((i) => [i.id, i]));
   }
-  for (const e of EXAMPLE_60) {
-    const onUse = e.onUse ? { ...e.onUse, value: Math.round(e.onUse.value * 0.3) } : null;
-    const weapon = e.weapon ? { ...WEAPONS_30[e.key] } : null;
-    items.push({ id: `ex30-${e.key}`, name: `${e.name} niv. 30 (exemple)`, type: e.type, level: 30, source: 'exemple', stats: scaleStats(e.stats), weapon, onUse });
-  }
-  return items;
+  return dbList;
 }
 
-const SET_2H = { head: 'head', neck: 'neck', shoulders: 'shoulders', back: 'back', chest: 'chest', wrists: 'wrists', hands: 'hands', waist: 'waist', legs: 'legs', feet: 'feet', finger1: 'ring1', finger2: 'ring2', trinket1: 'trinket1', trinket2: 'trinket2', mainHand: 'twohand', ranged: 'ranged' };
+export function dbItem(id) {
+  dbItems();
+  return dbIndex.get(id) || null;
+}
 
-export function exampleEquipment(level, dualWield = false) {
-  const prefix = level === 30 ? 'ex30' : 'ex60';
+export function wowheadUrl(item) {
+  return item && item.dbId ? `https://www.wowhead.com/forever/item=${item.dbId}` : null;
+}
+
+// Un chasseur porte la maille à partir du niveau 40.
+export function wearable(item, level) {
+  if (item.reqLevel && item.reqLevel > level) return false;
+  if (item.armor === 'mail' && level < 40) return false;
+  return true;
+}
+
+// Poids par défaut (PA = 1), mesurés sur le profil d’exemple niveau 60. Toucher, crit,
+// hâte et réduction d’esquive en points de % ; arme en DPS d’arme.
+export const DEFAULT_EP = { agi: 1.6, str: 1, ap: 1, hit: 12, crit: 24, haste: 10, expertise: 23, skill: 8, weapon: 14, weaponDmg: 4 };
+
+// Poids issus du calcul « Poids des stats » quand il existe.
+export function epFromWeights(rows) {
+  const ep = { ...DEFAULT_EP };
+  for (const r of rows || []) if (Number.isFinite(r.ep) && r.key in ep) ep[r.key] = Math.max(0, r.ep);
+  return ep;
+}
+
+// Compétence d’arme raciale du profil (ex. orc : +5 hache), qui compte dans la valeur d’une arme.
+export function raceSkill(profile) {
+  return (RACES[profile?.race] || {}).skill || {};
+}
+
+// Valeur d’un objet en PA. `offHand` : une arme en main gauche ne compte que pour les attaques auto.
+export function itemScore(item, ep, factors, { offHand = false, raceSkill: racial = {} } = {}) {
+  const st = item.stats || {};
+  const n = (k) => Number(st[k]) || 0;
+  let v = n('agi') * ep.agi + n('str') * ep.str + n('ap') * ep.ap
+    + (n('hit') + n('hitRating') / factors.hit) * ep.hit
+    + (n('crit') + n('critRating') / factors.crit) * ep.crit
+    + (n('haste') + n('hasteRating') / factors.haste) * ep.haste
+    + (n('expertise') + n('expertiseRating') / factors.expertise) * ep.expertise
+    + n('skill') * ep.skill + n('weaponDmg') * ep.weaponDmg;
+  const u = item.onUse;
+  if (u && Number(u.value) && Number(u.cd)) {
+    const uptime = Math.min(1, (Number(u.duration) || 0) / Number(u.cd));
+    const per = { ap: ep.ap, agi: ep.agi, str: ep.str, haste: ep.haste, crit: ep.crit }[u.type] || 0;
+    v += Number(u.value) * uptime * per;
+  }
+  if (item.weapon) {
+    v += weaponDps(item.weapon) * ep.weapon * (offHand ? 0.35 : 1);
+    v += (racial[item.weapon.type] || 0) * ep.skill * (offHand ? 0.35 : 1);
+  }
+  return v;
+}
+
+// Meilleur objet de la base pour chaque emplacement, selon les poids.
+// `style` : '2h' ou 'dw' ; `maxQuality` : 2 vert, 3 bleu, 4 épique, 5 légendaire.
+export function bestEquipment(profile, { ep = DEFAULT_EP, factors = ratingFactors(profile), maxQuality = 4, style = '2h', pool = null } = {}) {
+  const level = Number(profile.level) === 30 ? 30 : 60;
+  const items = (pool || dbItems()).filter((i) => wearable(i, level) && (!i.quality || i.quality <= maxQuality));
+  const racial = raceSkill(profile);
+  const best = (type, { exclude = new Set(), filter = () => true, offHand = false } = {}) => {
+    let top = null;
+    let topV = 0;
+    for (const i of items) {
+      if (i.type !== type || exclude.has(i.id) || !filter(i)) continue;
+      const v = itemScore(i, ep, factors, { offHand, raceSkill: racial });
+      if (v > topV) { topV = v; top = i; }
+    }
+    return top;
+  };
   const eq = {};
-  for (const [slot, key] of Object.entries(SET_2H)) eq[slot] = `${prefix}-${key}`;
-  if (dualWield) {
-    eq.mainHand = `${prefix}-mh`;
-    eq.offHand = `${prefix}-oh`;
+  for (const slot of ['head', 'neck', 'shoulders', 'back', 'chest', 'wrists', 'hands', 'waist', 'legs', 'feet', 'ranged']) {
+    const it = best(slot);
+    if (it) eq[slot] = it.id;
+  }
+  for (const [type, a, b] of [['finger', 'finger1', 'finger2'], ['trinket', 'trinket1', 'trinket2']]) {
+    const first = best(type);
+    if (!first) continue;
+    eq[a] = first.id;
+    const second = best(type, { exclude: new Set([first.id]), filter: (i) => i.name !== first.name });
+    if (second) eq[b] = second.id;
+  }
+  if (style === 'dw') {
+    const mh = best('weapon1h', { filter: (i) => !i.ohOnly });
+    if (mh) {
+      eq.mainHand = mh.id;
+      const oh = best('weapon1h', { exclude: new Set([mh.id]), filter: (i) => !i.mhOnly, offHand: true });
+      if (oh) eq.offHand = oh.id;
+    }
+  } else {
+    const th = best('weapon2h');
+    if (th) eq.mainHand = th.id;
   }
   return eq;
 }

@@ -9,6 +9,7 @@ export const DATA_INFO = {
 };
 
 export const CONFIDENCE = {
+  client: { label: 'Client', desc: 'Lu dans les données du client Forever (build 1.60.1.70338) exportées par wowsims/gamedata, la même source que Wowhead.' },
   officiel: { label: 'Officiel', desc: 'Notes de développement ou article Blizzard.' },
   communaute: { label: 'Communauté', desc: 'Datamining ou guides de la bêta, sources concordantes ou presque.' },
   classic: { label: 'Classic', desc: 'Valeur de Classic Era reprise faute de donnée Forever.' },
@@ -16,6 +17,14 @@ export const CONFIDENCE = {
 };
 
 export const SOURCES = {
+  gamedata: {
+    label: 'wowsims/gamedata — sorts et objets lus dans le client WoW Forever (build 1.60.1.70338, 12 octobre 2026)',
+    url: 'https://github.com/wowsims/gamedata',
+  },
+  wowheadForever: {
+    label: 'Wowhead — base de données WoW Forever',
+    url: 'https://www.wowhead.com/forever',
+  },
   devnotes: {
     label: 'Blizzard — Forever Beta Development Notes (8 octobre 2026)',
     url: 'https://us.forums.blizzard.com/en/wow/t/wow-forever-beta-development-notes-%E2%80%93-updated-october-8/2360696/4',
@@ -169,74 +178,91 @@ export const MECHANICS = [
   { key: 'apPerAgi', group: 'Formules', label: 'PA de mêlée par point d’Agilité', value: 1, step: 0.1, conf: 'communaute', src: ['itemization', 'foreverdb'] },
   { key: 'apPerStr', group: 'Formules', label: 'PA de mêlée par point de Force', value: 1, step: 0.1, conf: 'communaute', src: ['icyveins'] },
   { key: 'apPerDps', group: 'Formules', label: 'PA pour 1 DPS d’arme', value: 14, step: 1, conf: 'communaute', src: ['foreverdb'] },
-  { key: 'gcd', group: 'Formules', label: 'Temps de recharge global (s)', value: 1.5, step: 0.1, conf: 'classic', src: ['wowsims'] },
+  { key: 'gcd', group: 'Formules', label: 'Temps de recharge global (s)', value: 1.5, step: 0.1, conf: 'client', src: ['gamedata'], note: 'GCD de 1,5 s sur Mongoose Bite, Strider Kick, Counterattack et Lacerate.' },
   { key: 'reaction', group: 'Formules', label: 'Temps de réaction aux procs (s)', value: 0.2, step: 0.05, conf: 'estime', src: [], note: 'Délai entre un proc (Expose Prey, esquive) et la Morsure.' },
   { key: 'glancing', group: 'Formules', label: 'Coups érafles sur les attaques blanches', value: true, conf: 'classic', src: ['magey', 'wowsims'] },
   { key: 'critSuppression', group: 'Formules', label: 'Réduction de crit contre un boss +3', value: true, conf: 'classic', src: ['magey', 'wowsims'] },
   { key: 'dwMissPenalty', group: 'Formules', label: 'Pénalité de raté ambidextrie (blanc), %', value: 19, step: 1, conf: 'classic', src: ['wowsims'] },
   { key: 'ohPenalty', group: 'Formules', label: 'Dégâts de la main gauche, % (avant talents)', value: 50, step: 1, conf: 'classic', src: ['wowsims'] },
+  { key: 'normSpeed2h', group: 'Formules', label: 'Vitesse normalisée, arme à deux mains (s)', value: 3.3, step: 0.1, conf: 'estime', src: ['gamedata'], note: 'Mongoose Bite, Strider Kick et Counterattack utilisent des « dégâts d’arme normalisés » dans le client. Valeurs standard de WoW.' },
+  { key: 'normSpeed1h', group: 'Formules', label: 'Vitesse normalisée, arme à une main (s)', value: 2.4, step: 0.1, conf: 'estime', src: ['gamedata'] },
+  { key: 'normSpeedDagger', group: 'Formules', label: 'Vitesse normalisée, dague (s)', value: 1.7, step: 0.1, conf: 'estime', src: ['gamedata'] },
+
+  // Scores des objets (Forever affiche toucher, crit, hâte et expertise en scores)
+  { key: 'hitRatingPerPct', group: 'Scores des objets', label: 'Score de toucher pour 1 %', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de toucher en Classic devient +10 en Forever (Pendentif croc d’Onyxia, Heaume Cœur-de-lion). Niveau 30 estimé (échelle de TBC).' },
+  { key: 'critRatingPerPct', group: 'Scores des objets', label: 'Score de crit pour 1 %', value: { 60: 14, 30: 5.92 }, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de crit en Classic devient +14 en Forever (Jambières en diablosaure). Niveau 30 estimé.' },
+  { key: 'hasteRatingPerPct', group: 'Scores des objets', label: 'Score de hâte pour 1 %', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'estime', src: [], note: 'Valeur du niveau 60 de TBC.' },
+  { key: 'expertiseRatingPerPct', group: 'Scores des objets', label: 'Score d’expertise pour 1 % (esquive/parade)', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'estime', src: ['itemization'], note: 'Valeur du niveau 60 de TBC (2,5 par point d’expertise, 0,25 % par point).' },
 
   // Raptor Strike
-  { key: 'raptorBonus', group: 'Raptor Strike', label: 'Bonus de dégâts (dégâts d’arme + X)', value: { 60: 70, 30: 25 }, step: 1, conf: 'communaute', src: ['wfTalents', 'foreverchanges'], note: 'Rang 8 : arme + 70 (Classic : +140). Niveau 30 (rang 4) estimé.' },
-  { key: 'raptorMana', group: 'Raptor Strike', label: 'Coût en mana', value: { 60: 100, 30: 40 }, step: 1, conf: 'communaute', src: ['wfTalents', 'mmonster'] },
-  { key: 'raptorCd', group: 'Raptor Strike', label: 'Recharge (s)', value: 6, step: 0.5, conf: 'communaute', src: ['wfTalents', 'mmonster'] },
-  { key: 'raptorMode', group: 'Raptor Strike', label: 'Fonctionnement', value: 'instant', options: { instant: 'Instantané (déclenche le GCD)', instantOffGcd: 'Instantané (hors GCD)', nextSwing: 'Prochaine attaque (Classic)' }, conf: 'estime', src: ['wfTalents'], note: 'Le tooltip Forever dit « Instant » ; Classic utilisait la prochaine attaque.' },
+  { key: 'raptorBonus', group: 'Raptor Strike', label: 'Bonus de dégâts (dégâts d’arme + X)', value: { 60: 70, 30: 30 }, step: 1, conf: 'client', src: ['gamedata'], note: 'Rang 8 : arme + 70 ; rang 4 (niveau 30) : arme + 30. Dégâts d’arme non normalisés.' },
+  { key: 'raptorMana', group: 'Raptor Strike', label: 'Coût en mana', value: { 60: 100, 30: 45 }, step: 1, conf: 'client', src: ['gamedata'] },
+  { key: 'raptorCd', group: 'Raptor Strike', label: 'Recharge (s)', value: 6, step: 0.5, conf: 'client', src: ['gamedata'] },
+  { key: 'raptorMode', group: 'Raptor Strike', label: 'Fonctionnement', value: 'nextSwing', options: { nextSwing: 'Prochaine attaque (comme en Classic)', instantOffGcd: 'Instantané (hors GCD)', instant: 'Instantané (déclenche le GCD)' }, conf: 'estime', src: ['gamedata'], note: 'Le client ne donne pas de GCD à Raptor Strike, comme à Frappe héroïque (coup sur la prochaine attaque). « Instantané hors GCD » reste possible.' },
 
   // Mongoose Bite
-  { key: 'mongooseBonus', group: 'Mongoose Bite', label: 'Bonus de dégâts (dégâts d’arme + X)', value: { 60: 57, 30: 22 }, step: 1, conf: 'communaute', src: ['wclboxMongoose'], note: 'Forever : dégâts d’arme + bonus (Classic : 115 fixes au rang 4).' },
-  { key: 'mongooseMana', group: 'Mongoose Bite', label: 'Coût en mana', value: { 60: 65, 30: 26 }, step: 1, conf: 'communaute', src: ['wclboxMongoose', 'mmonster'] },
-  { key: 'mongooseCd', group: 'Mongoose Bite', label: 'Recharge (s)', value: 5, step: 0.5, conf: 'communaute', src: ['wclboxMongoose'] },
+  { key: 'mongooseBonus', group: 'Mongoose Bite', label: 'Bonus de dégâts (dégâts d’arme normalisés + X)', value: { 60: 57, 30: 22 }, step: 1, conf: 'client', src: ['gamedata', 'wclboxMongoose'], note: 'Rang 4 : arme normalisée + 57 ; rang 2 (niveau 30) : + 22.' },
+  { key: 'mongooseMana', group: 'Mongoose Bite', label: 'Coût en mana', value: { 60: 65, 30: 40 }, step: 1, conf: 'client', src: ['gamedata'] },
+  { key: 'mongooseCd', group: 'Mongoose Bite', label: 'Recharge (s)', value: 5, step: 0.5, conf: 'client', src: ['gamedata'] },
   { key: 'dodgeWindow', group: 'Mongoose Bite', label: 'Fenêtre après une esquive (s)', value: 5, step: 0.5, conf: 'classic', src: ['wowsims'] },
 
   // Expose Prey
-  { key: 'exposePreyChance', group: 'Expose Prey', label: 'Chance de proc par rang, %', value: 5, step: 0.5, conf: 'communaute', src: ['mobalytics', 'classicwowgg', 'leprestore'], note: 'Sources : 5 % par rang (10 % à 2/2). Une source annonce « jusqu’à 10 % ».' },
+  { key: 'exposePreyChance', group: 'Expose Prey', label: 'Chance de proc par rang, %', value: 5, step: 0.5, conf: 'client', src: ['gamedata', 'mobalytics'], note: 'Le client donne 10 % au rang maximal, sur les attaques et techniques de mêlée et à distance.' },
   { key: 'exposePreyWindow', group: 'Expose Prey', label: 'Durée de la fenêtre Mongoose (s)', value: 10, step: 0.5, conf: 'officiel', src: ['devnotes'], note: 'Passée de 5 à 10 s le 8 octobre.' },
-  { key: 'exposePreyOn', group: 'Expose Prey', label: 'Attaques qui peuvent déclencher', value: 'all', options: { all: 'Toutes les attaques qui touchent', white: 'Attaques automatiques seulement' }, conf: 'estime', src: ['deepdive'] },
+  { key: 'exposePreyOn', group: 'Expose Prey', label: 'Attaques qui peuvent déclencher', value: 'all', options: { all: 'Toutes les attaques qui touchent', white: 'Attaques automatiques seulement' }, conf: 'client', src: ['gamedata'] },
 
   // Lacerating Strikes
-  { key: 'laceratingPct', group: 'Lacerating Strikes', label: 'Saignement, % des dégâts de la Morsure', value: 40, step: 1, conf: 'communaute', src: ['deepdive', 'mobalytics'] },
-  { key: 'laceratingDuration', group: 'Lacerating Strikes', label: 'Durée (s)', value: 21, step: 1, conf: 'officiel', src: ['deepdive'] },
-  { key: 'laceratingTick', group: 'Lacerating Strikes', label: 'Intervalle entre tics (s)', value: 3, step: 0.5, conf: 'estime', src: [] },
+  { key: 'laceratingPct', group: 'Lacerating Strikes', label: 'Saignement, % des dégâts de la Morsure', value: 40, step: 1, conf: 'client', src: ['gamedata', 'deepdive'] },
+  { key: 'laceratingDuration', group: 'Lacerating Strikes', label: 'Durée (s)', value: 21, step: 1, conf: 'client', src: ['gamedata'] },
+  { key: 'laceratingTick', group: 'Lacerating Strikes', label: 'Intervalle entre tics (s)', value: 3, step: 0.5, conf: 'client', src: ['gamedata'] },
   { key: 'laceratingRefresh', group: 'Lacerating Strikes', label: 'Réapplication', value: 'replace', options: { replace: 'Remplace (le reste est perdu)', rolling: 'Cumule le reste dans le nouveau' }, conf: 'estime', src: [], note: 'Comportement non documenté. « Remplace » est l’hypothèse prudente.' },
-  { key: 'laceratingCanCrit', group: 'Lacerating Strikes', label: 'Les tics peuvent critiquer', value: false, conf: 'estime', src: ['mobalytics'], note: 'Une source dit que le saignement peut critiquer.' },
+  { key: 'laceratingCanCrit', group: 'Lacerating Strikes', label: 'Les tics peuvent critiquer', value: true, conf: 'client', src: ['gamedata'], note: 'Attribut « periodic can crit » dans le client.' },
+
+  // Lacerate (technique)
+  { key: 'lacerateTick', group: 'Lacerate', label: 'Dégâts par tic (7 tics en 21 s)', value: { 60: 58, 30: 28 }, step: 1, conf: 'client', src: ['gamedata'], note: 'Rang 4 : 58 par tic au niveau 60. Niveau 30 : rang 2 supposé appris.' },
+  { key: 'lacerateMana', group: 'Lacerate', label: 'Coût en mana', value: { 60: 95, 30: 65 }, step: 1, conf: 'client', src: ['gamedata'] },
+  { key: 'lacerateDuration', group: 'Lacerate', label: 'Durée (s)', value: 21, step: 1, conf: 'client', src: ['gamedata'] },
 
   // Strider Kick & Counterattack
-  { key: 'striderWeaponPct', group: 'Strider Kick', label: 'Dégâts, % de l’arme', value: 100, step: 5, conf: 'communaute', src: ['striderKick'] },
-  { key: 'striderManaPct', group: 'Strider Kick', label: 'Coût, % du mana de base', value: 5.81, step: 0.01, conf: 'communaute', src: ['striderKick'] },
-  { key: 'striderCd', group: 'Strider Kick', label: 'Recharge (s)', value: 8, step: 0.5, conf: 'communaute', src: ['striderKick'] },
-  { key: 'counterWeaponPct', group: 'Counterattack', label: 'Dégâts, % de l’arme', value: 50, step: 5, conf: 'communaute', src: ['counterattack'] },
-  { key: 'counterBonus', group: 'Counterattack', label: 'Bonus de dégâts', value: { 60: 110, 30: 40 }, step: 1, conf: 'communaute', src: ['counterattack'], note: 'Rang 4 au niveau 60 ; rang 2 au niveau 30 estimé.' },
-  { key: 'counterMana', group: 'Counterattack', label: 'Coût en mana', value: { 60: 85, 30: 45 }, step: 1, conf: 'communaute', src: ['counterattack'] },
-  { key: 'counterCd', group: 'Counterattack', label: 'Recharge (s)', value: 5, step: 0.5, conf: 'classic', src: ['wowsims'] },
+  { key: 'striderWeaponPct', group: 'Strider Kick', label: 'Dégâts, % de l’arme normalisée', value: 100, step: 5, conf: 'client', src: ['gamedata', 'striderKick'] },
+  { key: 'striderManaPct', group: 'Strider Kick', label: 'Coût, % du mana de base', value: 5.81, step: 0.01, conf: 'client', src: ['gamedata'] },
+  { key: 'striderCd', group: 'Strider Kick', label: 'Recharge (s)', value: 8, step: 0.5, conf: 'client', src: ['gamedata'] },
+  { key: 'counterWeaponPct', group: 'Counterattack', label: 'Dégâts, % de (arme normalisée + bonus)', value: 50, step: 5, conf: 'client', src: ['gamedata'] },
+  { key: 'counterBonus', group: 'Counterattack', label: 'Bonus de dégâts', value: { 60: 110, 30: 40 }, step: 1, conf: 'client', src: ['gamedata'], note: 'Rang 4 au niveau 60, rang 2 au niveau 30.' },
+  { key: 'counterMana', group: 'Counterattack', label: 'Coût en mana', value: { 60: 85, 30: 45 }, step: 1, conf: 'client', src: ['gamedata'] },
+  { key: 'counterCd', group: 'Counterattack', label: 'Recharge (s)', value: 5, step: 0.5, conf: 'client', src: ['gamedata'] },
 
   // Piège d’immolation
-  { key: 'trapDamage', group: 'Piège d’immolation', label: 'Dégâts de Feu totaux', value: { 60: 690, 30: 215 }, step: 5, conf: 'classic', src: ['wowsims'] },
-  { key: 'trapMana', group: 'Piège d’immolation', label: 'Coût en mana', value: { 60: 245, 30: 90 }, step: 5, conf: 'classic', src: ['wowsims'] },
-  { key: 'trapDuration', group: 'Piège d’immolation', label: 'Durée du DoT (s)', value: 15, step: 1, conf: 'classic', src: [] },
-  { key: 'trapCd', group: 'Piège d’immolation', label: 'Recharge (s)', value: 15, step: 1, conf: 'classic', src: ['wowsims'] },
+  { key: 'trapDamage', group: 'Piège d’immolation', label: 'Dégâts de Feu totaux', value: { 60: 690, 30: 215 }, step: 5, conf: 'client', src: ['gamedata'], note: '5 tics de 138 (rang 5) ou de 43 (rang 2).' },
+  { key: 'trapMana', group: 'Piège d’immolation', label: 'Coût en mana', value: { 60: 245, 30: 90 }, step: 5, conf: 'client', src: ['gamedata'] },
+  { key: 'trapDuration', group: 'Piège d’immolation', label: 'Durée du DoT (s)', value: 15, step: 1, conf: 'client', src: ['gamedata'] },
+  { key: 'trapCd', group: 'Piège d’immolation', label: 'Recharge (s)', value: 30, step: 1, conf: 'client', src: ['gamedata'], note: '30 s dans le client (15 s en Classic).' },
+  { key: 'trapCanCrit', group: 'Piège d’immolation', label: 'Les tics peuvent critiquer (×1,5)', value: true, conf: 'client', src: ['gamedata'] },
   { key: 'trapArm', group: 'Piège d’immolation', label: 'Délai avant déclenchement (s)', value: 1, step: 0.5, conf: 'estime', src: [] },
 
-  // Talents à valeur incertaine
-  { key: 'savageStrikesPerRank', group: 'Talents', label: 'Savage Strikes, % par rang', value: 2, step: 0.5, conf: 'communaute', src: ['mobalytics', 'deepdive'] },
-  { key: 'savageStrikesMode', group: 'Talents', label: 'Savage Strikes, effet', value: 'crit', options: { crit: 'Crit des techniques de mêlée', damage: 'Tous les dégâts de mêlée' }, conf: 'communaute', src: ['mobalytics', 'deepdive'], note: 'Les guides lisent « crit des techniques », un résumé de l’article Blizzard lit « dégâts ».' },
-  { key: 'predatorCritPerRank', group: 'Talents', label: 'Predator’s Edge, dégâts critiques % par rang', value: 6, step: 1, conf: 'communaute', src: ['mobalytics', 'classicwowgg'] },
-  { key: 'predatorOhPerRank', group: 'Talents', label: 'Predator’s Edge, dégâts main gauche % par rang', value: 10, step: 1, conf: 'communaute', src: ['mobalytics', 'classicwowgg'] },
-  { key: 'predatorCritMode', group: 'Talents', label: 'Predator’s Edge, application', value: 'bonus', options: { bonus: 'Sur le bonus de crit (200 % → 230 %)', total: 'Sur le total (200 % → 260 %)' }, conf: 'estime', src: [], note: 'Même formulation que Mortal Shots en Classic, qui s’applique au bonus.' },
-  { key: 'lightningReflexesPerRank', group: 'Talents', label: 'Lightning Reflexes, % Agilité par rang', value: 2, step: 0.5, conf: 'communaute', src: ['classicwowgg', 'wfTalents'], note: 'Réduit de 3 % à 2 % par rang en septembre.' },
-  { key: 'surefootedPerRank', group: 'Talents', label: 'Surefooted, % toucher par rang', value: 1, step: 0.5, conf: 'communaute', src: ['wfTalents'] },
-  { key: 'resourcefulnessPerRank', group: 'Talents', label: 'Resourcefulness, % de mana économisé par rang', value: 30, step: 5, conf: 'communaute', src: ['mobalytics', 'wfTalents'] },
-  { key: 'resourcefulnessProc', group: 'Talents', label: 'Resourcefulness, chance sur crit de garder 50 % de la regen (30 s), %', value: 0, step: 5, conf: 'estime', src: ['wfTalents'], note: 'Les sources donnent 0 % à 40 %.' },
-  { key: 'cleverTrapsPerRank', group: 'Talents', label: 'Clever Traps, % dégâts des pièges par rang', value: 15, step: 5, conf: 'classic', src: [] },
-  { key: 'survivalistsDiscipline', group: 'Talents', label: 'Survivalist’s Discipline, % de recharge des pièges', value: 40, step: 5, conf: 'communaute', src: ['wfTalents'] },
+  // Talents
+  { key: 'savageStrikesPerRank', group: 'Talents', label: 'Savage Strikes, % par rang', value: 10, step: 0.5, conf: 'client', src: ['gamedata'], note: 'Le client donne +20 % de crit à Raptor Strike, Mongoose Bite et d’autres techniques de mêlée, pas aux attaques auto. Les guides de septembre parlaient de 2 % par rang.' },
+  { key: 'savageStrikesMode', group: 'Talents', label: 'Savage Strikes, effet', value: 'crit', options: { crit: 'Crit des techniques de mêlée', damage: 'Tous les dégâts de mêlée' }, conf: 'client', src: ['gamedata'] },
+  { key: 'predatorCritPerRank', group: 'Talents', label: 'Predator’s Edge, dégâts critiques % par rang', value: 6, step: 1, conf: 'client', src: ['gamedata'], note: '+30 % au rang maximal.' },
+  { key: 'predatorOhPerRank', group: 'Talents', label: 'Predator’s Edge, dégâts main gauche % par rang', value: 10, step: 1, conf: 'client', src: ['gamedata'], note: '+50 % au rang maximal.' },
+  { key: 'predatorScope', group: 'Talents', label: 'Predator’s Edge, coups concernés', value: 'abilities', options: { abilities: 'Techniques et saignements', all: 'Toutes les attaques de mêlée' }, conf: 'client', src: ['gamedata'], note: 'Le client l’applique à une liste de techniques du chasseur, pas aux attaques auto.' },
+  { key: 'predatorCritMode', group: 'Talents', label: 'Predator’s Edge, application', value: 'bonus', options: { bonus: 'Sur le bonus de crit (200 % → 230 %)', total: 'Sur le total (200 % → 260 %)' }, conf: 'client', src: ['gamedata'], note: 'Modificateur « CRIT_DAMAGE_BONUS », comme Mortal Shots.' },
+  { key: 'lightningReflexesPerRank', group: 'Talents', label: 'Lightning Reflexes, % Agilité par rang', value: 2, step: 0.5, conf: 'communaute', src: ['classicwowgg', 'wfTalents'], note: 'Absent de l’export du client : valeur des guides.' },
+  { key: 'lethalAttacksPerRank', group: 'Talents', label: 'Lethal Attacks, % de crit par rang', value: 1, step: 0.5, conf: 'client', src: ['gamedata'] },
+  { key: 'surefootedPerRank', group: 'Talents', label: 'Surefooted, % toucher par rang', value: 1, step: 0.5, conf: 'client', src: ['gamedata'], note: '+3 % au rang maximal.' },
+  { key: 'resourcefulnessPerRank', group: 'Talents', label: 'Resourcefulness, % de mana économisé par rang', value: 30, step: 5, conf: 'client', src: ['gamedata'], note: '−60 % au rang maximal.' },
+  { key: 'resourcefulnessProc', group: 'Talents', label: 'Resourcefulness, chance sur crit de garder 50 % de la regen (30 s), %', value: 0, step: 5, conf: 'estime', src: ['wfTalents'], note: 'Le client ne donne pas le taux.' },
+  { key: 'cleverTrapsPerRank', group: 'Talents', label: 'Clever Traps, % dégâts des pièges par rang', value: 15, step: 5, conf: 'client', src: ['gamedata'], note: '+30 % au rang maximal.' },
+  { key: 'survivalistsDiscipline', group: 'Talents', label: 'Survivalist’s Discipline, % de recharge des pièges', value: 40, step: 5, conf: 'client', src: ['gamedata'] },
   { key: 'survivalTacticsPerRank', group: 'Talents', label: 'Survival Tactics, % toucher des pièges par rang', value: 5, step: 1, conf: 'communaute', src: ['wfTalents', 'deepdive'], note: 'Les sources donnent 5 % ou 10 % au total.' },
-  { key: 'improvedTrackingPerRank', group: 'Talents', label: 'Improved Tracking, % dégâts par rang (cible pistée)', value: 1, step: 0.5, conf: 'estime', src: ['mobalytics'] },
-  { key: 'focusedFirePerRank', group: 'Talents', label: 'Focused Fire, % dégâts par rang (familier actif)', value: 1, step: 0.5, conf: 'estime', src: [] },
-  { key: 'deadlyAspectsChance', group: 'Talents', label: 'Deadly Aspects, chance sur attaque auto, %', value: 2, step: 0.5, conf: 'communaute', src: ['foreverchanges'] },
+  { key: 'improvedTrackingPerRank', group: 'Talents', label: 'Improved Tracking, % dégâts par rang (cible pistée)', value: 1, step: 0.5, conf: 'client', src: ['gamedata'], note: '+5 % au rang maximal.' },
+  { key: 'focusedFirePerRank', group: 'Talents', label: 'Focused Fire, % dégâts par rang (familier actif)', value: 2, step: 0.5, conf: 'client', src: ['gamedata'], note: '+4 % au rang maximal.' },
+  { key: 'deadlyAspectsChance', group: 'Talents', label: 'Deadly Aspects, chance sur attaque auto, %', value: 10, step: 0.5, conf: 'client', src: ['gamedata', 'foreverchanges'], note: 'Le talent ajoute 10 points de chance au proc « Quick Strikes » d’Aspect of the Beast. Chance de base inconnue.' },
   { key: 'deadlyAspectsHaste', group: 'Talents', label: 'Deadly Aspects, hâte de mêlée, %', value: 30, step: 1, conf: 'communaute', src: ['foreverchanges'] },
   { key: 'deadlyAspectsDuration', group: 'Talents', label: 'Deadly Aspects, durée (s)', value: 12, step: 1, conf: 'communaute', src: ['foreverchanges'] },
 
   // Aspects et raciaux
-  { key: 'beastAp', group: 'Aspects et raciaux', label: 'Aspect of the Beast, PA de mêlée', value: { 60: 110, 30: 50 }, step: 5, conf: 'communaute', src: ['forevergithub', 'icyveins'], note: '4 rangs : 50 / 70 / 90 / 110 (une seule source au-delà du rang 1).' },
+  { key: 'beastAp', group: 'Aspects et raciaux', label: 'Aspect of the Beast, PA de mêlée', value: { 60: 110, 30: 50 }, step: 5, conf: 'client', src: ['gamedata', 'forevergithub'], note: '4 rangs : 50 / 70 / 90 / 110.' },
   { key: 'bloodFuryPct', group: 'Aspects et raciaux', label: 'Fureur sanguinaire, % du PA de base', value: 25, step: 1, conf: 'classic', src: ['wowsims'] },
   { key: 'berserkingHaste', group: 'Aspects et raciaux', label: 'Berserker, % de hâte', value: 10, step: 1, conf: 'classic', src: ['wowsims'] },
   { key: 'windfuryChance', group: 'Aspects et raciaux', label: 'Totem Furie-des-vents, chance %', value: 20, step: 1, conf: 'classic', src: ['wowsims'] },
@@ -244,10 +270,11 @@ export const MECHANICS = [
 
 // Talents utiles au sim. `need` = points requis dans l’arbre (pour l’affichage).
 export const TALENTS = [
-  { id: 'savageStrikes', tree: 'Survie', name: 'Savage Strikes', max: 2, need: 5, desc: 'Crit des techniques de mêlée (ou dégâts, selon l’hypothèse).' },
+  { id: 'savageStrikes', tree: 'Survie', name: 'Savage Strikes', max: 2, need: 5, desc: '+Crit des techniques de mêlée (+20 % au rang maximal).' },
   { id: 'lightningReflexes', tree: 'Survie', name: 'Lightning Reflexes', max: 5, need: 25, desc: '+Agilité en %.' },
+  { id: 'lethalAttacks', tree: 'Précision', name: 'Lethal Attacks', max: 5, need: 0, desc: '+1 % de crit par rang (physique et sorts).' },
   { id: 'surefooted', tree: 'Survie', name: 'Surefooted', max: 3, need: 10, desc: '+Toucher (unifié mêlée, distance, sorts).' },
-  { id: 'predatorsEdge', tree: 'Survie', name: 'Predator’s Edge', max: 5, need: 10, desc: '+Dégâts critiques de mêlée et +dégâts de la main gauche.' },
+  { id: 'predatorsEdge', tree: 'Survie', name: 'Predator’s Edge', max: 5, need: 10, desc: '+Dégâts critiques des techniques et +dégâts de la main gauche.' },
   { id: 'counterattack', tree: 'Survie', name: 'Counterattack', max: 1, need: 15, desc: 'Après une parade : 50 % de l’arme + bonus, inévitable.' },
   { id: 'resourcefulness', tree: 'Survie', name: 'Resourcefulness', max: 2, need: 20, desc: '−Coût en mana des techniques de mêlée et des pièges.' },
   { id: 'exposePrey', tree: 'Survie', name: 'Expose Prey', max: 2, need: 20, desc: 'Les attaques sur une cible marquée activent Mongoose Bite.' },
@@ -265,12 +292,12 @@ export const TALENT_PRESETS = {
   60: {
     savageStrikes: 2, lightningReflexes: 5, surefooted: 3, predatorsEdge: 5, counterattack: 1,
     resourcefulness: 2, exposePrey: 2, striderKick: 1, laceratingStrikes: 1, cleverTraps: 0,
-    survivalistsDiscipline: 0, survivalTactics: 0, improvedTracking: 0, deadlyAspects: 0, focusedFire: 0,
+    survivalistsDiscipline: 0, survivalTactics: 0, improvedTracking: 0, deadlyAspects: 0, focusedFire: 0, lethalAttacks: 0,
   },
   30: {
     savageStrikes: 2, lightningReflexes: 0, surefooted: 0, predatorsEdge: 4, counterattack: 1,
     resourcefulness: 2, exposePrey: 2, striderKick: 1, laceratingStrikes: 0, cleverTraps: 0,
-    survivalistsDiscipline: 0, survivalTactics: 0, improvedTracking: 0, deadlyAspects: 0, focusedFire: 0,
+    survivalistsDiscipline: 0, survivalTactics: 0, improvedTracking: 0, deadlyAspects: 0, focusedFire: 0, lethalAttacks: 0,
   },
 };
 
@@ -321,9 +348,10 @@ export const BUFF_PRESETS = {
 };
 
 export const ROTATION_ABILITIES = {
-  mongoose: { name: 'Mongoose Bite', desc: 'Pendant une fenêtre (Expose Prey ou esquive).' },
+  mongoose: { name: 'Mongoose Bite', desc: 'Pendant une fenêtre (Expose Prey ou esquive). Arme normalisée + bonus.' },
   raptor: { name: 'Raptor Strike', desc: 'Dégâts d’arme + bonus, 6 s de recharge.' },
-  striderKick: { name: 'Strider Kick', desc: 'Talent : 100 % de l’arme, 8 s de recharge.' },
+  striderKick: { name: 'Strider Kick', desc: 'Talent : 100 % de l’arme normalisée, 8 s de recharge.' },
+  lacerate: { name: 'Lacerate', desc: 'Saignement de 21 s, relancé quand il se termine.' },
   counterattack: { name: 'Counterattack', desc: 'Talent : après une parade (si vous êtes attaqué).' },
   immolation: { name: 'Piège d’immolation', desc: 'DoT de Feu, ne suit pas le PA.' },
 };
@@ -384,6 +412,7 @@ export function defaultProfile(level = 60) {
       { id: 'mongoose', enabled: true, minMana: 0 },
       { id: 'raptor', enabled: true, minMana: 0 },
       { id: 'striderKick', enabled: true, minMana: 0 },
+      { id: 'lacerate', enabled: true, minMana: 20 },
       { id: 'counterattack', enabled: true, minMana: 0 },
       { id: 'immolation', enabled: false, minMana: 30 },
     ],

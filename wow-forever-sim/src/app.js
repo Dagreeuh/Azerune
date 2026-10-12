@@ -6,9 +6,11 @@ import {
   defaultProfile, mechanicDefault,
 } from './data.js';
 import {
-  ITEM_STATS, ITEM_TYPES, ON_USE_TYPES, SLOTS, canEquip, equipItem, equipmentTotals, exampleEquipment,
-  exampleItems, isWeaponType, itemSummary, parseTooltip, resolveProfile, slotDef, weaponDps,
+  ARMOR_NAMES, ITEM_STATS, ITEM_TYPES, ON_USE_TYPES, QUALITY_NAMES, SLOTS, bestEquipment, canEquip, dbItem, dbItems,
+  epFromWeights, equipItem, equipmentTotals, findItem, isWeaponType, itemScore, itemSummary, parseTooltip,
+  raceSkill, ratingFactors, resolveProfile, slotDef, wearable, weaponDps, wowheadUrl,
 } from './gear.js';
+import { ITEM_DB_INFO } from './itemdb.js';
 import {
   buildCharacter, characterSheet, combatTrace, createAccumulator, label, pairedDiff, profileVariants,
   simulateBatch, statWeightsFromRuns, summarize,
@@ -68,6 +70,13 @@ const state = {
   editorMessage: '',
   libType: 'all',
   libLevel: 'all',
+  dbQuery: '',
+  dbType: 'all',
+  dbQuality: 0,
+  dbUsable: true,
+  autoQuality: 3,
+  autoStyle: '2h',
+  compareDb: true,
 };
 
 // ---------- profils et objets ----------
@@ -127,25 +136,23 @@ function emptyGear(level) {
   return g;
 }
 
+// Profils d’exemple équipés d’objets réels de la base (meilleurs objets selon les poids par défaut).
 function sampleProfiles() {
-  const a = defaultProfile(60);
-  a.id = 'exemple-60-2m';
-  a.name = 'Exemple · niveau 60 · arme à deux mains';
-  a.gear = emptyGear(60);
-  a.equipment = exampleEquipment(60);
-
-  const b = defaultProfile(60);
-  b.id = 'exemple-60-dw';
-  b.name = 'Exemple · niveau 60 · ambidextrie';
-  b.gear = emptyGear(60);
-  b.equipment = exampleEquipment(60, true);
-
-  const c = defaultProfile(30);
-  c.id = 'exemple-30-beta';
-  c.name = 'Exemple · niveau 30 (bêta) · 2M';
-  c.gear = emptyGear(30);
-  c.equipment = exampleEquipment(30);
-  return [a, b, c];
+  const make = (level, style, quality, id, name) => {
+    const p = defaultProfile(level);
+    p.id = id;
+    p.name = name;
+    p.gear = emptyGear(level);
+    p.twoHand = style === '2h';
+    p.equipment = bestEquipment(p, { style, maxQuality: quality });
+    return p;
+  };
+  return [
+    make(60, '2h', 3, 'exemple-60-bleu-2m', 'Exemple · niveau 60 · objets bleus · 2M'),
+    make(60, 'dw', 3, 'exemple-60-bleu-dw', 'Exemple · niveau 60 · objets bleus · ambidextrie'),
+    make(60, '2h', 4, 'exemple-60-epique-2m', 'Exemple · niveau 60 · objets épiques · 2M'),
+    make(30, '2h', 3, 'exemple-30-beta', 'Exemple · niveau 30 (bêta) · objets bleus'),
+  ];
 }
 
 function load() {
@@ -155,13 +162,15 @@ function load() {
   } catch {
     data = null;
   }
-  state.items = Array.isArray(data?.items) ? data.items.map(sanitizeItem).filter(Boolean) : exampleItems();
+  state.items = Array.isArray(data?.items) ? data.items.map(sanitizeItem).filter(Boolean) : [];
   if (data && Array.isArray(data.profiles) && data.profiles.length) {
     state.profiles = data.profiles.map(normalizeProfile);
     state.currentId = data.currentId;
     state.iterations = [500, 1000, 2000, 5000, 10000].includes(data.iterations) ? data.iterations : 2000;
     state.tab = TABS.some(([k]) => k === data.tab) ? data.tab : 'equip';
     state.resultsTab = RESULT_TABS.some(([k]) => k === data.resultsTab) ? data.resultsTab : 'summary';
+    if ([2, 3, 4, 5].includes(data.autoQuality)) state.autoQuality = data.autoQuality;
+    if (['2h', 'dw'].includes(data.autoStyle)) state.autoStyle = data.autoStyle;
   } else {
     state.profiles = sampleProfiles();
     state.currentId = state.profiles[0].id;
@@ -174,6 +183,7 @@ function save() {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       profiles: state.profiles, items: state.items, currentId: state.currentId,
       iterations: state.iterations, tab: state.tab, resultsTab: state.resultsTab,
+      autoQuality: state.autoQuality, autoStyle: state.autoStyle,
     }));
   } catch {
     // Stockage indisponible (navigation privée) : le sim fonctionne sans.
@@ -310,6 +320,7 @@ function renderProfileBar() {
 function exportPayload(p) {
   const ids = new Set(Object.values(p.equipment || {}));
   return JSON.stringify({ format: 'sim-survie-forever', profile: { ...p, id: undefined }, items: state.items.filter((i) => ids.has(i.id)) }, null, 2);
+  // Les objets de la base (« db… ») ne sont pas copiés : leur identifiant suffit.
 }
 
 function importPayload(data) {
@@ -394,7 +405,7 @@ function renderSheet() {
     ['Érafles (pénalité)', `${fmt0(s.glance)} % (−${fmt0(s.glancePenalty)} %)`],
     ['Compétence d’arme', fmt0(s.skill)],
     ['Armure du boss', `${fmt0(s.armor)} (−${fmt(s.armorReduction)} %)`],
-    ['Dégâts critiques', `${fmt0(s.critMult * 100)} %`],
+    ['Dégâts critiques', `${fmt0(s.critMultWhite * 100)} % auto · ${fmt0(s.critMult * 100)} % techniques`],
     ['Mana', fmt0(s.mana)],
     ['Expose Prey', `${fmt(s.exposePrey)} % par coup`],
     ['Coût RS / MB / SK', `${fmt0(s.costs.raptor)} / ${fmt0(s.costs.mongoose)} / ${fmt0(s.costs.striderKick)}`],
@@ -433,36 +444,58 @@ function renderPanel() {
 
 // ----- Équipement -----
 
-// Objets proposés pour un profil : ceux de son niveau (ou sans niveau), plus ceux déjà équipés.
+const lookup = (id) => findItem(state.items, id);
+
+// Objets proposés dans les listes : la bibliothèque (niveau du profil) et les objets déjà équipés.
 function itemsForProfile(p) {
-  const equipped = new Set(Object.values(p.equipment || {}));
-  return state.items.filter((i) => !i.level || i.level === p.level || equipped.has(i.id));
+  const equipped = new Set(Object.values(p.equipment || {}).filter(Boolean));
+  const own = state.items.filter((i) => !i.level || i.level === p.level || equipped.has(i.id));
+  const fromDb = [...equipped].filter((id) => String(id).startsWith('db')).map((id) => dbItem(id)).filter(Boolean);
+  return [...own, ...fromDb];
 }
 
-function itemValue(item) {
-  const w = state.weights[current().id];
-  if (!w) return null;
-  const ep = Object.fromEntries(w.rows.map((r) => [r.key, r.ep]));
-  let v = 0;
-  for (const s of ITEM_STATS) {
-    const n = Number(item.stats?.[s.key]) || 0;
-    if (n && ep[s.key] !== undefined) v += n * ep[s.key];
-  }
-  if (item.weapon && ep.weapon !== undefined) v += weaponDps(item.weapon) * ep.weapon;
-  return v;
+function currentEp(p = current()) {
+  const w = state.weights[p.id];
+  return { ep: epFromWeights(w ? w.rows : null), measured: !!w };
+}
+
+function itemValue(item, p = current(), opts = {}) {
+  return itemScore(item, currentEp(p).ep, ratingFactors(p), { raceSkill: raceSkill(p), ...opts });
+}
+
+function itemTitle(item) {
+  const url = wowheadUrl(item);
+  return h('span', { class: 'item-name' },
+    item.quality ? h('i', { class: `qdot q${item.quality}`, title: QUALITY_NAMES[item.quality], 'aria-hidden': 'true' }) : null,
+    h('span', {}, item.name),
+    url ? h('a', { class: 'wh', href: url, target: '_blank', rel: 'noopener' }, 'Wowhead') : null);
+}
+
+function levelTag(item) {
+  if (item.reqLevel) return `niv. ${item.reqEstimated ? '~' : ''}${item.reqLevel}`;
+  return item.level ? `niv. ${item.level}` : null;
 }
 
 function preferredSlot(p, item) {
   const eq = p.equipment || {};
-  const byId = (id) => state.items.find((i) => i.id === id);
   if (item.type === 'finger') return !eq.finger1 ? 'finger1' : !eq.finger2 ? 'finger2' : 'finger1';
   if (item.type === 'trinket') return !eq.trinket1 ? 'trinket1' : !eq.trinket2 ? 'trinket2' : 'trinket1';
   if (item.type === 'weapon2h') return 'mainHand';
   if (item.type === 'weapon1h') {
-    const main = byId(eq.mainHand);
-    return main && main.type === 'weapon1h' && main.id !== item.id ? 'offHand' : 'mainHand';
+    if (item.ohOnly) return 'offHand';
+    const main = lookup(eq.mainHand);
+    return main && main.type === 'weapon1h' && main.id !== item.id && !item.mhOnly ? 'offHand' : 'mainHand';
   }
   return SLOTS.find((s) => s.accepts.includes(item.type))?.id;
+}
+
+function equipNow(p, item) {
+  const slot = preferredSlot(p, item);
+  if (!slot) return;
+  equipItem(p, state.items, slot, item.id);
+  state.editorMessage = '';
+  state.notice = `« ${item.name} » équipé (${slotDef(slot).name}).`;
+  afterChange(true);
 }
 
 function newDraft(type = 'head') {
@@ -473,14 +506,21 @@ function newDraft(type = 'head') {
   };
 }
 
+// Les objets de la base ne se modifient pas : « Modifier » en crée une copie dans la bibliothèque.
 function editItem(item) {
+  const fromDb = item.source === 'base';
   state.editor = {
     ...newDraft(item.type),
     ...JSON.parse(JSON.stringify(item)),
     weapon: item.weapon ? { ...item.weapon } : newDraft(item.type).weapon,
     onUse: item.onUse ? { ...item.onUse } : newDraft(item.type).onUse,
   };
-  state.editorMessage = `Modification de « ${item.name} ».`;
+  if (fromDb) {
+    Object.assign(state.editor, { id: null, dbId: undefined, source: 'manuel', name: `${item.name} (copie)`, level: current().level });
+    state.editorMessage = `Copie de « ${item.name} » : les objets de la base ne se modifient pas, la copie ira dans votre bibliothèque.`;
+  } else {
+    state.editorMessage = `Modification de « ${item.name} ».`;
+  }
   state.tab = 'equip';
   renderTabs();
   renderPanel();
@@ -512,62 +552,152 @@ function saveDraft(equip) {
   afterChange(true);
 }
 
-function deleteItem(id) {
-  state.items = state.items.filter((i) => i.id !== id);
+function deleteItems(ids) {
+  const set = new Set(ids);
+  state.items = state.items.filter((i) => !set.has(i.id));
   for (const p of state.profiles) {
-    for (const [slot, itemId] of Object.entries(p.equipment || {})) if (itemId === id) p.equipment[slot] = null;
+    for (const [slot, itemId] of Object.entries(p.equipment || {})) if (set.has(itemId)) p.equipment[slot] = null;
   }
   state.confirmItemDelete = null;
   afterChange(true);
 }
 
+function autoEquip(p) {
+  const style = state.autoStyle;
+  p.equipment = bestEquipment(p, { ep: currentEp(p).ep, factors: ratingFactors(p), maxQuality: state.autoQuality, style });
+  p.twoHand = style === '2h';
+  const count = Object.values(p.equipment).filter(Boolean).length;
+  const manual = Object.values(p.gear || {}).some((v) => Number(v));
+  state.notice = `${count} objets de la base équipés (${AUTO_QUALITY[state.autoQuality].toLowerCase()}, ${style === '2h' ? 'arme à deux mains' : 'ambidextrie'}), choisis selon les poids ${currentEp(p).measured ? 'mesurés' : 'par défaut'}.${manual ? ' Vos bonus manuels (onglet Personnage) s’ajoutent encore : remettez-les à zéro s’ils faisaient double emploi.' : ''} Affinez ensuite emplacement par emplacement avec « Comparer ».`;
+  afterChange(true);
+}
+
+const AUTO_QUALITY = { 2: 'Objets verts au plus', 3: 'Objets bleus au plus', 4: 'Objets épiques au plus', 5: 'Objets légendaires au plus' };
+
 function panelEquip(p) {
   const eq = p.equipment || {};
-  const byId = (id) => state.items.find((i) => i.id === id);
-  const main = byId(eq.mainHand);
+  const main = lookup(eq.mainHand);
   const twoHandEquipped = main && main.type === 'weapon2h';
+  const factors = ratingFactors(p);
 
   const rows = SLOTS.map((slot) => {
-    const options = itemsForProfile(p).filter((i) => slot.accepts.includes(i.type))
+    const options = itemsForProfile(p).filter((i) => canEquip(i, slot.id))
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-    const it = byId(eq[slot.id]);
+    const it = lookup(eq[slot.id]);
     const disabled = slot.id === 'offHand' && twoHandEquipped;
     const sel = h('select', { id: `slot-${slot.id}`, 'aria-label': `Objet pour ${slot.name}`, disabled },
       h('option', { value: '' }, disabled ? '— Arme à deux mains équipée —' : '— Vide —'),
-      options.map((o) => h('option', { value: o.id }, o.name)));
+      options.map((o) => h('option', { value: o.id }, `${o.name}${o.source === 'base' ? '' : ' · bibliothèque'}`)));
     sel.value = it && !disabled ? it.id : '';
     sel.addEventListener('change', () => {
       equipItem(p, state.items, slot.id, sel.value || null);
       afterChange(true);
     });
-    const alternatives = options.length + 1;
     return h('div', { class: 'slot-row' },
       h('label', { class: 'slot-name', for: `slot-${slot.id}` }, slot.name),
-      h('div', { class: 'slot-main' }, sel, h('small', { class: 'muted' }, it && !disabled ? itemSummary(it) : '')),
+      h('div', { class: 'slot-main' }, sel,
+        it && !disabled ? h('small', { class: 'muted' },
+          it.quality ? h('i', { class: `qdot q${it.quality}`, 'aria-hidden': 'true' }) : null,
+          itemSummary(it, factors), ' ',
+          wowheadUrl(it) ? h('a', { class: 'wh', href: wowheadUrl(it), target: '_blank', rel: 'noopener' }, 'Wowhead') : null) : null),
       h('div', { class: 'slot-actions' },
-        it && !disabled ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => editItem(it) }, 'Modifier') : null,
+        it && !disabled ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => editItem(it) }, it.source === 'base' ? 'Copier' : 'Modifier') : null,
         h('button', {
-          class: 'btn small', type: 'button', disabled: disabled || alternatives < 2 || !!state.running,
+          class: 'btn small', type: 'button', disabled: disabled || !!state.running,
           onclick: () => { state.resultsTab = 'compare'; state.compareSlot = slot.id; save(); runItemCompare(slot.id); },
         }, 'Comparer')));
   });
 
   const totals = equipmentTotals(p, state.items);
-  const totalText = itemSummary({ stats: totals });
-  const manual = itemSummary({ stats: p.gear });
+  const legacy = state.items.filter((i) => i.source === 'exemple');
+
+  const qualSel = selectEl(AUTO_QUALITY, state.autoQuality, { id: 'auto-quality', 'aria-label': 'Qualité maximale' });
+  qualSel.addEventListener('change', () => { state.autoQuality = Number(qualSel.value); save(); });
+  const styleSel = selectEl({ '2h': 'Arme à deux mains', dw: 'Ambidextrie' }, state.autoStyle, { id: 'auto-style', 'aria-label': 'Style d’arme' });
+  styleSel.addEventListener('change', () => { state.autoStyle = styleSel.value; save(); });
 
   return h('div', { class: 'section-stack' },
-    section('Objets équipés', null,
-      h('p', { class: 'hint' }, 'Choisissez un objet par emplacement. « Comparer » simule tous les objets possibles pour cet emplacement.'),
+    legacy.length ? h('div', { class: 'notice' },
+      `Votre bibliothèque contient ${legacy.length} objets d’exemple fictifs de la version précédente. `,
+      h('button', { class: 'btn small', type: 'button', onclick: () => deleteItems(legacy.map((i) => i.id)) }, 'Les supprimer')) : null,
+    section('Objets équipés', `${ITEM_DB_INFO.count.toLocaleString('fr-FR')} objets réels de Forever disponibles`,
+      h('p', { class: 'hint' }, 'Choisissez un objet par emplacement, ou cherchez-le dans la base ci-dessous. « Comparer » simule les objets possibles pour l’emplacement, y compris les meilleurs de la base.'),
       h('div', { class: 'slots' }, rows),
       h('div', { class: 'totals' },
-        h('div', {}, h('span', { class: 'k' }, 'Total des objets'), h('span', {}, totalText)),
-        h('div', {}, h('span', { class: 'k' }, 'Bonus manuels (onglet Personnage)'), h('span', {}, manual))),
+        h('div', {}, h('span', { class: 'k' }, 'Total des objets'), h('span', {}, itemSummary({ stats: totals }, factors))),
+        h('div', {}, h('span', { class: 'k' }, 'Bonus manuels (onglet Personnage)'), h('span', {}, itemSummary({ stats: p.gear })))),
       h('div', { class: 'io-actions' },
-        h('button', { class: 'btn small', type: 'button', onclick: () => { p.equipment = exampleEquipment(p.level); afterChange(true); } }, `Équiper l’ensemble d’exemple (niv. ${p.level})`),
         h('button', { class: 'btn small', type: 'button', onclick: () => { p.equipment = {}; afterChange(true); } }, 'Tout retirer'))),
+    section('Équiper automatiquement', null,
+      h('p', { class: 'hint' }, `Prend dans la base le meilleur objet de chaque emplacement selon les poids des stats (${currentEp(p).measured ? 'mesurés sur ce profil' : 'poids par défaut ; calculez-les dans « Poids des stats » pour les adapter au profil'}). Les bonus d’ensemble et les effets spéciaux ne comptent pas, et le plafond de toucher n’est pas pris en compte.`),
+      h('div', { class: 'io-actions' }, qualSel, styleSel,
+        h('button', { class: 'btn small primary', type: 'button', onclick: () => autoEquip(p) }, 'Équiper les meilleurs objets'))),
+    dbSearch(p),
     itemEditor(p),
     itemLibrary(p),
+  );
+}
+
+const normalizeText = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+let dbNames = null;
+
+function dbSearch(p) {
+  const q = h('input', { id: 'db-q', type: 'search', placeholder: 'Nom anglais de l’objet, par ex. Devilsaur…', value: state.dbQuery, 'aria-label': 'Rechercher un objet de la base' });
+  q.addEventListener('input', () => { state.dbQuery = q.value; renderDbResults(p); });
+  const typeSel = selectEl({ all: 'Tous les types', ...ITEM_TYPES }, state.dbType, { id: 'db-type', 'aria-label': 'Type d’objet' });
+  typeSel.addEventListener('change', () => { state.dbType = typeSel.value; renderDbResults(p); });
+  const qualSel = selectEl({ 0: 'Toutes qualités', ...AUTO_QUALITY }, state.dbQuality, { id: 'db-quality', 'aria-label': 'Qualité maximale' });
+  qualSel.addEventListener('change', () => { state.dbQuality = Number(qualSel.value); renderDbResults(p); });
+  const usable = h('input', { id: 'db-usable', type: 'checkbox' });
+  usable.checked = state.dbUsable;
+  usable.addEventListener('change', () => { state.dbUsable = usable.checked; renderDbResults(p); });
+
+  const box = section('Base de données Forever', `Build ${ITEM_DB_INFO.build}, lue dans le client`,
+    h('div', { class: 'db-filters' },
+      h('label', { class: 'field db-q', for: 'db-q' }, h('span', {}, 'Rechercher'), q),
+      h('label', { class: 'field', for: 'db-type' }, h('span', {}, 'Type'), typeSel),
+      h('label', { class: 'field', for: 'db-quality' }, h('span', {}, 'Qualité'), qualSel)),
+    h('label', { class: 'check', for: 'db-usable' }, usable, h('span', {}, `Seulement ce que je peux porter au niveau ${p.level}`)),
+    h('div', { id: 'db-results', 'aria-live': 'polite' }));
+  queueMicrotask(() => renderDbResults(p));
+  return box;
+}
+
+function renderDbResults(p) {
+  const box = $('db-results');
+  if (!box) return;
+  if (!dbNames) dbNames = new Map(dbItems().map((i) => [i.id, normalizeText(i.name)]));
+  const words = normalizeText(state.dbQuery).split(/\s+/).filter(Boolean);
+  const { ep, measured } = currentEp(p);
+  const factors = ratingFactors(p);
+  const found = dbItems().filter((i) => (state.dbType === 'all' || i.type === state.dbType)
+    && (!state.dbQuality || i.quality <= state.dbQuality)
+    && (!state.dbUsable || wearable(i, p.level))
+    && words.every((w) => dbNames.get(i.id).includes(w)));
+  const racial = raceSkill(p);
+  const scored = found.map((i) => ({ i, v: itemScore(i, ep, factors, { raceSkill: racial }) })).sort((a, b) => b.v - a.v).slice(0, 25);
+  const equipped = new Set(Object.values(p.equipment || {}));
+  box.replaceChildren(
+    h('p', { class: 'hint' }, found.length
+      ? `${found.length.toLocaleString('fr-FR')} objet${found.length > 1 ? 's' : ''} trouvé${found.length > 1 ? 's' : ''}${found.length > 25 ? ', les 25 meilleurs affichés' : ''}, classés par valeur en PA (poids ${measured ? 'mesurés' : 'par défaut'}).`
+      : 'Aucun objet ne correspond. Les noms sont en anglais, comme dans le client.'),
+    h('div', { class: 'library' }, scored.map(({ i, v }) => h('div', { class: `item-row${equipped.has(i.id) ? ' equipped' : ''}` },
+      h('div', { class: 'item-main' },
+        h('div', { class: 'item-title' },
+          itemTitle(i),
+          h('span', { class: 'tag' }, ITEM_TYPES[i.type]),
+          levelTag(i) ? h('span', { class: 'tag', title: i.reqEstimated ? 'Pas de niveau requis : estimé d’après le niveau d’objet' : '' }, levelTag(i)) : null,
+          i.armor ? h('span', { class: 'tag' }, ARMOR_NAMES[i.armor]) : null,
+          equipped.has(i.id) ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
+        h('small', { class: 'muted' }, itemSummary(i, factors)),
+        h('small', { class: 'muted' }, `≈ ${fmt0(v)} PA`),
+        i.notes.length ? h('small', { class: 'muted' }, i.notes.join(' · ')) : null),
+      h('div', { class: 'slot-actions' },
+        h('button', { class: 'btn small', type: 'button', disabled: equipped.has(i.id), onclick: () => equipNow(p, i) }, 'Équiper'),
+        h('button', {
+          class: 'btn small ghost', type: 'button', disabled: !!state.running,
+          onclick: () => { const slot = preferredSlot(p, i); state.resultsTab = 'compare'; state.compareSlot = slot; save(); runItemCompare(slot, [i.id]); },
+        }, 'Comparer'))))),
   );
 }
 
@@ -593,7 +723,7 @@ function itemEditor(p) {
     renderPanel();
   };
 
-  const head = section(d ? (d.id ? 'Modifier un objet' : 'Nouvel objet') : 'Ajouter un objet', null,
+  const head = section(d ? (d.id ? 'Modifier un objet' : 'Nouvel objet') : 'Ajouter un objet absent de la base', null,
     h('div', { class: 'field' }, paste),
     h('div', { class: 'io-actions' },
       h('button', { class: 'btn small primary', type: 'button', onclick: analyse }, 'Analyser le tooltip'),
@@ -628,6 +758,9 @@ function itemEditor(p) {
 }
 
 function itemLibrary(p) {
+  if (!state.items.length) {
+    return section('Ma bibliothèque', null, h('p', { class: 'empty' }, 'Vide pour l’instant. Les objets que vous saisissez ou copiez depuis la base apparaissent ici, pour tous vos profils.'));
+  }
   const typeOptions = { all: 'Tous les types', ...ITEM_TYPES };
   const levelOptions = { all: 'Tous niveaux', 60: 'Niveau 60', 30: 'Niveau 30' };
   const typeSel = selectEl(typeOptions, state.libType, { id: 'lib-type', 'aria-label': 'Filtrer par type' });
@@ -636,16 +769,16 @@ function itemLibrary(p) {
   levelSel.addEventListener('change', () => { state.libLevel = levelSel.value; renderPanel(); });
 
   const equippedIds = new Set(Object.values(p.equipment || {}));
+  const factors = ratingFactors(p);
   const list = state.items
     .filter((i) => state.libType === 'all' || i.type === state.libType)
     .filter((i) => state.libLevel === 'all' || String(i.level) === state.libLevel)
     .sort((a, b) => Object.keys(ITEM_TYPES).indexOf(a.type) - Object.keys(ITEM_TYPES).indexOf(b.type) || a.name.localeCompare(b.name, 'fr'));
-  const sourceLabel = { exemple: 'Exemple', manuel: 'Saisi', tooltip: 'Tooltip' };
+  const sourceLabel = { exemple: 'Exemple fictif', manuel: 'Saisi', tooltip: 'Tooltip' };
 
-  return section(`Bibliothèque (${state.items.length} objets)`, 'Partagée entre tous les profils',
+  return section(`Ma bibliothèque (${state.items.length} objets)`, 'Vos objets saisis, partagés entre tous les profils',
     h('div', { class: 'io-actions' }, typeSel, levelSel),
     list.length ? h('div', { class: 'library' }, list.map((it) => {
-      const val = itemValue(it);
       const confirming = state.confirmItemDelete === it.id;
       return h('div', { class: `item-row${equippedIds.has(it.id) ? ' equipped' : ''}` },
         h('div', { class: 'item-main' },
@@ -654,16 +787,16 @@ function itemLibrary(p) {
             h('span', { class: 'tag' }, ITEM_TYPES[it.type]),
             h('span', { class: 'tag' }, sourceLabel[it.source] || 'Saisi'),
             equippedIds.has(it.id) ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
-          h('small', { class: 'muted' }, itemSummary(it)),
-          val !== null ? h('small', { class: 'muted' }, `≈ ${fmt0(val)} PA selon les poids des stats`) : null),
+          h('small', { class: 'muted' }, itemSummary(it, factors)),
+          h('small', { class: 'muted' }, `≈ ${fmt0(itemValue(it, p))} PA`)),
         h('div', { class: 'slot-actions' },
-          h('button', { class: 'btn small', type: 'button', onclick: () => { const slot = preferredSlot(p, it); if (slot) { equipItem(p, state.items, slot, it.id); afterChange(true); } } }, 'Équiper'),
+          h('button', { class: 'btn small', type: 'button', onclick: () => equipNow(p, it) }, 'Équiper'),
           h('button', { class: 'btn small ghost', type: 'button', onclick: () => editItem(it) }, 'Modifier'),
           h('button', {
             class: `btn small ghost${confirming ? ' danger' : ''}`, type: 'button',
-            onclick: () => { if (confirming) deleteItem(it.id); else { state.confirmItemDelete = it.id; renderPanel(); } },
+            onclick: () => { if (confirming) deleteItems([it.id]); else { state.confirmItemDelete = it.id; renderPanel(); } },
           }, confirming ? 'Confirmer' : 'Supprimer')));
-    })) : h('p', { class: 'empty' }, 'Aucun objet pour ce filtre. Collez un tooltip ci-dessus pour en ajouter un.'));
+    })) : h('p', { class: 'empty' }, 'Aucun objet pour ce filtre.'));
 }
 
 // ----- Personnage -----
@@ -688,7 +821,7 @@ function panelPerso(p) {
   levelSel.addEventListener('change', () => changeLevel(Number(levelSel.value)));
   const r = resolved(p);
   const eq = p.equipment || {};
-  const byId = (id) => state.items.find((i) => i.id === id);
+  const byId = lookup;
   const mainItem = byId(eq.mainHand);
   const weaponsFromItems = !!(mainItem && mainItem.weapon);
 
@@ -697,6 +830,9 @@ function panelPerso(p) {
     const item = byId(eq[`trinket${i + 1}`]);
     if (item && item.onUse && Number(item.onUse.value)) {
       return h('p', { class: 'hint' }, `Bijou ${i + 1} : ${item.name} (onglet Équipement) — ${itemSummary({ stats: {}, onUse: item.onUse })}.`);
+    }
+    if (item) {
+      return h('p', { class: 'hint' }, `Bijou ${i + 1} : ${item.name} (onglet Équipement), sans effet à activer simulé.`);
     }
     const tr = p.trinkets[i];
     const presets = Object.fromEntries(Object.entries(ON_USE_PRESETS).map(([k, v]) => [k, v.name]));
@@ -713,8 +849,8 @@ function panelPerso(p) {
   const enchants = Object.fromEntries(Object.entries(ENCHANTS).filter(([k]) => k !== 'counterweight' || r.twoHand).map(([k, v]) => [k, v.name]));
   const weaponSection = weaponsFromItems
     ? section('Armes', 'Définies par l’onglet Équipement',
-      h('p', {}, `${mainItem.name} : ${itemSummary(mainItem)}`),
-      r.oh ? h('p', {}, `${byId(eq.offHand)?.name || 'Main gauche'} : ${itemSummary(byId(eq.offHand) || { stats: {} })}`) : null,
+      h('p', {}, `${mainItem.name} : ${itemSummary(mainItem, ratingFactors(p))}`),
+      r.oh ? h('p', {}, `${byId(eq.offHand)?.name || 'Main gauche'} : ${itemSummary(byId(eq.offHand) || { stats: {} }, ratingFactors(p))}`) : null,
       h('div', { class: 'fields' },
         selectField(r.twoHand ? 'Enchantement' : 'Enchantement main droite', 'mh.enchant', enchants),
         r.oh ? selectField('Enchantement main gauche', 'oh.enchant', enchants) : null))
@@ -1073,12 +1209,36 @@ function runCompareAll() {
   });
 }
 
-function runItemCompare(slotId) {
+// Candidats : la bibliothèque, l’objet équipé, les meilleurs objets de la base (selon les poids)
+// et les objets demandés explicitement (`extraIds`).
+function compareCandidates(p, slotId, extraIds = []) {
+  const eq = p.equipment || {};
+  const others = new Set(Object.entries(eq).filter(([s]) => s !== slotId).map(([, id]) => id));
+  const out = new Map();
+  for (const i of itemsForProfile(p)) if (canEquip(i, slotId) && !others.has(i.id)) out.set(i.id, i);
+  if (state.compareDb) {
+    const { ep } = currentEp(p);
+    const factors = ratingFactors(p);
+    const offHand = slotId === 'offHand';
+    dbItems()
+      .filter((i) => canEquip(i, slotId) && wearable(i, p.level) && i.quality <= state.autoQuality && !others.has(i.id))
+      .map((i) => ({ i, v: itemScore(i, ep, factors, { offHand, raceSkill: raceSkill(p) }) }))
+      .sort((a, b) => b.v - a.v)
+      .slice(0, 10)
+      .forEach(({ i }) => out.set(i.id, i));
+  }
+  for (const id of extraIds) {
+    const i = lookup(id);
+    if (i && canEquip(i, slotId)) out.set(i.id, i);
+  }
+  return [null, ...out.values()];
+}
+
+function runItemCompare(slotId, extraIds = []) {
   return guarded('items', async () => {
     const p = current();
     const eq = p.equipment || {};
-    const others = new Set(Object.entries(eq).filter(([s]) => s !== slotId).map(([, id]) => id));
-    const candidates = [null, ...itemsForProfile(p).filter((i) => canEquip(i, slotId) && !others.has(i.id))];
+    const candidates = compareCandidates(p, slotId, extraIds);
     const n = Math.min(state.iterations, 2000);
     const total = candidates.length + 1;
     const base = await simulateChunked(resolved(p), n, (f) => setProgress(f / total));
@@ -1092,6 +1252,7 @@ function runItemCompare(slotId) {
       rows.push({
         id: item ? item.id : '', name: item ? item.name : 'Emplacement vide', item,
         mean: s.mean, delta: diff.mean, err: 1.96 * diff.se, equipped: (item ? item.id : null) === (eq[slotId] || null),
+        value: item ? itemValue(item, p, { offHand: slotId === 'offHand' }) : 0,
       });
     }
     rows.sort((a, b) => b.mean - a.mean);
@@ -1348,33 +1509,42 @@ function resultsCompare(p, s, busy) {
   const slotSel = selectEl(Object.fromEntries(SLOTS.map((x) => [x.id, x.name])), ic ? ic.slotId : state.compareSlot, { id: 'compare-slot', 'aria-label': 'Emplacement à comparer' });
   slotSel.addEventListener('change', () => { state.compareSlot = slotSel.value; });
 
+  const withDb = h('input', { id: 'compare-db', type: 'checkbox' });
+  withDb.checked = state.compareDb;
+  withDb.addEventListener('change', () => { state.compareDb = withDb.checked; });
+  const qualSel = selectEl(AUTO_QUALITY, state.autoQuality, { id: 'compare-quality', 'aria-label': 'Qualité maximale des objets de la base' });
+  qualSel.addEventListener('change', () => { state.autoQuality = Number(qualSel.value); save(); });
+
   panels.push(resultPanel('Comparer des objets', 'Même profil, un emplacement à la fois',
     h('div', { class: 'runbar' },
       slotSel,
       h('button', { class: 'btn', type: 'button', disabled: busy, onclick: () => { state.compareSlot = slotSel.value; runItemCompare(slotSel.value); } }, state.running === 'items' ? 'Calcul…' : 'Comparer les objets'),
       ic ? staleChip(ic) : null),
+    h('div', { class: 'runbar' },
+      h('label', { class: 'check', for: 'compare-db' }, withDb, h('span', {}, 'Inclure les 10 meilleurs objets de la base')),
+      qualSel),
     ic ? [
       barChart(ic.rows.map((r) => ({
         id: r.id || 'empty', label: `${r.name}${r.equipped ? ' (équipé)' : ''}`, value: r.mean,
+        labelNode: r.item ? h('span', { class: 'item-name' }, r.item.quality ? h('i', { class: `qdot q${r.item.quality}`, 'aria-hidden': 'true' }) : null, h('span', {}, `${r.name}${r.equipped ? ' (équipé)' : ''}`)) : null,
         valueText: r.equipped ? `${fmt(r.mean)} · équipé` : `${fmt(r.mean)} · ${fmtSigned(r.delta)}`,
         tipTitle: `${fmt(r.mean)} DPS`, tip: r.equipped ? 'Objet équipé' : `${fmtSigned(r.delta)} DPS ± ${fmt(r.err)} (IC 95 %)`,
       })), { currentId: ic.rows.find((r) => r.equipped)?.id || 'empty' }),
       h('div', { class: 'table-wrap' }, h('table', {},
         h('thead', {}, h('tr', {}, ['Objet', 'DPS', 'Écart (± marge)', 'Valeur PA', ''].map((t, i) => h('th', { class: i && i < 4 ? 'num' : '' }, t)))),
         h('tbody', {}, ic.rows.map((r) => {
-          const val = r.item ? itemValue(r.item) : null;
           return h('tr', {},
-            h('td', { class: 'wrap' }, r.name, r.equipped ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
+            h('td', { class: 'wrap' }, r.item ? itemTitle(r.item) : r.name, r.equipped ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
             h('td', { class: 'num' }, fmt(r.mean)),
             h('td', { class: 'num' }, r.equipped ? '—' : [deltaNode(r.delta), h('small', { class: 'muted' }, ` ± ${fmt(r.err)}`)]),
-            h('td', { class: 'num' }, val === null ? '—' : fmt0(val)),
+            h('td', { class: 'num' }, r.item ? fmt0(r.value) : '—'),
             h('td', {}, r.equipped ? null : h('button', {
               class: 'btn small', type: 'button', disabled: busy,
               onclick: () => { equipItem(p, state.items, ic.slotId, r.item ? r.item.id : null); afterChange(true); runItemCompare(ic.slotId); },
             }, 'Équiper')));
         })))),
-      h('p', { class: 'hint' }, `${ic.iterations.toLocaleString('fr-FR')} combats par objet avec les mêmes tirages aléatoires ; la marge indique l’incertitude de l’écart. « Valeur PA » utilise les poids des stats s’ils ont été calculés.`),
-    ] : h('p', { class: 'empty' }, 'Choisissez un emplacement : le sim essaie chaque objet de la bibliothèque à cette place et classe le résultat. Le bouton « Comparer » de l’onglet Équipement fait la même chose.')));
+      h('p', { class: 'hint' }, `${ic.iterations.toLocaleString('fr-FR')} combats par objet avec les mêmes tirages aléatoires ; la marge indique l’incertitude de l’écart. La « valeur PA » est l’estimation rapide par les poids des stats, qui sert à présélectionner les objets de la base ; le DPS simulé fait foi.`),
+    ] : h('p', { class: 'empty' }, 'Choisissez un emplacement : le sim essaie l’objet équipé, ceux de votre bibliothèque et les 10 meilleurs de la base à cette place, puis classe le résultat.')));
 
   const [aId, bId] = duelIds();
   const opts = Object.fromEntries(state.profiles.map((x) => [x.id, `${x.name} (niv. ${x.level})`]));
@@ -1469,7 +1639,8 @@ function renderSources() {
         h('li', {}, 'Monte-Carlo événementiel : chaque itération joue un combat complet (attaques automatiques, GCD, recharges, mana, procs, saignement, piège).'),
         h('li', {}, 'Table d’attaque de Classic : un seul jet pour les attaques automatiques (raté, esquive, parade, érafle, crit), deux jets pour les techniques. Formules reprises du code de wowsims et du wiki de magey.'),
         h('li', {}, 'Changements Forever appliqués : Mongoose Bite et Raptor Strike basés sur l’arme, Expose Prey, Lacerating Strikes, Strider Kick, Predator’s Edge, Aspect of the Beast avec PA de mêlée, toucher et crit unifiés, stat de réduction d’esquive/parade.'),
-        h('li', {}, 'Les objets d’exemple sont fictifs : remplacez-les par les vôtres (onglet Équipement, en collant leur tooltip).'),
+        h('li', {}, `Objets : ${ITEM_DB_INFO.count.toLocaleString('fr-FR')} objets réels de Forever (build ${ITEM_DB_INFO.build}, ${ITEM_DB_INFO.date}), lus dans le client par wowsims/gamedata, la même source que Wowhead. Gardés : ce qu’un chasseur mêlée peut porter et qui a une stat utile ; exclus : objets de test et de Season of Discovery. Chaque objet a un lien vers sa page Wowhead Forever.`),
+        h('li', {}, 'Valeurs des sorts du chasseur (Raptor Strike, Mongoose Bite, Expose Prey, Lacerate…) lues dans les mêmes données du client : fiabilité « Client » dans l’onglet Hypothèses.'),
         h('li', {}, 'Pas simulé : déplacements, AoE, menace, Wing Clip, procs d’objets précis, détail des capacités du familier.'))),
     h('div', { class: 'section' },
       h('h3', {}, 'Sources'),
