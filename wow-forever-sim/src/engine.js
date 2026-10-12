@@ -271,10 +271,16 @@ function newMetrics() {
   return m;
 }
 
-// Simule un combat. `log` (tableau) reçoit le journal des `logLimit` premières secondes.
-export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
+function newCycle() {
+  return { gcdBusy: 0, uptime: {}, mb: { opened: 0, used: 0, wasted: 0, delay: 0 }, seq: new Map() };
+}
+
+// Simule un combat. `trace` ({ events: [], spans: [], limit }) reçoit le détail des `limit`
+// premières secondes : attaques, techniques, procs, et périodes actives (buffs, fenêtres, saignement).
+export function simulateOnce(C, rng, duration, trace = null) {
   const M = C.M;
   const metrics = newMetrics();
+  const cycle = newCycle();
   let t = 0;
   let mana = C.manaMax;
   let lastSpend = -100;
@@ -282,6 +288,8 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
   const cdReady = { raptor: 0, mongoose: 0, striderKick: 0, counterattack: 0, immolation: 0 };
   let mbUntil = -1;
   let mbAvail = 0;
+  let mbOpenAt = -1;
+  let mbUsed = true;
   let caUntil = -1;
   let caAvail = 0;
   let rsQueued = false;
@@ -290,21 +298,42 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
   let runeReady = 0;
   const procs = { exposePrey: 0, dodgeWindows: 0, parryWindows: 0, deadlyAspects: 0, windfury: 0, crusader: 0, potions: 0 };
   const cdReadyAt = C.cooldowns.map(() => 0);
+  const auraNames = Object.fromEntries(C.cooldowns.map((cd) => [cd.id, cd.name]));
 
   const dyn = { ap: 0, str: 0, agi: 0, crit: 0 };
   let regenWhileCasting = 0;
   let haste = C.stats.hasteStatic;
   const auras = [];
+  const auraStart = {};
+  const lastCasts = [];
 
   let nextMH = 0;
   let nextOH = C.dw ? rng() * 0.3 : Infinity;
   let nextRegen = rng() * 2;
   let nextBoss = C.beingAttacked ? rng() * C.bossSwing : Infinity;
   let nextDecide = 0;
-  const bleed = { perTick: 0, ticksLeft: 0, next: Infinity };
-  const trap = { triggerAt: Infinity, perTick: 0, ticksLeft: 0, next: Infinity };
+  const bleed = { perTick: 0, ticksLeft: 0, next: Infinity, start: -1 };
+  const trap = { triggerAt: Infinity, perTick: 0, ticksLeft: 0, next: Infinity, start: -1 };
 
-  const say = log ? (text) => { if (t <= logLimit) log.push({ t, text, mana }); } : null;
+  // Trace détaillée (uniquement pour la chronologie et le journal).
+  const limit = trace ? (trace.limit ?? duration) : 0;
+  const openSpans = {};
+  const ev = trace ? (kind, id, extra = {}) => {
+    if (t > limit) return null;
+    const e = { t, kind, id, mana, ...extra };
+    trace.events.push(e);
+    return e;
+  } : null;
+  function spanOpen(id, end) {
+    if (!trace || t > limit) return;
+    const s = { id, name: auraNames[id] || label(id), start: t, end };
+    trace.spans.push(s);
+    openSpans[id] = s;
+  }
+  function spanEnd(id, end) {
+    if (openSpans[id]) openSpans[id].end = end;
+  }
+  const addUptime = (id, dt) => { cycle.uptime[id] = (cycle.uptime[id] || 0) + Math.max(0, dt); };
 
   const currentAP = () => C.stats.ap + dyn.ap + dyn.str * C.strMult * M.apPerStr + dyn.agi * C.agiMult * M.apPerAgi;
   const currentCrit = () => C.stats.crit + dyn.crit + (dyn.agi * C.agiMult) / M.agiPerCrit;
@@ -321,9 +350,9 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
   function applyEffect(a, sign) {
     if (a.stat === 'haste') {
       a.active = sign > 0;
-      let h = C.stats.hasteStatic;
-      for (const o of auras) if (o.stat === 'haste' && o.active) h *= 1 + o.value / 100;
-      setHaste(h);
+      let hs = C.stats.hasteStatic;
+      for (const o of auras) if (o.stat === 'haste' && o.active) hs *= 1 + o.value / 100;
+      setHaste(hs);
     } else if (a.stat === 'regen') {
       regenWhileCasting += sign;
     } else {
@@ -335,10 +364,13 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
     const existing = auras.find((a) => a.id === id);
     if (existing) {
       existing.until = t + dur;
+      spanEnd(id, t + dur);
       return;
     }
     const a = { id, stat, value, until: t + dur, active: false };
     auras.push(a);
+    auraStart[id] = t;
+    spanOpen(id, t + dur);
     applyEffect(a, 1);
   }
 
@@ -348,14 +380,55 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
       if (a.until <= t) {
         auras.splice(i, 1);
         applyEffect(a, -1);
-        if (say) say(`Fin de ${a.id}`);
+        addUptime(a.id, t - auraStart[a.id]);
+        spanEnd(a.id, t);
+        delete openSpans[a.id];
       }
     }
+  }
+
+  // Fenêtre pendant laquelle Mongoose Bite est utilisable.
+  function openMongooseWindow(until) {
+    if (t >= mbUntil) {
+      if (!mbUsed) {
+        cycle.mb.wasted++;
+        addUptime('mbWindow', mbUntil - mbOpenAt);
+      }
+      mbOpenAt = t;
+      mbUsed = false;
+      cycle.mb.opened++;
+      mbAvail = t + M.reaction;
+      mbUntil = until;
+      spanOpen('mbWindow', until);
+    } else {
+      mbUntil = Math.max(mbUntil, until);
+      spanEnd('mbWindow', mbUntil);
+    }
+  }
+
+  function consumeMongooseWindow() {
+    if (!mbUsed) {
+      mbUsed = true;
+      cycle.mb.used++;
+      cycle.mb.delay += t - mbOpenAt;
+      addUptime('mbWindow', t - mbOpenAt);
+      spanEnd('mbWindow', t);
+    }
+    mbUntil = -1;
   }
 
   function spend(cost) {
     mana -= cost;
     lastSpend = t;
+  }
+
+  function recordCast(id) {
+    if (lastCasts.length === 2) {
+      const key = `${lastCasts[0]}>${lastCasts[1]}>${id}`;
+      cycle.seq.set(key, (cycle.seq.get(key) || 0) + 1);
+    }
+    lastCasts.push(id);
+    if (lastCasts.length > 2) lastCasts.shift();
   }
 
   function weaponDamage(w, extraAp = 0) {
@@ -366,29 +439,30 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
   function onHit(w, isWhite, isCrit, isExtra) {
     if (C.exposePreyChance > 0 && (isWhite || M.exposePreyOn === 'all')) {
       if (rng() * 100 < C.exposePreyChance) {
-        if (t >= mbUntil) mbAvail = t + M.reaction;
-        mbUntil = t + M.exposePreyWindow;
+        openMongooseWindow(t + M.exposePreyWindow);
         procs.exposePrey++;
-        if (say) say('Expose Prey : Mongoose Bite disponible');
+        if (ev) ev('proc', 'exposePrey');
       }
     }
     if (isWhite && C.deadlyAspects && rng() * 100 < M.deadlyAspectsChance) {
       applyAura('deadlyAspects', 'haste', M.deadlyAspectsHaste, M.deadlyAspectsDuration);
       procs.deadlyAspects++;
-      if (say) say('Deadly Aspects : +vitesse d’attaque');
+      if (ev) ev('proc', 'deadlyAspects');
     }
     if (w.enchant === 'crusader' && rng() < w.speed / 60) {
       applyAura(w.isOH ? 'crusaderOH' : 'crusaderMH', 'str', 100, 15);
       procs.crusader++;
+      if (ev) ev('proc', w.isOH ? 'crusaderOH' : 'crusaderMH');
     }
     if (isCrit && C.resourcefulnessProc > 0 && rng() * 100 < C.resourcefulnessProc) {
       applyAura('resourcefulness', 'regen', 1, 30);
     }
     if (!isExtra && !w.isOH && C.windfuryAp > 0 && rng() * 100 < M.windfuryChance) {
       procs.windfury++;
-      if (say) say('Furie-des-vents : attaque supplémentaire');
+      if (ev) ev('proc', 'windfury');
       whiteAttack(C.mh, C.windfuryAp, true);
     } else if (!isExtra && C.extraAttackChance > 0 && rng() * 100 < C.extraAttackChance) {
+      if (ev) ev('proc', 'extraAttack');
       whiteAttack(C.mh, 0, true);
     }
   }
@@ -397,31 +471,33 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
     const id = w.isOH ? 'oh' : isExtra ? 'extra' : 'mh';
     const m = metrics[id];
     const tbl = w.table;
+    const e = ev ? ev('swing', id, { outcome: 'miss', dmg: 0 }) : null;
     m.casts++;
     const dwPenalty = C.dw && !rsQueued ? M.dwMissPenalty : 0;
     const miss = Math.max(0, tbl.miss + dwPenalty - effHit(tbl));
     const r = rng() * 100;
     let acc = miss;
-    if (r < acc) { m.miss++; if (say) say(`${label(id)} : raté`); return; }
+    if (r < acc) { m.miss++; return; }
     acc += tbl.dodge;
-    if (r < acc) { m.dodge++; if (say) say(`${label(id)} : esquivé`); return; }
+    if (r < acc) { m.dodge++; if (e) e.outcome = 'dodge'; return; }
     if (!C.behind) {
       acc += tbl.parry;
-      if (r < acc) { m.parry++; if (say) say(`${label(id)} : paré`); return; }
+      if (r < acc) { m.parry++; if (e) e.outcome = 'parry'; return; }
     }
     let dmg = weaponDamage(w, extraAp) * C.meleeMult * C.armorMult;
-    let isCrit = false;
+    let outcome = 'hit';
     acc += tbl.glance;
     if (r < acc) {
       dmg *= tbl.glanceMin + rng() * (tbl.glanceMax - tbl.glanceMin);
       m.glance++;
+      outcome = 'glance';
     } else {
       acc += Math.max(0, currentCrit() - tbl.critSuppression);
-      if (r < acc) { dmg *= C.critMult; isCrit = true; m.crits++; } else m.hits++;
+      if (r < acc) { dmg *= C.critMult; m.crits++; outcome = 'crit'; } else m.hits++;
     }
     m.dmg += dmg;
-    if (say) say(`${label(id)} : ${Math.round(dmg)}${isCrit ? ' (crit)' : ''}`);
-    onHit(w, true, isCrit, isExtra);
+    if (e) { e.outcome = outcome; e.dmg = dmg; }
+    onHit(w, true, outcome === 'crit', isExtra);
   }
 
   function yellowAttack(id, raw, noAvoid = false) {
@@ -430,22 +506,21 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
     m.casts++;
     const r = rng() * 100;
     let acc = Math.max(0, tbl.miss - effHit(tbl));
-    if (r < acc) { m.miss++; if (say) say(`${label(id)} : raté`); return null; }
+    if (r < acc) { m.miss++; return { outcome: 'miss', dmg: 0 }; }
     if (!noAvoid) {
       acc += tbl.dodge;
-      if (r < acc) { m.dodge++; if (say) say(`${label(id)} : esquivé`); return null; }
+      if (r < acc) { m.dodge++; return { outcome: 'dodge', dmg: 0 }; }
       if (!C.behind) {
         acc += tbl.parry;
-        if (r < acc) { m.parry++; if (say) say(`${label(id)} : paré`); return null; }
+        if (r < acc) { m.parry++; return { outcome: 'parry', dmg: 0 }; }
       }
     }
     const isCrit = rng() * 100 < currentCrit() + C.specialCritBonus - tbl.critSuppression;
     let dmg = raw() * C.meleeMult * C.armorMult;
     if (isCrit) { dmg *= C.critMult; m.crits++; } else m.hits++;
     m.dmg += dmg;
-    if (say) say(`${label(id)} : ${Math.round(dmg)}${isCrit ? ' (crit)' : ''}`);
     onHit(C.mh, false, isCrit, false);
-    return { dmg, isCrit };
+    return { outcome: isCrit ? 'crit' : 'hit', dmg };
   }
 
   function applyBleed(dmg) {
@@ -453,45 +528,60 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
     const ticks = Math.max(1, Math.round(M.laceratingDuration / M.laceratingTick));
     let pool = total;
     if (M.laceratingRefresh === 'rolling' && bleed.ticksLeft > 0) pool += bleed.perTick * bleed.ticksLeft;
+    if (bleed.ticksLeft === 0) {
+      bleed.start = t;
+      spanOpen('bleed', t + ticks * M.laceratingTick);
+    } else {
+      spanEnd('bleed', t + ticks * M.laceratingTick);
+    }
     bleed.perTick = pool / ticks;
     bleed.ticksLeft = ticks;
     bleed.next = t + M.laceratingTick;
   }
 
-  function cast(id) {
-    const cost = C.costs[id];
-    spend(cost);
-    if (id !== 'raptor' || M.raptorMode === 'instant') gcdReady = t + M.gcd;
-    if (say) say(`Lance ${label(id)} (−${Math.round(cost)} mana)`);
+  // Résout une technique (le coût est déjà payé).
+  function resolve(id) {
     switch (id) {
       case 'mongoose': {
-        mbUntil = -1;
+        consumeMongooseWindow();
         cdReady.mongoose = t + M.mongooseCd;
         const res = yellowAttack('mongoose', () => weaponDamage(C.mh) + M.mongooseBonus);
-        if (res && C.lacerating) applyBleed(res.dmg);
-        break;
+        if (res.dmg > 0 && C.lacerating) applyBleed(res.dmg);
+        return res;
       }
       case 'raptor':
         cdReady.raptor = t + M.raptorCd;
-        yellowAttack('raptor', () => weaponDamage(C.mh) + M.raptorBonus);
-        break;
+        return yellowAttack('raptor', () => weaponDamage(C.mh) + M.raptorBonus);
       case 'striderKick':
         cdReady.striderKick = t + M.striderCd;
-        yellowAttack('striderKick', () => (weaponDamage(C.mh) * M.striderWeaponPct) / 100);
-        break;
+        return yellowAttack('striderKick', () => (weaponDamage(C.mh) * M.striderWeaponPct) / 100);
       case 'counterattack':
         caUntil = -1;
+        spanEnd('caWindow', t);
         cdReady.counterattack = t + M.counterCd;
-        yellowAttack('counterattack', () => (weaponDamage(C.mh) * M.counterWeaponPct) / 100 + M.counterBonus, true);
-        break;
+        return yellowAttack('counterattack', () => (weaponDamage(C.mh) * M.counterWeaponPct) / 100 + M.counterBonus, true);
       case 'immolation':
         cdReady.immolation = t + C.trapCd;
         metrics.immolation.casts++;
         trap.triggerAt = t + M.trapArm;
-        break;
+        return { outcome: 'placed', dmg: 0 };
       default:
-        break;
+        return { outcome: 'hit', dmg: 0 };
     }
+  }
+
+  function cast(id) {
+    const cost = C.costs[id];
+    spend(cost);
+    const onGcd = id !== 'raptor' || M.raptorMode === 'instant';
+    if (onGcd) {
+      gcdReady = t + M.gcd;
+      cycle.gcdBusy += Math.min(M.gcd, duration - t);
+    }
+    recordCast(id);
+    const e = ev ? ev('cast', id, { cost, gcd: onGcd }) : null;
+    const res = resolve(id);
+    if (e) { e.outcome = res.outcome; e.dmg = res.dmg; }
   }
 
   function usable(r) {
@@ -513,20 +603,20 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
         const cd = C.cooldowns[i];
         applyAura(cd.id, cd.type, cd.value, cd.duration);
         cdReadyAt[i] = t + cd.cd;
-        if (say) say(`Utilise ${cd.name}`);
+        if (ev) ev('cooldown', cd.id, { name: cd.name });
       }
     }
     if (C.manaPotion && t >= potionReady && C.manaMax - mana >= 2250) {
       mana += 1350 + rng() * 900;
       potionReady = t + 120;
       procs.potions++;
-      if (say) say('Potion de mana');
+      if (ev) ev('proc', 'potion');
     }
     if (C.manaRune && t >= runeReady && C.manaMax - mana >= 1500) {
       mana += 900 + rng() * 600;
       runeReady = t + 120;
       procs.potions++;
-      if (say) say('Rune démoniaque');
+      if (ev) ev('proc', 'rune');
     }
 
     if (C.raptorEnabled && M.raptorMode !== 'instant') {
@@ -563,8 +653,10 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
       const cost = C.costs.raptor;
       if (mana >= cost && t >= cdReady.raptor) {
         spend(cost);
-        cdReady.raptor = t + M.raptorCd;
-        yellowAttack('raptor', () => weaponDamage(C.mh) + M.raptorBonus);
+        recordCast('raptor');
+        const e = ev ? ev('cast', 'raptor', { cost, gcd: false }) : null;
+        const res = resolve('raptor');
+        if (e) { e.outcome = res.outcome; e.dmg = res.dmg; }
       } else {
         whiteAttack(C.mh);
       }
@@ -580,20 +672,25 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
     else if (regenWhileCasting > 0) gain += C.spiritTick * 0.5;
     mana = Math.min(C.manaMax, mana + gain);
     nextRegen = t + 2;
+    if (ev) ev('regen', 'mana', { gain });
   }
 
   function bossSwing() {
     const r = rng() * 100;
     if (r < C.playerDodge) {
-      if (t >= mbUntil) mbAvail = t + M.reaction;
-      mbUntil = Math.max(mbUntil, t + M.dodgeWindow);
+      openMongooseWindow(t + M.dodgeWindow);
       procs.dodgeWindows++;
-      if (say) say('Vous esquivez : Mongoose Bite disponible');
+      if (ev) ev('proc', 'dodge');
     } else if (r < C.playerDodge + C.playerParry && C.T.counterattack > 0) {
-      if (t >= caUntil) caAvail = t + M.reaction;
+      if (t >= caUntil) {
+        caAvail = t + M.reaction;
+        spanOpen('caWindow', t + 5);
+      } else {
+        spanEnd('caWindow', t + 5);
+      }
       caUntil = t + 5;
       procs.parryWindows++;
-      if (say) say('Vous parez : Counterattack disponible');
+      if (ev) ev('proc', 'parry');
     }
     nextBoss = t + C.bossSwing;
   }
@@ -602,13 +699,15 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
     trap.triggerAt = Infinity;
     if (rng() * 100 < C.trapMiss) {
       metrics.immolation.miss++;
-      if (say) say('Piège d’immolation : résisté');
+      if (ev) ev('proc', 'trapResist');
       return;
     }
     metrics.immolation.hits++;
     trap.ticksLeft = C.trapTicks;
     trap.perTick = (M.trapDamage * C.trapMult) / C.trapTicks;
     trap.next = t + M.trapDuration / C.trapTicks;
+    trap.start = t;
+    spanOpen('trap', t + M.trapDuration);
   }
 
   decide();
@@ -627,20 +726,32 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
     else if (tn === nextRegen) regenTick();
     else if (tn === bleed.next) {
       let dmg = bleed.perTick;
+      let crit = false;
       if (M.laceratingCanCrit && rng() * 100 < currentCrit() + C.specialCritBonus - C.mh.table.critSuppression) {
         dmg *= C.critMult;
         metrics.lacerating.crits++;
+        crit = true;
       }
       metrics.lacerating.dmg += dmg;
       metrics.lacerating.ticks++;
+      if (ev) ev('tick', 'lacerating', { dmg, outcome: crit ? 'crit' : 'hit' });
       bleed.ticksLeft--;
-      bleed.next = bleed.ticksLeft > 0 ? t + M.laceratingTick : Infinity;
+      if (bleed.ticksLeft > 0) bleed.next = t + M.laceratingTick;
+      else {
+        bleed.next = Infinity;
+        addUptime('bleed', t - bleed.start);
+      }
     } else if (tn === trap.triggerAt) trapTrigger();
     else if (tn === trap.next) {
       metrics.immolation.dmg += trap.perTick;
       metrics.immolation.ticks++;
+      if (ev) ev('tick', 'immolation', { dmg: trap.perTick, outcome: 'hit' });
       trap.ticksLeft--;
-      trap.next = trap.ticksLeft > 0 ? t + M.trapDuration / C.trapTicks : Infinity;
+      if (trap.ticksLeft > 0) trap.next = t + M.trapDuration / C.trapTicks;
+      else {
+        trap.next = Infinity;
+        addUptime('trap', t - trap.start);
+      }
     } else if (tn === nextBoss) bossSwing();
     else if (tn === nextMH) mhSwing();
     else if (tn === nextOH) {
@@ -651,9 +762,19 @@ export function simulateOnce(C, rng, duration, log = null, logLimit = 60) {
     decide();
   }
 
+  // Clôture des périodes encore actives à la fin du combat.
+  for (const a of auras) addUptime(a.id, duration - auraStart[a.id]);
+  if (bleed.ticksLeft > 0) addUptime('bleed', duration - bleed.start);
+  if (trap.ticksLeft > 0) addUptime('trap', duration - trap.start);
+  if (!mbUsed) {
+    addUptime('mbWindow', Math.min(mbUntil, duration) - mbOpenAt);
+    if (mbUntil <= duration) cycle.mb.wasted++;
+  }
+  if (trace) for (const s of trace.spans) s.end = Math.min(s.end, duration, limit);
+
   let total = 0;
   for (const id of METRIC_IDS) total += metrics[id].dmg;
-  return { damage: total, duration, metrics, oomTime, procs, manaEnd: mana };
+  return { damage: total, duration, metrics, oomTime, procs, manaEnd: mana, cycle };
 }
 
 const LABELS = {
@@ -667,7 +788,27 @@ const LABELS = {
   lacerating: 'Lacerating Strikes (saignement)',
   immolation: 'Piège d’immolation',
   pet: 'Familier (estimation)',
+  bloodFury: 'Fureur sanguinaire',
+  berserking: 'Berserker',
+  deadlyAspects: 'Deadly Aspects',
+  crusaderMH: 'Croisé (main droite)',
+  crusaderOH: 'Croisé (main gauche)',
+  resourcefulness: 'Resourcefulness (regen)',
+  mbWindow: 'Fenêtre Mongoose Bite',
+  caWindow: 'Fenêtre Counterattack',
+  bleed: 'Saignement',
+  trap: 'Piège (dégâts sur la durée)',
+  exposePrey: 'Expose Prey',
+  dodge: 'Esquive',
+  parry: 'Parade',
+  windfury: 'Furie-des-vents',
+  extraAttack: 'Attaque supplémentaire',
+  potion: 'Potion de mana',
+  rune: 'Rune démoniaque',
+  trapResist: 'Piège résisté',
 };
+
+export const CAST_IDS = ['raptor', 'mongoose', 'striderKick', 'counterattack', 'immolation'];
 
 export function label(id) {
   return LABELS[id] || id;
@@ -675,7 +816,7 @@ export function label(id) {
 
 // Accumulateur : permet de lancer les itérations par paquets sans bloquer l’interface.
 export function createAccumulator() {
-  return { n: 0, dps: [], damage: 0, duration: 0, oom: 0, metrics: newMetrics(), procs: {} };
+  return { n: 0, dps: [], damage: 0, duration: 0, oom: 0, metrics: newMetrics(), procs: {}, cycle: newCycle() };
 }
 
 export function simulateBatch(C, profile, acc, start, count, seed = 1) {
@@ -697,9 +838,46 @@ export function simulateBatch(C, profile, acc, start, count, seed = 1) {
       for (const k of Object.keys(a)) a[k] += b[k];
     }
     for (const [k, v] of Object.entries(res.procs)) acc.procs[k] = (acc.procs[k] || 0) + v;
+    const c = acc.cycle;
+    c.gcdBusy += res.cycle.gcdBusy;
+    for (const [k, v] of Object.entries(res.cycle.uptime)) c.uptime[k] = (c.uptime[k] || 0) + v;
+    for (const k of Object.keys(c.mb)) c.mb[k] += res.cycle.mb[k];
+    for (const [k, v] of res.cycle.seq) c.seq.set(k, (c.seq.get(k) || 0) + v);
     acc.n++;
   }
   return acc;
+}
+
+function summarizeCycle(C, acc) {
+  const n = acc.n || 1;
+  const c = acc.cycle;
+  const minutes = acc.duration / 60 || 1;
+  const names = Object.fromEntries(C.cooldowns.map((cd) => [cd.id, cd.name]));
+  const uptime = Object.entries(c.uptime)
+    .map(([id, secs]) => ({ id, name: names[id] || label(id), pct: (secs / acc.duration) * 100 }))
+    .filter((u) => u.pct > 0.05)
+    .sort((a, b) => b.pct - a.pct);
+  const totalSeq = [...c.seq.values()].reduce((s, v) => s + v, 0) || 1;
+  const sequences = [...c.seq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([key, count]) => ({ ids: key.split('>'), perFight: count / n, pct: (count / totalSeq) * 100 }));
+  const perMinute = CAST_IDS
+    .map((id) => ({ id, name: label(id), perMinute: acc.metrics[id].casts / minutes }))
+    .filter((x) => x.perMinute > 0);
+  return {
+    gcdUsage: (c.gcdBusy / acc.duration) * 100,
+    perMinute,
+    uptime,
+    mb: {
+      opened: c.mb.opened / n,
+      used: c.mb.used / n,
+      wasted: c.mb.wasted / n,
+      usedPct: c.mb.opened ? (c.mb.used / c.mb.opened) * 100 : 0,
+      avgDelay: c.mb.used ? c.mb.delay / c.mb.used : 0,
+    },
+    sequences,
+  };
 }
 
 export function summarize(C, acc) {
@@ -748,6 +926,7 @@ export function summarize(C, acc) {
     oomPct: (acc.oom / acc.duration) * 100,
     breakdown,
     procs,
+    cycle: summarizeCycle(C, acc),
     dps: acc.dps,
   };
 }
@@ -759,13 +938,22 @@ export function runSim(profile, { iterations = 1000, seed = 1 } = {}) {
   return summarize(C, acc);
 }
 
-// Journal d’un combat (pour comprendre la rotation).
-export function combatLog(profile, { seed = 1, seconds = 60 } = {}) {
+// Détail d’un combat pour la chronologie et le journal.
+export function combatTrace(profile, { seed = 1, seconds = 60 } = {}) {
   const C = buildCharacter(profile);
   const rng = makeRng(iterationSeed(seed, 0));
-  const log = [];
-  simulateOnce(C, rng, seconds, log, seconds);
-  return log;
+  const trace = { events: [], spans: [], limit: seconds };
+  const res = simulateOnce(C, rng, seconds, trace);
+  return {
+    events: trace.events,
+    spans: trace.spans.filter((s) => s.end > s.start),
+    duration: seconds,
+    damage: res.damage,
+    gcd: C.M.gcd,
+    raptorMode: C.M.raptorMode,
+    manaMax: C.manaMax,
+    dw: C.dw,
+  };
 }
 
 // Feuille de personnage (valeurs affichées dans l’interface).
@@ -838,7 +1026,7 @@ export function profileVariants(profile) {
 }
 
 // Écart moyen et erreur type appariée entre deux séries de DPS jouées avec les mêmes graines.
-function pairedDiff(a, b) {
+export function pairedDiff(a, b) {
   const n = Math.min(a.length, b.length);
   if (!n) return { mean: 0, se: 0 };
   let sum = 0;

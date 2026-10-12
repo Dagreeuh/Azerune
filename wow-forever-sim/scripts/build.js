@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
-const MODULES = ['src/data.js', 'src/engine.js', 'src/app.js'];
+const MODULES = ['src/data.js', 'src/gear.js', 'src/engine.js', 'src/ui/dom.js', 'src/ui/charts.js', 'src/app.js'];
 
 function stripModule(code) {
   return code

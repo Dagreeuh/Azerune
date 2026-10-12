@@ -6,14 +6,22 @@ import {
   defaultProfile, mechanicDefault,
 } from './data.js';
 import {
-  buildCharacter, characterSheet, combatLog, createAccumulator, profileVariants, simulateBatch,
-  statWeightsFromRuns, summarize,
+  ITEM_STATS, ITEM_TYPES, ON_USE_TYPES, SLOTS, canEquip, equipItem, equipmentTotals, exampleEquipment,
+  exampleItems, isWeaponType, itemSummary, parseTooltip, resolveProfile, slotDef, weaponDps,
+} from './gear.js';
+import {
+  buildCharacter, characterSheet, combatTrace, createAccumulator, label, pairedDiff, profileVariants,
+  simulateBatch, statWeightsFromRuns, summarize,
 } from './engine.js';
+import { $, fmt, fmt0, fmtSigned, getPath, h, setPath, tick, uid } from './ui/dom.js';
+import { CAST_STYLE, barChart, castChip, histogram, manaChart, timelineChart } from './ui/charts.js';
 
 const STORE_KEY = 'forever-sv-sim:v1';
 const SEED = 1;
+const WINDOW = 30;
 
 const TABS = [
+  ['equip', 'Équipement'],
   ['perso', 'Personnage'],
   ['talents', 'Talents'],
   ['buffs', 'Buffs'],
@@ -22,72 +30,79 @@ const TABS = [
   ['hypo', 'Hypothèses'],
 ];
 
+const RESULT_TABS = [
+  ['summary', 'Résumé'],
+  ['cycle', 'Cycle de sorts'],
+  ['compare', 'Comparer'],
+  ['weights', 'Poids des stats'],
+];
+
+const OUTCOME = {
+  hit: 'touché', crit: 'critique', glance: 'érafle', miss: 'raté', dodge: 'esquivé', parry: 'paré', placed: 'posé',
+};
+
 const state = {
   profiles: [],
+  items: [],
   currentId: null,
-  tab: 'perso',
+  tab: 'equip',
+  resultsTab: 'summary',
   iterations: 2000,
   results: {},
   weights: {},
-  compare: null,
-  log: {},
+  compareAll: null,
+  itemCompare: null,
+  compareSlot: 'head',
+  duel: null,
+  duelIds: [null, null],
+  traces: {},
+  traceSeed: 1,
+  cycleFrom: 0,
   running: null,
   notice: '',
   ioOpen: false,
   ioMessage: '',
   confirmDelete: false,
+  confirmItemDelete: null,
+  editor: null,
+  editorMessage: '',
+  libType: 'all',
+  libLevel: 'all',
 };
 
-// ---------- utilitaires ----------
-
-const fmt = (v, d = 1) => (Number.isFinite(v) ? v.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }) : '—');
-const fmt0 = (v) => fmt(v, 0);
-const uid = () => `p${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
-const tick = () => new Promise((r) => setTimeout(r, 0));
-const $ = (id) => document.getElementById(id);
-
-function h(tag, attrs = {}, ...children) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs || {})) {
-    if (v === undefined || v === null || v === false) continue;
-    if (k === 'class') el.className = v;
-    else if (k === 'text') el.textContent = v;
-    else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
-    else if (v === true) el.setAttribute(k, '');
-    else el.setAttribute(k, v);
-  }
-  for (const c of children.flat(Infinity)) {
-    if (c === null || c === undefined || c === false) continue;
-    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
-  }
-  return el;
-}
-
-function svg(tag, attrs = {}, ...children) {
-  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
-  for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== null) el.setAttribute(k, v);
-  for (const c of children.flat()) if (c) el.append(c instanceof Node ? c : document.createTextNode(String(c)));
-  return el;
-}
-
-function getPath(obj, path) {
-  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
-}
-
-function setPath(obj, path, value) {
-  const keys = path.split('.');
-  let o = obj;
-  for (let i = 0; i < keys.length - 1; i++) {
-    if (o[keys[i]] == null) o[keys[i]] = /^\d+$/.test(keys[i + 1]) ? [] : {};
-    o = o[keys[i]];
-  }
-  o[keys[keys.length - 1]] = value;
-}
+// ---------- profils et objets ----------
 
 const current = () => state.profiles.find((p) => p.id === state.currentId) || state.profiles[0];
-const snapshot = (p) => JSON.stringify({ ...p, name: undefined });
+const resolved = (p = current()) => resolveProfile(p, state.items);
+const snapshotOf = (p = current()) => JSON.stringify({ ...resolved(p), name: undefined, id: undefined });
 
-// ---------- profils ----------
+function sanitizeItem(i) {
+  if (!i || typeof i !== 'object' || !ITEM_TYPES[i.type]) return null;
+  const stats = {};
+  for (const s of ITEM_STATS) {
+    const v = Number(i.stats?.[s.key]);
+    if (Number.isFinite(v) && v !== 0) stats[s.key] = v;
+  }
+  const item = {
+    id: String(i.id || uid('i')),
+    name: String(i.name || 'Objet sans nom').slice(0, 80),
+    type: i.type,
+    level: Number(i.level) === 30 ? 30 : Number(i.level) === 60 ? 60 : null,
+    source: ['exemple', 'manuel', 'tooltip'].includes(i.source) ? i.source : 'manuel',
+    stats,
+    weapon: null,
+    onUse: null,
+    skillFor: Array.isArray(i.skillFor) && i.skillFor.length ? i.skillFor.filter((t) => WEAPON_TYPES[t]) : null,
+  };
+  if (isWeaponType(i.type) && i.weapon) {
+    const min = Math.max(0, Number(i.weapon.min) || 0);
+    item.weapon = { min, max: Math.max(min, Number(i.weapon.max) || 0), speed: Math.max(0.5, Number(i.weapon.speed) || 2), type: WEAPON_TYPES[i.weapon.type] ? i.weapon.type : 'axe' };
+  }
+  if (i.type === 'trinket' && i.onUse && Number(i.onUse.value)) {
+    item.onUse = { type: ON_USE_TYPES[i.onUse.type] ? i.onUse.type : 'ap', value: Number(i.onUse.value), duration: Math.max(1, Number(i.onUse.duration) || 20), cd: Math.max(1, Number(i.onUse.cd) || 120) };
+  }
+  return item;
+}
 
 function normalizeProfile(p) {
   const L = Number(p.level) === 30 ? 30 : 60;
@@ -99,27 +114,37 @@ function normalizeProfile(p) {
   const rot = Array.isArray(p.rotation) ? p.rotation.filter((r) => ROTATION_ABILITIES[r.id]) : [];
   for (const r of d.rotation) if (!rot.some((x) => x.id === r.id)) rot.push({ ...r });
   out.rotation = rot.map((r) => ({ id: r.id, enabled: !!r.enabled, minMana: Number(r.minMana) || 0 }));
+  out.equipment = {};
+  for (const slot of SLOTS) if (p.equipment?.[slot.id]) out.equipment[slot.id] = String(p.equipment[slot.id]);
   out.id = p.id || uid();
   out.name = String(p.name || d.name).slice(0, 80);
   return out;
+}
+
+function emptyGear(level) {
+  const g = { ...defaultProfile(level).gear };
+  for (const k of Object.keys(g)) g[k] = 0;
+  return g;
 }
 
 function sampleProfiles() {
   const a = defaultProfile(60);
   a.id = 'exemple-60-2m';
   a.name = 'Exemple · niveau 60 · arme à deux mains';
+  a.gear = emptyGear(60);
+  a.equipment = exampleEquipment(60);
 
   const b = defaultProfile(60);
-  const w = SAMPLE_WEAPONS[60];
   b.id = 'exemple-60-dw';
   b.name = 'Exemple · niveau 60 · ambidextrie';
-  b.twoHand = false;
-  b.mh = { min: w.mh.min, max: w.mh.max, speed: w.mh.speed, type: w.mh.type, enchant: 'crusader' };
-  b.oh = { min: w.oh.min, max: w.oh.max, speed: w.oh.speed, type: w.oh.type, enchant: 'crusader' };
+  b.gear = emptyGear(60);
+  b.equipment = exampleEquipment(60, true);
 
   const c = defaultProfile(30);
   c.id = 'exemple-30-beta';
   c.name = 'Exemple · niveau 30 (bêta) · 2M';
+  c.gear = emptyGear(30);
+  c.equipment = exampleEquipment(30);
   return [a, b, c];
 }
 
@@ -130,11 +155,13 @@ function load() {
   } catch {
     data = null;
   }
+  state.items = Array.isArray(data?.items) ? data.items.map(sanitizeItem).filter(Boolean) : exampleItems();
   if (data && Array.isArray(data.profiles) && data.profiles.length) {
     state.profiles = data.profiles.map(normalizeProfile);
     state.currentId = data.currentId;
     state.iterations = [500, 1000, 2000, 5000, 10000].includes(data.iterations) ? data.iterations : 2000;
-    state.tab = TABS.some(([k]) => k === data.tab) ? data.tab : 'perso';
+    state.tab = TABS.some(([k]) => k === data.tab) ? data.tab : 'equip';
+    state.resultsTab = RESULT_TABS.some(([k]) => k === data.resultsTab) ? data.resultsTab : 'summary';
   } else {
     state.profiles = sampleProfiles();
     state.currentId = state.profiles[0].id;
@@ -145,7 +172,8 @@ function load() {
 function save() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
-      profiles: state.profiles, currentId: state.currentId, iterations: state.iterations, tab: state.tab,
+      profiles: state.profiles, items: state.items, currentId: state.currentId,
+      iterations: state.iterations, tab: state.tab, resultsTab: state.resultsTab,
     }));
   } catch {
     // Stockage indisponible (navigation privée) : le sim fonctionne sans.
@@ -156,6 +184,7 @@ function switchProfile(id) {
   state.currentId = id;
   state.confirmDelete = false;
   state.notice = '';
+  state.cycleFrom = 0;
   save();
   renderAll();
 }
@@ -176,7 +205,7 @@ function changeLevel(L) {
     if (def.value !== null && typeof def.value === 'object') p.mechanics[def.key] = mechanicDefault(def, L);
   }
   if (L < 40) p.talents.laceratingStrikes = 0;
-  state.notice = `Niveau ${L} : niveau et armure du boss, rangs des sorts et valeurs dépendantes du niveau ont été remis à jour. Vérifiez l’équipement, les armes, les buffs et les talents.`;
+  state.notice = `Niveau ${L} : niveau et armure du boss, rangs des sorts et valeurs dépendantes du niveau ont été remis à jour. Vérifiez l’équipement, les buffs et les talents.`;
   save();
   renderAll();
 }
@@ -187,20 +216,24 @@ function fieldId(path) {
   return `f-${path.replace(/\./g, '-')}`;
 }
 
-function numField(label, path, opts = {}) {
-  const value = getPath(current(), path);
-  return h('label', { class: 'field', for: fieldId(path) },
-    h('span', {}, label),
+function numField(text, path, opts = {}) {
+  const value = getPath(opts.target || current(), path);
+  const attr = opts.draft ? 'data-draft' : 'data-path';
+  const id = opts.draft ? `d-${path.replace(/\./g, '-')}` : fieldId(path);
+  return h('label', { class: 'field', for: id },
+    h('span', {}, text),
     h('input', {
-      id: fieldId(path), type: 'number', inputmode: 'decimal', step: opts.step ?? 'any', min: opts.min, max: opts.max,
-      value: value ?? 0, 'data-path': path, 'data-kind': 'num',
+      id, type: 'number', inputmode: 'decimal', step: opts.step ?? 'any', min: opts.min, max: opts.max,
+      value: value ?? 0, [attr]: path, 'data-kind': 'num',
     }));
 }
 
-function textField(label, path) {
-  return h('label', { class: 'field', for: fieldId(path) },
-    h('span', {}, label),
-    h('input', { id: fieldId(path), type: 'text', value: getPath(current(), path) ?? '', 'data-path': path, 'data-kind': 'str' }));
+function textField(text, path, opts = {}) {
+  const attr = opts.draft ? 'data-draft' : 'data-path';
+  const id = opts.draft ? `d-${path.replace(/\./g, '-')}` : fieldId(path);
+  return h('label', { class: 'field', for: id },
+    h('span', {}, text),
+    h('input', { id, type: 'text', value: getPath(opts.target || current(), path) ?? '', [attr]: path, 'data-kind': 'str' }));
 }
 
 function selectEl(options, value, attrs = {}) {
@@ -209,16 +242,18 @@ function selectEl(options, value, attrs = {}) {
   return s;
 }
 
-function selectField(label, path, options, { kind = 'str', rerender = false } = {}) {
-  return h('label', { class: 'field', for: fieldId(path) },
-    h('span', {}, label),
-    selectEl(options, getPath(current(), path), { id: fieldId(path), 'data-path': path, 'data-kind': kind, 'data-rerender': rerender ? '1' : undefined }));
+function selectField(text, path, options, { kind = 'str', rerender = false, draft = false, target } = {}) {
+  const attr = draft ? 'data-draft' : 'data-path';
+  const id = draft ? `d-${path.replace(/\./g, '-')}` : fieldId(path);
+  return h('label', { class: 'field', for: id },
+    h('span', {}, text),
+    selectEl(options, getPath(target || current(), path), { id, [attr]: path, 'data-kind': kind, 'data-rerender': rerender ? '1' : undefined }));
 }
 
-function checkField(label, path, { rerender = false } = {}) {
+function checkField(text, path, { rerender = false } = {}) {
   const input = h('input', { id: fieldId(path), type: 'checkbox', 'data-path': path, 'data-rerender': rerender ? '1' : undefined });
   input.checked = !!getPath(current(), path);
-  return h('label', { class: 'check', for: fieldId(path) }, input, h('span', {}, label));
+  return h('label', { class: 'check', for: fieldId(path) }, input, h('span', {}, text));
 }
 
 function chip(conf) {
@@ -244,8 +279,8 @@ function renderProfileBar() {
   sel.addEventListener('change', () => switchProfile(sel.value));
   bar.append(
     sel,
-    h('button', { class: 'btn small', type: 'button', onclick: () => addProfile(defaultProfile(60)) }, 'Nouveau 60'),
-    h('button', { class: 'btn small', type: 'button', onclick: () => addProfile(defaultProfile(30)) }, 'Nouveau 30'),
+    h('button', { class: 'btn small', type: 'button', onclick: () => addProfile({ ...defaultProfile(60), gear: emptyGear(60) }) }, 'Nouveau 60'),
+    h('button', { class: 'btn small', type: 'button', onclick: () => addProfile({ ...defaultProfile(30), gear: emptyGear(30) }) }, 'Nouveau 30'),
     h('button', {
       class: 'btn small', type: 'button',
       onclick: () => addProfile({ ...JSON.parse(JSON.stringify(p)), name: `${p.name} (copie)` }),
@@ -261,6 +296,7 @@ function renderProfileBar() {
         state.profiles = state.profiles.filter((x) => x.id !== p.id);
         delete state.results[p.id];
         delete state.weights[p.id];
+        delete state.traces[p.id];
         switchProfile(state.profiles[0].id);
       },
     }, state.confirmDelete ? 'Confirmer la suppression' : 'Supprimer'),
@@ -271,31 +307,56 @@ function renderProfileBar() {
   );
 }
 
+function exportPayload(p) {
+  const ids = new Set(Object.values(p.equipment || {}));
+  return JSON.stringify({ format: 'sim-survie-forever', profile: { ...p, id: undefined }, items: state.items.filter((i) => ids.has(i.id)) }, null, 2);
+}
+
+function importPayload(data) {
+  const profile = data && data.profile ? data.profile : data;
+  if (!profile || typeof profile !== 'object') throw new Error('format');
+  const remap = {};
+  for (const raw of Array.isArray(data.items) ? data.items : []) {
+    const item = sanitizeItem(raw);
+    if (!item) continue;
+    const existing = state.items.find((i) => i.id === item.id);
+    if (existing && JSON.stringify(existing) === JSON.stringify(item)) continue;
+    if (existing) {
+      const id = uid('i');
+      remap[item.id] = id;
+      item.id = id;
+    }
+    state.items.push(item);
+  }
+  const eq = {};
+  for (const [slot, id] of Object.entries(profile.equipment || {})) eq[slot] = remap[id] || id;
+  addProfile({ ...profile, equipment: eq });
+}
+
 function renderIO() {
   const box = $('io');
   box.replaceChildren();
   box.hidden = !state.ioOpen;
   if (!state.ioOpen) return;
   const p = current();
-  const exportData = JSON.stringify({ ...p, id: undefined }, null, 2);
+  const exportData = exportPayload(p);
   const out = h('textarea', { id: 'exportText', readonly: true, 'aria-label': 'Profil exporté (JSON)' });
   out.value = exportData;
   const inp = h('textarea', { id: 'importText', placeholder: 'Collez ici un profil exporté (JSON)…', 'aria-label': 'Profil à importer (JSON)' });
   const msg = h('p', { class: 'hint', 'aria-live': 'polite' }, state.ioMessage);
   box.append(
-    h('div', { class: 'panel-head' }, h('h2', {}, 'Importer ou exporter un profil'), h('span', { class: 'hint' }, 'Pour sauvegarder ailleurs ou partager un profil.')),
+    h('div', { class: 'panel-head' }, h('h2', {}, 'Importer ou exporter un profil'), h('span', { class: 'hint' }, 'Le profil exporté contient aussi ses objets équipés.')),
     h('div', { class: 'io' },
       h('label', { class: 'field', for: 'exportText' }, h('span', {}, `Profil « ${p.name} »`), out),
       h('div', { class: 'io-actions' },
         h('button', {
           class: 'btn small', type: 'button',
           onclick: () => {
-            const done = () => { state.ioMessage = 'Profil copié dans le presse-papiers.'; msg.textContent = state.ioMessage; };
+            const fail = () => { out.select(); msg.textContent = 'Copie refusée : le texte est sélectionné, copiez-le avec Ctrl+C.'; };
             try {
-              navigator.clipboard.writeText(exportData).then(done, () => { out.select(); msg.textContent = 'Copie refusée : le texte est sélectionné, copiez-le avec Ctrl+C.'; });
+              navigator.clipboard.writeText(exportData).then(() => { msg.textContent = 'Profil copié dans le presse-papiers.'; }, fail);
             } catch {
-              out.select();
-              msg.textContent = 'Copie refusée : le texte est sélectionné, copiez-le avec Ctrl+C.';
+              fail();
             }
           },
         }, 'Copier le profil')),
@@ -305,10 +366,8 @@ function renderIO() {
           class: 'btn small primary', type: 'button',
           onclick: () => {
             try {
-              const data = JSON.parse(inp.value);
-              if (!data || typeof data !== 'object') throw new Error('format');
               state.ioMessage = 'Profil importé.';
-              addProfile(data);
+              importPayload(JSON.parse(inp.value));
             } catch {
               msg.textContent = 'Ce texte n’est pas un profil valide. Collez le JSON complet obtenu avec « Copier le profil ».';
             }
@@ -321,7 +380,7 @@ function renderIO() {
 // ---------- feuille de personnage ----------
 
 function renderSheet() {
-  const s = characterSheet(current());
+  const s = characterSheet(resolved());
   const hitWarn = s.yellowMiss > 0;
   const items = [
     ['PA de mêlée', fmt0(s.ap)],
@@ -346,20 +405,19 @@ function renderSheet() {
   $('sheet').replaceChildren(...items.map(([k, v, warn]) => h('div', {}, h('span', { class: 'k' }, k), h('span', { class: `v${warn ? ' warn' : ''}` }, v))));
 }
 
-// ---------- onglets ----------
+// ---------- onglets de réglages ----------
 
 function renderTabs() {
-  const tabs = $('tabs');
-  tabs.replaceChildren(...TABS.map(([key, label]) => h('button', {
+  $('tabs').replaceChildren(...TABS.map(([key, text]) => h('button', {
     class: 'tab', type: 'button', role: 'tab', 'aria-selected': state.tab === key ? 'true' : 'false',
     onclick: () => { state.tab = key; save(); renderTabs(); renderPanel(); },
-  }, label)));
+  }, text)));
 }
 
 function renderPanel() {
-  const panel = $('panel');
   const p = current();
   const content = {
+    equip: panelEquip,
     perso: panelPerso,
     talents: panelTalents,
     buffs: panelBuffs,
@@ -367,11 +425,248 @@ function renderPanel() {
     combat: panelCombat,
     hypo: panelHypo,
   }[state.tab](p);
-  panel.replaceChildren(...[
+  $('panel').replaceChildren(...[
     state.notice ? h('div', { class: 'notice', role: 'status' }, state.notice) : null,
     content,
   ].filter(Boolean));
 }
+
+// ----- Équipement -----
+
+// Objets proposés pour un profil : ceux de son niveau (ou sans niveau), plus ceux déjà équipés.
+function itemsForProfile(p) {
+  const equipped = new Set(Object.values(p.equipment || {}));
+  return state.items.filter((i) => !i.level || i.level === p.level || equipped.has(i.id));
+}
+
+function itemValue(item) {
+  const w = state.weights[current().id];
+  if (!w) return null;
+  const ep = Object.fromEntries(w.rows.map((r) => [r.key, r.ep]));
+  let v = 0;
+  for (const s of ITEM_STATS) {
+    const n = Number(item.stats?.[s.key]) || 0;
+    if (n && ep[s.key] !== undefined) v += n * ep[s.key];
+  }
+  if (item.weapon && ep.weapon !== undefined) v += weaponDps(item.weapon) * ep.weapon;
+  return v;
+}
+
+function preferredSlot(p, item) {
+  const eq = p.equipment || {};
+  const byId = (id) => state.items.find((i) => i.id === id);
+  if (item.type === 'finger') return !eq.finger1 ? 'finger1' : !eq.finger2 ? 'finger2' : 'finger1';
+  if (item.type === 'trinket') return !eq.trinket1 ? 'trinket1' : !eq.trinket2 ? 'trinket2' : 'trinket1';
+  if (item.type === 'weapon2h') return 'mainHand';
+  if (item.type === 'weapon1h') {
+    const main = byId(eq.mainHand);
+    return main && main.type === 'weapon1h' && main.id !== item.id ? 'offHand' : 'mainHand';
+  }
+  return SLOTS.find((s) => s.accepts.includes(item.type))?.id;
+}
+
+function newDraft(type = 'head') {
+  return {
+    id: null, name: '', type, stats: {}, source: 'manuel', skillFor: null,
+    weapon: { min: 0, max: 0, speed: type === 'weapon2h' ? 3.5 : 2.6, type: 'axe' },
+    onUse: { type: 'ap', value: 0, duration: 20, cd: 120 },
+  };
+}
+
+function editItem(item) {
+  state.editor = {
+    ...newDraft(item.type),
+    ...JSON.parse(JSON.stringify(item)),
+    weapon: item.weapon ? { ...item.weapon } : newDraft(item.type).weapon,
+    onUse: item.onUse ? { ...item.onUse } : newDraft(item.type).onUse,
+  };
+  state.editorMessage = `Modification de « ${item.name} ».`;
+  state.tab = 'equip';
+  renderTabs();
+  renderPanel();
+  $('item-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function saveDraft(equip) {
+  const d = state.editor;
+  if (!d) return;
+  if (!String(d.name || '').trim()) {
+    state.editorMessage = 'Donnez un nom à l’objet avant de l’enregistrer.';
+    renderPanel();
+    return;
+  }
+  const item = sanitizeItem({ ...d, id: d.id || uid('i'), level: d.level ?? current().level, source: d.source || 'manuel' });
+  const idx = state.items.findIndex((i) => i.id === item.id);
+  if (idx >= 0) state.items[idx] = item;
+  else state.items.push(item);
+  let msg = `« ${item.name} » enregistré.`;
+  if (equip) {
+    const slot = preferredSlot(current(), item);
+    if (slot) {
+      equipItem(current(), state.items, slot, item.id);
+      msg = `« ${item.name} » enregistré et équipé (${slotDef(slot).name}).`;
+    }
+  }
+  state.editor = null;
+  state.editorMessage = msg;
+  afterChange(true);
+}
+
+function deleteItem(id) {
+  state.items = state.items.filter((i) => i.id !== id);
+  for (const p of state.profiles) {
+    for (const [slot, itemId] of Object.entries(p.equipment || {})) if (itemId === id) p.equipment[slot] = null;
+  }
+  state.confirmItemDelete = null;
+  afterChange(true);
+}
+
+function panelEquip(p) {
+  const eq = p.equipment || {};
+  const byId = (id) => state.items.find((i) => i.id === id);
+  const main = byId(eq.mainHand);
+  const twoHandEquipped = main && main.type === 'weapon2h';
+
+  const rows = SLOTS.map((slot) => {
+    const options = itemsForProfile(p).filter((i) => slot.accepts.includes(i.type))
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    const it = byId(eq[slot.id]);
+    const disabled = slot.id === 'offHand' && twoHandEquipped;
+    const sel = h('select', { id: `slot-${slot.id}`, 'aria-label': `Objet pour ${slot.name}`, disabled },
+      h('option', { value: '' }, disabled ? '— Arme à deux mains équipée —' : '— Vide —'),
+      options.map((o) => h('option', { value: o.id }, o.name)));
+    sel.value = it && !disabled ? it.id : '';
+    sel.addEventListener('change', () => {
+      equipItem(p, state.items, slot.id, sel.value || null);
+      afterChange(true);
+    });
+    const alternatives = options.length + 1;
+    return h('div', { class: 'slot-row' },
+      h('label', { class: 'slot-name', for: `slot-${slot.id}` }, slot.name),
+      h('div', { class: 'slot-main' }, sel, h('small', { class: 'muted' }, it && !disabled ? itemSummary(it) : '')),
+      h('div', { class: 'slot-actions' },
+        it && !disabled ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => editItem(it) }, 'Modifier') : null,
+        h('button', {
+          class: 'btn small', type: 'button', disabled: disabled || alternatives < 2 || !!state.running,
+          onclick: () => { state.resultsTab = 'compare'; state.compareSlot = slot.id; save(); runItemCompare(slot.id); },
+        }, 'Comparer')));
+  });
+
+  const totals = equipmentTotals(p, state.items);
+  const totalText = itemSummary({ stats: totals });
+  const manual = itemSummary({ stats: p.gear });
+
+  return h('div', { class: 'section-stack' },
+    section('Objets équipés', null,
+      h('p', { class: 'hint' }, 'Choisissez un objet par emplacement. « Comparer » simule tous les objets possibles pour cet emplacement.'),
+      h('div', { class: 'slots' }, rows),
+      h('div', { class: 'totals' },
+        h('div', {}, h('span', { class: 'k' }, 'Total des objets'), h('span', {}, totalText)),
+        h('div', {}, h('span', { class: 'k' }, 'Bonus manuels (onglet Personnage)'), h('span', {}, manual))),
+      h('div', { class: 'io-actions' },
+        h('button', { class: 'btn small', type: 'button', onclick: () => { p.equipment = exampleEquipment(p.level); afterChange(true); } }, `Équiper l’ensemble d’exemple (niv. ${p.level})`),
+        h('button', { class: 'btn small', type: 'button', onclick: () => { p.equipment = {}; afterChange(true); } }, 'Tout retirer'))),
+    itemEditor(p),
+    itemLibrary(p),
+  );
+}
+
+function itemEditor(p) {
+  const d = state.editor;
+  const paste = h('textarea', { id: 'tooltipText', placeholder: 'Collez ici le tooltip d’un objet (Wowhead ou jeu, en anglais ou en français)…', 'aria-label': 'Tooltip à analyser' });
+  const analyse = () => {
+    const r = parseTooltip(paste.value);
+    if (!r.name) {
+      state.editorMessage = 'Rien à analyser : collez le texte complet du tooltip.';
+      renderPanel();
+      return;
+    }
+    const base = newDraft(r.type || 'head');
+    state.editor = {
+      ...base, name: r.name, type: r.type || 'head', stats: r.stats, source: 'tooltip', skillFor: r.skillFor,
+      weapon: r.weapon || base.weapon, onUse: r.onUse || base.onUse,
+    };
+    const lines = [];
+    if (!r.type) lines.push('Type d’objet non trouvé : choisissez-le.');
+    if (r.unparsed.length) lines.push(`Lignes non reconnues, à reporter à la main si besoin : ${r.unparsed.join(' / ')}`);
+    state.editorMessage = lines.length ? lines.join(' ') : 'Tooltip analysé : vérifiez les valeurs puis enregistrez.';
+    renderPanel();
+  };
+
+  const head = section(d ? (d.id ? 'Modifier un objet' : 'Nouvel objet') : 'Ajouter un objet', null,
+    h('div', { class: 'field' }, paste),
+    h('div', { class: 'io-actions' },
+      h('button', { class: 'btn small primary', type: 'button', onclick: analyse }, 'Analyser le tooltip'),
+      h('button', { class: 'btn small', type: 'button', onclick: () => { state.editor = newDraft(); state.editorMessage = ''; renderPanel(); } }, 'Saisir à la main')),
+    state.editorMessage ? h('p', { class: 'notice', role: 'status' }, state.editorMessage) : null);
+  head.id = 'item-editor';
+  if (!d) return head;
+
+  const typeSel = selectEl(ITEM_TYPES, d.type, { id: 'd-type', 'data-draft': 'type', 'data-kind': 'str', 'data-rerender': '1' });
+  head.append(
+    h('div', { class: 'fields' },
+      textField('Nom', 'name', { draft: true, target: d }),
+      h('label', { class: 'field', for: 'd-type' }, h('span', {}, 'Type'), typeSel)),
+    h('div', { class: 'fields' }, ITEM_STATS.map((s) => numField(s.label, `stats.${s.key}`, { draft: true, target: d, step: s.pct ? 0.5 : 1 }))),
+    isWeaponType(d.type) ? h('div', { class: 'fields' },
+      numField('Dégâts min', 'weapon.min', { draft: true, target: d, step: 1, min: 0 }),
+      numField('Dégâts max', 'weapon.max', { draft: true, target: d, step: 1, min: 0 }),
+      numField('Vitesse (s)', 'weapon.speed', { draft: true, target: d, step: 0.1, min: 0.5 }),
+      selectField('Type d’arme', 'weapon.type', WEAPON_TYPES, { draft: true, target: d })) : null,
+    d.type === 'trinket' ? h('div', { class: 'fields' },
+      selectField('Effet à activer', 'onUse.type', ON_USE_TYPES, { draft: true, target: d }),
+      numField('Valeur (0 = aucun)', 'onUse.value', { draft: true, target: d, step: 1 }),
+      numField('Durée (s)', 'onUse.duration', { draft: true, target: d, step: 1, min: 1 }),
+      numField('Recharge (s)', 'onUse.cd', { draft: true, target: d, step: 1, min: 1 })) : null,
+    d.skillFor ? h('p', { class: 'hint' }, `Compétence limitée à : ${d.skillFor.map((t) => WEAPON_TYPES[t]).join(', ')}.`) : null,
+    h('div', { class: 'io-actions' },
+      h('button', { class: 'btn small primary', type: 'button', onclick: () => saveDraft(true) }, d.id ? 'Enregistrer et équiper' : 'Ajouter et équiper'),
+      h('button', { class: 'btn small', type: 'button', onclick: () => saveDraft(false) }, d.id ? 'Enregistrer' : 'Ajouter à la bibliothèque'),
+      h('button', { class: 'btn small ghost', type: 'button', onclick: () => { state.editor = null; state.editorMessage = ''; renderPanel(); } }, 'Annuler')),
+  );
+  return head;
+}
+
+function itemLibrary(p) {
+  const typeOptions = { all: 'Tous les types', ...ITEM_TYPES };
+  const levelOptions = { all: 'Tous niveaux', 60: 'Niveau 60', 30: 'Niveau 30' };
+  const typeSel = selectEl(typeOptions, state.libType, { id: 'lib-type', 'aria-label': 'Filtrer par type' });
+  typeSel.addEventListener('change', () => { state.libType = typeSel.value; renderPanel(); });
+  const levelSel = selectEl(levelOptions, state.libLevel, { id: 'lib-level', 'aria-label': 'Filtrer par niveau' });
+  levelSel.addEventListener('change', () => { state.libLevel = levelSel.value; renderPanel(); });
+
+  const equippedIds = new Set(Object.values(p.equipment || {}));
+  const list = state.items
+    .filter((i) => state.libType === 'all' || i.type === state.libType)
+    .filter((i) => state.libLevel === 'all' || String(i.level) === state.libLevel)
+    .sort((a, b) => Object.keys(ITEM_TYPES).indexOf(a.type) - Object.keys(ITEM_TYPES).indexOf(b.type) || a.name.localeCompare(b.name, 'fr'));
+  const sourceLabel = { exemple: 'Exemple', manuel: 'Saisi', tooltip: 'Tooltip' };
+
+  return section(`Bibliothèque (${state.items.length} objets)`, 'Partagée entre tous les profils',
+    h('div', { class: 'io-actions' }, typeSel, levelSel),
+    list.length ? h('div', { class: 'library' }, list.map((it) => {
+      const val = itemValue(it);
+      const confirming = state.confirmItemDelete === it.id;
+      return h('div', { class: `item-row${equippedIds.has(it.id) ? ' equipped' : ''}` },
+        h('div', { class: 'item-main' },
+          h('div', { class: 'item-title' },
+            h('span', { class: 'name' }, it.name),
+            h('span', { class: 'tag' }, ITEM_TYPES[it.type]),
+            h('span', { class: 'tag' }, sourceLabel[it.source] || 'Saisi'),
+            equippedIds.has(it.id) ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
+          h('small', { class: 'muted' }, itemSummary(it)),
+          val !== null ? h('small', { class: 'muted' }, `≈ ${fmt0(val)} PA selon les poids des stats`) : null),
+        h('div', { class: 'slot-actions' },
+          h('button', { class: 'btn small', type: 'button', onclick: () => { const slot = preferredSlot(p, it); if (slot) { equipItem(p, state.items, slot, it.id); afterChange(true); } } }, 'Équiper'),
+          h('button', { class: 'btn small ghost', type: 'button', onclick: () => editItem(it) }, 'Modifier'),
+          h('button', {
+            class: `btn small ghost${confirming ? ' danger' : ''}`, type: 'button',
+            onclick: () => { if (confirming) deleteItem(it.id); else { state.confirmItemDelete = it.id; renderPanel(); } },
+          }, confirming ? 'Confirmer' : 'Supprimer')));
+    })) : h('p', { class: 'empty' }, 'Aucun objet pour ce filtre. Collez un tooltip ci-dessus pour en ajouter un.'));
+}
+
+// ----- Personnage -----
 
 function weaponBlock(title, key, p) {
   const w = p[key];
@@ -391,9 +686,18 @@ function panelPerso(p) {
   const race = RACES[p.race] || RACES.orc;
   const levelSel = selectEl({ 60: 'Niveau 60', 30: 'Niveau 30 (bêta)' }, p.level, { id: 'f-level', 'aria-label': 'Niveau' });
   levelSel.addEventListener('change', () => changeLevel(Number(levelSel.value)));
+  const r = resolved(p);
+  const eq = p.equipment || {};
+  const byId = (id) => state.items.find((i) => i.id === id);
+  const mainItem = byId(eq.mainHand);
+  const weaponsFromItems = !!(mainItem && mainItem.weapon);
 
   const trinketTypes = { ap: 'Puissance d’attaque', haste: 'Hâte (%)', agi: 'Agilité', str: 'Force', crit: 'Critique (%)' };
   const trinketRows = [0, 1].map((i) => {
+    const item = byId(eq[`trinket${i + 1}`]);
+    if (item && item.onUse && Number(item.onUse.value)) {
+      return h('p', { class: 'hint' }, `Bijou ${i + 1} : ${item.name} (onglet Équipement) — ${itemSummary({ stats: {}, onUse: item.onUse })}.`);
+    }
     const tr = p.trinkets[i];
     const presets = Object.fromEntries(Object.entries(ON_USE_PRESETS).map(([k, v]) => [k, v.name]));
     return h('div', { class: 'fields' },
@@ -406,20 +710,28 @@ function panelPerso(p) {
       ] : null);
   });
 
+  const enchants = Object.fromEntries(Object.entries(ENCHANTS).filter(([k]) => k !== 'counterweight' || r.twoHand).map(([k, v]) => [k, v.name]));
+  const weaponSection = weaponsFromItems
+    ? section('Armes', 'Définies par l’onglet Équipement',
+      h('p', {}, `${mainItem.name} : ${itemSummary(mainItem)}`),
+      r.oh ? h('p', {}, `${byId(eq.offHand)?.name || 'Main gauche'} : ${itemSummary(byId(eq.offHand) || { stats: {} })}`) : null,
+      h('div', { class: 'fields' },
+        selectField(r.twoHand ? 'Enchantement' : 'Enchantement main droite', 'mh.enchant', enchants),
+        r.oh ? selectField('Enchantement main gauche', 'oh.enchant', enchants) : null))
+    : null;
+
   const twoHandToggle = h('div', { class: 'segmented', role: 'group', 'aria-label': 'Style d’arme' },
     h('button', { type: 'button', 'aria-pressed': p.twoHand ? 'true' : 'false', onclick: () => { p.twoHand = true; afterChange(true); } }, 'Arme à deux mains'),
     h('button', { type: 'button', 'aria-pressed': p.twoHand ? 'false' : 'true', onclick: () => { p.twoHand = false; afterChange(true); } }, 'Ambidextrie'));
-
+  const sample = SAMPLE_WEAPONS[p.level];
   const loadSample = () => {
-    const s = SAMPLE_WEAPONS[p.level];
-    if (p.twoHand) Object.assign(p.mh, { min: s.twoHand.min, max: s.twoHand.max, speed: s.twoHand.speed, type: s.twoHand.type });
+    if (p.twoHand) Object.assign(p.mh, { min: sample.twoHand.min, max: sample.twoHand.max, speed: sample.twoHand.speed, type: sample.twoHand.type });
     else {
-      Object.assign(p.mh, { min: s.mh.min, max: s.mh.max, speed: s.mh.speed, type: s.mh.type });
-      Object.assign(p.oh, { min: s.oh.min, max: s.oh.max, speed: s.oh.speed, type: s.oh.type });
+      Object.assign(p.mh, { min: sample.mh.min, max: sample.mh.max, speed: sample.mh.speed, type: sample.mh.type });
+      Object.assign(p.oh, { min: sample.oh.min, max: sample.oh.max, speed: sample.oh.speed, type: sample.oh.type });
     }
     afterChange(true);
   };
-  const sample = SAMPLE_WEAPONS[p.level];
 
   return h('div', { class: 'section-stack' },
     section('Personnage', null,
@@ -432,7 +744,7 @@ function panelPerso(p) {
       h('div', { class: 'fields' },
         checkField('Hunter’s Mark sur la cible', 'huntersMark'),
         checkField('Utiliser le racial offensif', 'racial'))),
-    section('Statistiques d’équipement', 'Totaux de l’équipement, sans buffs ni talents. Toucher et crit sont unifiés dans Forever.',
+    section('Bonus manuels', 'S’ajoutent aux objets équipés : enchantements d’armure, ou vos totaux si vous ne saisissez pas les objets.',
       h('div', { class: 'fields' },
         numField('Force', 'gear.str', { step: 1 }),
         numField('Agilité', 'gear.agi', { step: 1 }),
@@ -446,15 +758,17 @@ function panelPerso(p) {
         numField('Mana toutes les 5 s', 'gear.mp5', { step: 1 }),
         numField('Compétence d’arme (+)', 'gear.skill', { step: 1 }),
         numField('Réduction esquive/parade (%)', 'gear.expertise', { step: 0.5 }))),
-    h('div', { class: 'section' },
-      h('div', { class: 'section-title' }, h('h3', {}, 'Armes'), twoHandToggle),
-      h('div', { class: 'io-actions' },
-        h('button', { class: 'btn small', type: 'button', onclick: loadSample }, p.twoHand ? 'Charger l’arme d’exemple' : 'Charger les armes d’exemple'),
-        h('span', { class: 'hint' }, p.twoHand ? sample.twoHand.name : `${sample.mh.name} et ${sample.oh.name}`)),
-      h('p', { class: 'hint' }, 'Les armes d’exemple reprennent des stats de Classic : l’itemisation de Forever peut différer.')),
-    weaponBlock(p.twoHand ? 'Arme à deux mains' : 'Main droite', 'mh', p),
-    p.twoHand ? null : weaponBlock('Main gauche', 'oh', p),
-    section('Bijoux et procs', null,
+    weaponSection || [
+      h('div', { class: 'section' },
+        h('div', { class: 'section-title' }, h('h3', {}, 'Armes'), twoHandToggle),
+        h('div', { class: 'io-actions' },
+          h('button', { class: 'btn small', type: 'button', onclick: loadSample }, p.twoHand ? 'Charger l’arme d’exemple' : 'Charger les armes d’exemple'),
+          h('span', { class: 'hint' }, p.twoHand ? sample.twoHand.name : `${sample.mh.name} et ${sample.oh.name}`)),
+        h('p', { class: 'hint' }, 'Équipez une arme dans l’onglet Équipement pour remplacer ces valeurs.')),
+      weaponBlock(p.twoHand ? 'Arme à deux mains' : 'Main droite', 'mh', p),
+      p.twoHand ? null : weaponBlock('Main gauche', 'oh', p),
+    ],
+    section('Bijoux à activer et procs', null,
       trinketRows,
       h('div', { class: 'fields' }, numField('Attaque suppl. (% par coup)', 'extraAttackChance', { min: 0, step: 0.5 })),
       h('p', { class: 'hint' }, 'Bijoux utilisés dès que possible. Attaque supplémentaire : chance par coup qui touche, par exemple 2 % pour la Main de justice.')),
@@ -467,6 +781,8 @@ function panelPerso(p) {
         numField('PA en plus', 'custom.ap', { step: 5 }))),
   );
 }
+
+// ----- Talents, buffs, rotation, combat, hypothèses -----
 
 function talentPoints(p) {
   return TALENTS.reduce((s, t) => s + (Number(p.talents[t.id]) || 0), 0);
@@ -542,7 +858,7 @@ function panelRotation(p) {
     return h('div', { class: `rot-row${r.enabled ? '' : ' disabled'}` },
       h('span', { class: 'rank' }, String(i + 1)),
       cb,
-      h('label', { class: 'rot-name', for: `rot-${r.id}` }, h('span', {}, def.name), h('small', { class: 'muted' }, note)),
+      h('label', { class: 'rot-name', for: `rot-${r.id}` }, castChip(r.id, def.name), h('small', { class: 'muted' }, note)),
       h('label', { class: 'mana', for: `rot-mana-${r.id}` }, 'Mana min.',
         h('input', { id: `rot-mana-${r.id}`, type: 'number', min: 0, max: 100, step: 5, value: r.minMana, 'data-path': `rotation.${i}.minMana`, 'data-kind': 'num' }), '%'),
       h('div', { class: 'moves' },
@@ -552,9 +868,10 @@ function panelRotation(p) {
   return h('div', { class: 'section-stack' },
     section('Priorités', 'À chaque fin de GCD, le sim lance la première technique disponible de la liste.',
       h('div', { class: 'rotation' }, rows),
-      h('p', { class: 'hint' }, 'Le seuil « Mana min. » garde du mana pour les techniques placées plus haut. Les recharges (racial, bijoux) et les potions sont utilisées dès que possible.'),
+      h('p', { class: 'hint' }, 'Le seuil « Mana min. » garde du mana pour les techniques placées plus haut. Les recharges (racial, bijoux) et les potions sont utilisées dès que possible. Le résultat est visible dans l’onglet « Cycle de sorts ».'),
       h('div', { class: 'io-actions' },
-        h('button', { class: 'btn small', type: 'button', onclick: () => { state.tab = 'hypo'; save(); renderTabs(); renderPanel(); } }, 'Changer le mode de Raptor Strike (Hypothèses)'))));
+        h('button', { class: 'btn small', type: 'button', onclick: () => { state.resultsTab = 'cycle'; save(); renderResults(); $('results')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }, 'Voir le cycle obtenu'),
+        h('button', { class: 'btn small', type: 'button', onclick: () => { state.tab = 'hypo'; save(); renderTabs(); renderPanel(); } }, 'Changer le mode de Raptor Strike'))));
 }
 
 function panelCombat(p) {
@@ -612,27 +929,41 @@ function mechRow(def, p) {
       chip(def.conf),
       h('span', {}, `Défaut : ${dfltText}`),
       def.note ? h('span', {}, def.note) : null,
-      (def.src || []).map((s) => SOURCES[s] ? h('a', { href: SOURCES[s].url, target: '_blank', rel: 'noopener' }, SOURCES[s].label.split(' — ')[0]) : null),
+      (def.src || []).map((s) => (SOURCES[s] ? h('a', { href: SOURCES[s].url, target: '_blank', rel: 'noopener' }, SOURCES[s].label.split(' — ')[0]) : null)),
       isChanged ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { p.mechanics[def.key] = dflt; afterChange(true); } }, 'Réinitialiser') : null),
     h('div', { class: 'control' }, control));
 }
 
 // ---------- liaison des champs ----------
 
+function readValue(el) {
+  if (el.type === 'checkbox') return { ok: true, v: el.checked };
+  if (el.dataset.kind === 'num') {
+    if (el.value === '') return { ok: false };
+    const v = Number(el.value);
+    return { ok: Number.isFinite(v), v };
+  }
+  return { ok: true, v: el.value };
+}
+
 function onFieldEvent(e) {
   const el = e.target;
   const path = el?.dataset?.path;
-  if (!path) return;
+  const draftPath = el?.dataset?.draft;
+  if (!path && !draftPath) return;
   const isText = el.type === 'number' || el.type === 'text';
   if (e.type === 'input' && !isText) return;
   if (e.type === 'change' && isText) return;
-  let v;
-  if (el.type === 'checkbox') v = el.checked;
-  else if (el.dataset.kind === 'num') {
-    if (el.value === '') return;
-    v = Number(el.value);
-    if (!Number.isFinite(v)) return;
-  } else v = el.value;
+  const { ok, v } = readValue(el);
+  if (!ok) return;
+
+  if (draftPath) {
+    if (!state.editor) return;
+    setPath(state.editor, draftPath, v);
+    if (el.dataset.rerender === '1') renderPanel();
+    return;
+  }
+
   setPath(current(), path, v);
   if (path === 'name') {
     const opt = $('profileSelect')?.selectedOptions?.[0];
@@ -661,19 +992,18 @@ function afterChange(rerender = false) {
   if (rerender) renderPanel();
 }
 
-// ---------- résultats ----------
+// ---------- calculs ----------
 
-function isStale(p, stored) {
-  return !stored || stored.snapshot !== snapshot(p);
+function isStale(stored) {
+  return !stored || stored.snapshot !== snapshotOf();
 }
 
 function renderStatus() {
   const el = $('runStatus');
   if (!el) return;
-  const p = current();
-  const res = state.results[p.id];
+  const res = state.results[current().id];
   el.replaceChildren(!res ? h('span', { class: 'chip stale' }, 'Pas encore simulé')
-    : isStale(p, res) ? h('span', { class: 'chip stale' }, 'Profil modifié depuis le calcul')
+    : isStale(res) ? h('span', { class: 'chip stale' }, 'Profil modifié depuis le calcul')
       : h('span', { class: 'chip fresh' }, 'À jour'));
 }
 
@@ -689,8 +1019,8 @@ async function simulateChunked(profile, iterations, onProgress) {
   return summarize(C, acc);
 }
 
-function setProgress(id, frac) {
-  const bar = $(id);
+function setProgress(frac) {
+  const bar = $('progress-bar');
   if (bar) bar.style.width = `${Math.round(frac * 100)}%`;
 }
 
@@ -698,139 +1028,154 @@ async function guarded(kind, fn) {
   if (state.running) return;
   state.running = kind;
   renderResults();
+  renderPanel();
   try {
     await fn();
   } finally {
     state.running = null;
     renderResults();
+    renderPanel();
   }
 }
 
 function runMain() {
   return guarded('main', async () => {
     const p = current();
-    const summary = await simulateChunked(p, state.iterations, (f) => setProgress('progress-main', f));
-    state.results[p.id] = { summary, snapshot: snapshot(p) };
+    const summary = await simulateChunked(resolved(p), state.iterations, setProgress);
+    state.results[p.id] = { summary, snapshot: snapshotOf(p) };
   });
 }
 
 function runWeights() {
   return guarded('weights', async () => {
     const p = current();
-    const variants = profileVariants(p);
+    const variants = profileVariants(resolved(p));
     const n = Math.min(state.iterations, 3000);
-    const results = {};
+    const runs = {};
     for (let k = 0; k < variants.length; k++) {
-      const v = variants[k];
-      const s = await simulateChunked(v.profile, n, (f) => setProgress('progress-weights', (k + f) / variants.length));
-      results[v.key] = s.dps;
+      const s = await simulateChunked(variants[k].profile, n, (f) => setProgress((k + f) / variants.length));
+      runs[variants[k].key] = s.dps;
     }
-    state.weights[p.id] = { rows: statWeightsFromRuns(results), snapshot: snapshot(p), iterations: n };
+    state.weights[p.id] = { rows: statWeightsFromRuns(runs), snapshot: snapshotOf(p), iterations: n };
   });
 }
 
-function runCompare() {
-  return guarded('compare', async () => {
+function runCompareAll() {
+  return guarded('compareAll', async () => {
     const n = Math.min(state.iterations, 3000);
     const rows = [];
     for (let k = 0; k < state.profiles.length; k++) {
       const p = state.profiles[k];
-      const s = await simulateChunked(p, n, (f) => setProgress('progress-compare', (k + f) / state.profiles.length));
+      const s = await simulateChunked(resolved(p), n, (f) => setProgress((k + f) / state.profiles.length));
       rows.push({ id: p.id, name: p.name, level: p.level, mean: s.mean, se: s.se, oomPct: s.oomPct });
     }
-    state.compare = { rows, iterations: n };
+    state.compareAll = { rows, iterations: n };
   });
 }
 
-function runLog() {
-  const p = current();
-  state.log[p.id] = { rows: combatLog(p, { seconds: 60, seed: SEED }), snapshot: snapshot(p) };
-  renderResults();
-}
-
-function niceTicks(min, max, count = 5) {
-  const span = max - min || 1;
-  const raw = span / count;
-  const pow = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => span / s <= count) || 10 * pow;
-  const ticks = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) ticks.push(v);
-  return ticks;
-}
-
-function columnPath(x, y, w, hgt, r) {
-  const rr = Math.min(r, w / 2, hgt);
-  const b = y + hgt;
-  return `M${x},${b}V${y + rr}Q${x},${y} ${x + rr},${y}H${x + w - rr}Q${x + w},${y} ${x + w},${y + rr}V${b}Z`;
-}
-
-function histogram(dps, mean) {
-  const W = 560;
-  const H = 210;
-  const m = { l: 40, r: 12, t: 22, b: 28 };
-  let lo = Math.min(...dps);
-  let hi = Math.max(...dps);
-  if (hi - lo < 1) { lo -= 1; hi += 1; }
-  const bins = 24;
-  const width = (hi - lo) / bins;
-  const counts = new Array(bins).fill(0);
-  for (const v of dps) counts[Math.min(bins - 1, Math.floor((v - lo) / width))]++;
-  const shares = counts.map((c) => (c / dps.length) * 100);
-  const yMax = Math.max(...shares) * 1.1;
-  const x = (v) => m.l + ((v - lo) / (hi - lo)) * (W - m.l - m.r);
-  const y = (v) => H - m.b - (v / yMax) * (H - m.t - m.b);
-  const bw = (W - m.l - m.r) / bins;
-
-  const yTicks = niceTicks(0, yMax, 3);
-  const xTicks = niceTicks(lo, hi, 5);
-  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Distribution du DPS sur ${dps.length} combats, moyenne ${fmt0(mean)}` });
-  root.append(
-    svg('g', { class: 'grid' }, yTicks.map((t) => svg('line', { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t) }))),
-    svg('g', { class: 'axis' },
-      yTicks.map((t) => svg('text', { x: m.l - 6, y: y(t) + 4, 'text-anchor': 'end' }, `${fmt0(t)} %`)),
-      xTicks.map((t) => svg('text', { x: x(t), y: H - 8, 'text-anchor': 'middle' }, fmt0(t))),
-      svg('line', { x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b })),
-  );
-  const cols = svg('g', {});
-  shares.forEach((s, i) => {
-    if (s <= 0) return;
-    const x0 = m.l + i * bw + 1;
-    const top = y(s);
-    const col = svg('path', {
-      class: 'col', d: columnPath(x0, top, Math.max(1, bw - 2), H - m.b - top, 4),
-      tabindex: '0', 'data-tip-title': `${fmt(s)} % des combats`,
-      'data-tip': `${fmt0(lo + i * width)} à ${fmt0(lo + (i + 1) * width)} DPS`,
-    });
-    cols.append(col);
+function runItemCompare(slotId) {
+  return guarded('items', async () => {
+    const p = current();
+    const eq = p.equipment || {};
+    const others = new Set(Object.entries(eq).filter(([s]) => s !== slotId).map(([, id]) => id));
+    const candidates = [null, ...itemsForProfile(p).filter((i) => canEquip(i, slotId) && !others.has(i.id))];
+    const n = Math.min(state.iterations, 2000);
+    const total = candidates.length + 1;
+    const base = await simulateChunked(resolved(p), n, (f) => setProgress(f / total));
+    const rows = [];
+    for (let k = 0; k < candidates.length; k++) {
+      const item = candidates[k];
+      const variant = JSON.parse(JSON.stringify(p));
+      equipItem(variant, state.items, slotId, item ? item.id : null);
+      const s = await simulateChunked(resolveProfile(variant, state.items), n, (f) => setProgress((k + 1 + f) / total));
+      const diff = pairedDiff(base.dps, s.dps);
+      rows.push({
+        id: item ? item.id : '', name: item ? item.name : 'Emplacement vide', item,
+        mean: s.mean, delta: diff.mean, err: 1.96 * diff.se, equipped: (item ? item.id : null) === (eq[slotId] || null),
+      });
+    }
+    rows.sort((a, b) => b.mean - a.mean);
+    state.itemCompare = { slotId, rows, iterations: n, base: base.mean, snapshot: snapshotOf(p), profileId: p.id };
   });
-  root.append(cols);
-  const mx = x(mean);
-  root.append(
-    svg('line', { class: 'mean-line', x1: mx, x2: mx, y1: m.t - 4, y2: H - m.b }),
-    svg('text', { class: 'mean-label', x: Math.min(W - m.r - 4, Math.max(m.l + 4, mx)), y: m.t - 8, 'text-anchor': mx > W - 90 ? 'end' : mx < m.l + 90 ? 'start' : 'middle' }, `moyenne ${fmt0(mean)}`),
-  );
-  return root;
 }
 
-function barChart(rows, { currentId } = {}) {
-  const max = Math.max(...rows.map((r) => r.value), 1e-9);
-  return h('div', { class: 'bars' }, rows.map((r) => {
-    const ratio = Math.max(0, r.value) / max;
-    return h('div', {
-      class: `bar-row${r.id && r.id === currentId ? ' current' : ''}`, tabindex: '0',
-      'data-tip-title': r.tipTitle || r.valueText, 'data-tip': r.tip || r.label,
-    },
-      h('span', { class: 'bar-label' }, r.label),
-      h('span', { class: 'bar-track' },
-        h('span', { class: 'bar-fill', style: `--ratio:${ratio.toFixed(4)}` }),
-        h('span', { class: 'bar-value' }, r.valueText)));
-  }));
+function runDuel() {
+  return guarded('duel', async () => {
+    const [aId, bId] = duelIds();
+    const A = state.profiles.find((x) => x.id === aId);
+    const B = state.profiles.find((x) => x.id === bId);
+    const n = Math.min(state.iterations, 3000);
+    const sa = await simulateChunked(resolved(A), n, (f) => setProgress(f / 2));
+    const sb = await simulateChunked(resolved(B), n, (f) => setProgress(0.5 + f / 2));
+    state.duel = {
+      iterations: n,
+      a: { id: A.id, name: A.name, s: sa, sheet: characterSheet(resolved(A)), r: resolved(A) },
+      b: { id: B.id, name: B.name, s: sb, sheet: characterSheet(resolved(B)), r: resolved(B) },
+    };
+  });
 }
+
+function duelIds() {
+  let [a, b] = state.duelIds;
+  const ids = state.profiles.map((p) => p.id);
+  if (!ids.includes(a)) a = current().id;
+  if (!ids.includes(b) || b === a) b = ids.find((id) => id !== a) || a;
+  state.duelIds = [a, b];
+  return [a, b];
+}
+
+function traceFor(p) {
+  const snap = snapshotOf(p);
+  const stored = state.traces[p.id];
+  if (stored && stored.snapshot === snap && stored.seed === state.traceSeed) return stored.trace;
+  const r = resolved(p);
+  const seconds = Math.min(300, Math.max(30, Number(r.fight.duration) || 180));
+  const trace = combatTrace(r, { seed: state.traceSeed, seconds });
+  state.traces[p.id] = { trace, snapshot: snap, seed: state.traceSeed };
+  return trace;
+}
+
+// ---------- textes des événements ----------
+
+function describeEvent(e) {
+  const at = `à ${fmt(e.t, 2)} s`;
+  const mana = Number.isFinite(e.mana) ? ` · mana ${fmt0(e.mana)}` : '';
+  if (e.kind === 'cast') {
+    const res = e.outcome === 'placed' ? 'posé' : e.dmg > 0 ? `${fmt0(e.dmg)} dégâts${e.outcome === 'crit' ? ' (critique)' : ''}` : OUTCOME[e.outcome] || e.outcome;
+    return { title: `${label(e.id)} : ${res}`, text: `${at} · coût ${fmt0(e.cost)}${mana}` };
+  }
+  if (e.kind === 'swing') {
+    const who = e.id === 'oh' ? 'Main gauche' : e.id === 'extra' ? 'Attaque supplémentaire' : 'Main droite';
+    const res = e.dmg > 0 ? `${fmt0(e.dmg)}${e.outcome === 'crit' ? ' (critique)' : e.outcome === 'glance' ? ' (érafle)' : ''}` : OUTCOME[e.outcome] || e.outcome;
+    return { title: `${who} : ${res}`, text: at };
+  }
+  if (e.kind === 'tick') return { title: `${label(e.id)} : ${fmt0(e.dmg)}${e.outcome === 'crit' ? ' (critique)' : ''}`, text: at };
+  if (e.kind === 'cooldown') return { title: `Utilise ${e.name}`, text: at };
+  if (e.kind === 'proc') {
+    const texts = {
+      exposePrey: 'Expose Prey : Mongoose Bite disponible',
+      dodge: 'Vous esquivez : Mongoose Bite disponible',
+      parry: 'Vous parez : Counterattack disponible',
+    };
+    return { title: texts[e.id] || label(e.id), text: at };
+  }
+  return { title: label(e.id), text: at };
+}
+
+// ---------- résultats ----------
 
 function resultPanel(title, hint, ...content) {
   return h('section', { class: 'panel' },
     h('div', { class: 'panel-head' }, h('h2', {}, title), hint ? h('span', { class: 'hint' }, hint) : null),
     content);
+}
+
+function stat(k, v) {
+  return h('div', { class: 'stat' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
+}
+
+function staleChip(stored) {
+  return stored && isStale(stored) ? h('span', { class: 'chip stale' }, 'Profil modifié depuis le calcul') : null;
 }
 
 function renderResults() {
@@ -842,13 +1187,16 @@ function renderResults() {
 
   const itSel = selectEl({ 500: '500', 1000: '1 000', 2000: '2 000', 5000: '5 000', 10000: '10 000' }, state.iterations, { id: 'iterations' });
   itSel.addEventListener('change', () => { state.iterations = Number(itSel.value); save(); });
+  const runningLabel = { main: 'Simulation', weights: 'Poids des stats', compareAll: 'Classement des profils', items: 'Comparaison d’objets', duel: 'Comparaison A / B' }[state.running];
 
   const main = resultPanel('Simulation', null,
     h('div', { class: 'runbar' },
       h('button', { class: 'btn primary', type: 'button', disabled: busy, onclick: runMain }, state.running === 'main' ? 'Calcul…' : 'Lancer la simulation'),
       h('label', { for: 'iterations' }, 'Combats', itSel),
       h('span', { id: 'runStatus' })),
-    h('div', { class: 'progress', 'aria-hidden': 'true', hidden: state.running !== 'main' }, h('i', { id: 'progress-main' })),
+    busy ? h('div', { class: 'progress-wrap' },
+      h('span', { class: 'hint' }, `${runningLabel} en cours…`),
+      h('div', { class: 'progress', 'aria-hidden': 'true' }, h('i', { id: 'progress-bar' }))) : null,
     s ? [
       h('div', { class: 'hero' },
         h('span', { class: 'big' }, fmt(s.mean)),
@@ -858,98 +1206,260 @@ function renderResults() {
         stat('Écart-type', `${fmt(s.sd)} DPS`),
         stat('5e – 95e centile', `${fmt0(s.p5)} – ${fmt0(s.p95)}`),
         stat('Temps à sec de mana', `${fmt(s.oomPct)} %`),
-        stat('Procs Expose Prey', `${fmt(s.procs.exposePrey || 0)} / combat`),
-        stat('Mongoose Bite', `${fmt(s.breakdown.find((b) => b.id === 'mongoose')?.casts || 0)} / combat`),
+        stat('GCD occupé', `${fmt0(s.cycle.gcdUsage)} %`),
+        stat('Mongoose Bite', `${fmt(s.cycle.mb.used)} / combat`),
         stat('Potions et runes', `${fmt(s.procs.potions || 0)} / combat`)),
-    ] : h('p', { class: 'empty' }, 'Lancez la simulation pour obtenir le DPS moyen, la répartition des dégâts et la distribution.'),
+    ] : h('p', { class: 'empty' }, 'Lancez la simulation pour obtenir le DPS moyen, la répartition des dégâts et le cycle de sorts.'),
   );
 
-  const panels = [main];
+  const nav = h('div', { class: 'results-tabs', role: 'tablist', 'aria-label': 'Résultats' }, RESULT_TABS.map(([key, text]) => h('button', {
+    class: 'tab', type: 'button', role: 'tab', 'aria-selected': state.resultsTab === key ? 'true' : 'false',
+    onclick: () => { state.resultsTab = key; save(); renderResults(); },
+  }, text)));
 
-  if (s) {
-    const table = h('div', { class: 'table-wrap' }, h('table', {},
-      h('thead', {}, h('tr', {}, ['Technique', 'DPS', 'Part', 'Par combat', 'Moyenne', 'Crit', 'Raté', 'Esquivé', 'Érafle'].map((t, i) => h('th', { class: i ? 'num' : '' }, t)))),
-      h('tbody', {}, s.breakdown.map((b) => h('tr', {},
-        h('td', {}, b.name),
-        h('td', { class: 'num' }, fmt(b.dps)),
-        h('td', { class: 'num' }, `${fmt(b.share)} %`),
-        h('td', { class: 'num' }, b.id === 'pet' ? '—' : b.casts ? fmt(b.casts) : `${fmt(b.ticks)} tics`),
-        h('td', { class: 'num' }, b.avgHit ? fmt0(b.avgHit) : '—'),
-        h('td', { class: 'num' }, `${fmt(b.critPct)} %`),
-        h('td', { class: 'num' }, `${fmt(b.missPct)} %`),
-        h('td', { class: 'num' }, `${fmt(b.dodgePct)} %`),
-        h('td', { class: 'num' }, `${fmt(b.glancePct)} %`))))));
-    panels.push(resultPanel('Répartition des dégâts', 'DPS par source',
+  const content = {
+    summary: resultsSummary,
+    cycle: resultsCycle,
+    compare: resultsCompare,
+    weights: resultsWeights,
+  }[state.resultsTab](p, s, busy);
+
+  box.replaceChildren(main, nav, ...[content].flat().filter(Boolean));
+  renderStatus();
+}
+
+function resultsSummary(p, s) {
+  if (!s) return h('p', { class: 'empty panel' }, 'Pas encore de résultats.');
+  const table = h('div', { class: 'table-wrap' }, h('table', {},
+    h('thead', {}, h('tr', {}, ['Technique', 'DPS', 'Part', 'Par combat', 'Moyenne', 'Crit', 'Raté', 'Esquivé', 'Érafle'].map((t, i) => h('th', { class: i ? 'num' : '' }, t)))),
+    h('tbody', {}, s.breakdown.map((b) => h('tr', {},
+      h('td', {}, b.name),
+      h('td', { class: 'num' }, fmt(b.dps)),
+      h('td', { class: 'num' }, `${fmt(b.share)} %`),
+      h('td', { class: 'num' }, b.id === 'pet' ? '—' : b.casts ? fmt(b.casts) : `${fmt(b.ticks)} tics`),
+      h('td', { class: 'num' }, b.avgHit ? fmt0(b.avgHit) : '—'),
+      h('td', { class: 'num' }, `${fmt(b.critPct)} %`),
+      h('td', { class: 'num' }, `${fmt(b.missPct)} %`),
+      h('td', { class: 'num' }, `${fmt(b.dodgePct)} %`),
+      h('td', { class: 'num' }, `${fmt(b.glancePct)} %`))))));
+  return [
+    resultPanel('Répartition des dégâts', 'DPS par source',
       barChart(s.breakdown.map((b) => ({
         label: b.name, value: b.dps, valueText: `${fmt(b.dps)} · ${fmt0(b.share)} %`,
         tipTitle: `${fmt(b.dps)} DPS`,
         tip: `${b.name}\n${b.casts ? `${fmt(b.casts)} par combat · ` : ''}crit ${fmt(b.critPct)} %`,
       }))),
-      h('details', {}, h('summary', {}, 'Détail par technique (tableau)'), table)));
+      h('details', {}, h('summary', {}, 'Détail par technique (tableau)'), table)),
+    resultPanel('Distribution du DPS', `${s.iterations.toLocaleString('fr-FR')} combats`,
+      histogram(s.dps, s.mean),
+      h('p', { class: 'hint' }, 'Part des combats par tranche de DPS. L’écart vient des crits, des procs et de la durée variable des combats.')),
+  ];
+}
 
-    panels.push(resultPanel('Distribution du DPS', `${s.iterations.toLocaleString('fr-FR')} combats`,
-      h('div', { class: 'histo' }, histogram(s.dps, s.mean)),
-      h('p', { class: 'hint' }, 'Part des combats par tranche de DPS. L’écart vient des crits, des procs et de la durée variable des combats.')));
+function resultsCycle(p, s) {
+  const trace = traceFor(p);
+  const span = Math.min(WINDOW, trace.duration);
+  const maxFrom = Math.max(0, trace.duration - span);
+  state.cycleFrom = Math.min(Math.max(0, state.cycleFrom), maxFrom);
+  const from = state.cycleFrom;
+  const to = from + span;
+  const castIds = [...new Set(trace.events.filter((e) => e.kind === 'cast').map((e) => e.id))];
+  const go = (d) => { state.cycleFrom = Math.min(maxFrom, Math.max(0, from + d)); renderResults(); };
+
+  const windowEvents = trace.events.filter((e) => e.kind !== 'regen' && e.t >= from && e.t < to);
+  const gcdCasts = trace.events.filter((e) => e.kind === 'cast' && e.gcd && e.t >= from && e.t < to);
+  const sequence = gcdCasts.map((e) => (CAST_STYLE[e.id] ? CAST_STYLE[e.id].abbr : '?'));
+
+  const timeline = resultPanel('Chronologie d’un combat', `${fmt0(from)} – ${fmt0(to)} s sur ${fmt0(trace.duration)} s`,
+    h('div', { class: 'runbar' },
+      h('button', { class: 'btn small', type: 'button', disabled: from <= 0, onclick: () => go(-span) }, `← ${fmt0(span)} s`),
+      h('button', { class: 'btn small', type: 'button', disabled: from >= maxFrom, onclick: () => go(span) }, `${fmt0(span)} s →`),
+      h('button', { class: 'btn small', type: 'button', onclick: () => { state.traceSeed++; state.cycleFrom = 0; renderResults(); } }, 'Autre combat'),
+      h('span', { class: 'hint' }, `combat n° ${state.traceSeed}`)),
+    h('div', { class: 'legend-row' },
+      castIds.map((id) => castChip(id, label(id))),
+      h('span', { class: 'hint' }, 'Trait au-dessus : coup critique. Contour seul : raté ou esquivé.')),
+    h('div', { class: 'timeline' },
+      timelineChart(trace, { from, to, describe: describeEvent }),
+      manaChart(trace, { from, to })),
+    h('p', { class: 'hint' }, sequence.length ? `Ordre des GCD : ${sequence.join(' · ')}` : 'Aucune technique sur cette période.'));
+
+  const panels = [timeline];
+
+  if (s) {
+    const c = s.cycle;
+    const gcd = Number(p.mechanics.gcd) || 1.5;
+    const perAbility = h('div', { class: 'table-wrap' }, h('table', {},
+      h('thead', {}, h('tr', {}, ['Technique', 'Par minute', 'Intervalle moyen', 'Part du temps de GCD'].map((t, i) => h('th', { class: i ? 'num' : '' }, t)))),
+      h('tbody', {}, c.perMinute.map((x) => h('tr', {},
+        h('td', {}, castChip(x.id, x.name)),
+        h('td', { class: 'num' }, fmt(x.perMinute)),
+        h('td', { class: 'num' }, `${fmt(60 / x.perMinute)} s`),
+        h('td', { class: 'num' }, `${fmt((x.perMinute * gcd) / 60 * 100)} %`))))));
+    panels.push(resultPanel('Le cycle en chiffres', `Moyenne sur ${s.iterations.toLocaleString('fr-FR')} combats`,
+      staleChip(state.results[p.id]),
+      h('div', { class: 'stats' },
+        stat('GCD occupé', `${fmt0(c.gcdUsage)} %`),
+        stat('Fenêtres Mongoose', `${fmt(c.mb.opened)} / combat`),
+        stat('Fenêtres utilisées', `${fmt0(c.mb.usedPct)} %`),
+        stat('Délai avant la Morsure', `${fmt(c.mb.avgDelay, 2)} s`),
+        stat('Fenêtres perdues', `${fmt(c.mb.wasted)} / combat`),
+        stat('Temps à sec de mana', `${fmt(s.oomPct)} %`)),
+      perAbility,
+      c.uptime.length ? [
+        h('h3', {}, 'Temps actif des effets'),
+        barChart(c.uptime.map((u) => ({ label: u.name, value: u.pct, valueText: `${fmt0(u.pct)} %`, tipTitle: `${fmt(u.pct)} % du combat`, tip: u.name }))),
+      ] : null,
+      h('p', { class: 'hint' }, `Un GCD occupé à ${fmt0(c.gcdUsage)} % veut dire que ${fmt0(100 - c.gcdUsage)} % du temps, aucune technique n’est prête : les recharges limitent le cycle plus que le GCD.`)));
+
+    const seqMax = Math.max(...c.sequences.map((q) => q.pct), 1);
+    panels.push(resultPanel('Séquences les plus fréquentes', 'Enchaînements de 3 techniques',
+      h('div', { class: 'sequences' }, c.sequences.map((q) => h('div', { class: 'seq-row', tabindex: '0', 'data-tip-title': `${fmt(q.pct)} % des enchaînements`, 'data-tip': `${fmt(q.perFight)} fois par combat` },
+        h('span', { class: 'seq-chips' }, q.ids.map((id, i) => [i ? h('span', { class: 'arrow', 'aria-hidden': 'true' }, '→') : null, castChip(id, CAST_STYLE[id] ? label(id) : id)])),
+        h('span', { class: 'bar-track' }, h('span', { class: 'bar-fill', style: `--ratio:${(q.pct / seqMax).toFixed(4)}` }), h('span', { class: 'bar-value' }, `${fmt0(q.pct)} %`))))),
+      h('p', { class: 'hint' }, 'Le sim suit la liste de priorités de l’onglet Rotation : ces séquences en sont le résultat, pas une consigne.')));
+  } else {
+    panels.push(h('p', { class: 'empty panel' }, 'Lancez la simulation pour obtenir les statistiques du cycle sur des milliers de combats.'));
   }
 
+  panels.push(resultPanel('Journal', `${fmt0(from)} – ${fmt0(to)} s`,
+    h('div', { class: 'log', role: 'log' },
+      h('div', { class: 'log-row' }, h('span', { class: 't' }, 'Temps'), h('span', { class: 'm' }, 'Mana'), h('span', { class: 'txt muted' }, 'Événement')),
+      windowEvents.map((e) => {
+        const d = describeEvent(e);
+        const cls = e.kind === 'cast' || e.kind === 'cooldown' ? ' cast' : e.kind === 'proc' ? ' proc' : '';
+        return h('div', { class: `log-row${cls}` },
+          h('span', { class: 't' }, `${fmt(e.t, 2)} s`),
+          h('span', { class: 'm' }, fmt0(e.mana)),
+          h('span', { class: 'txt' }, e.kind === 'cast' ? castChip(e.id, d.title) : d.title));
+      }))));
+  return panels;
+}
+
+function deltaNode(v, d = 1, suffix = '') {
+  const cls = v > 0.0001 ? 'delta pos' : v < -0.0001 ? 'delta neg' : 'delta';
+  const arrow = v > 0.0001 ? '▲ ' : v < -0.0001 ? '▼ ' : '';
+  return h('span', { class: cls }, `${arrow}${fmtSigned(v, d)}${suffix}`);
+}
+
+function resultsCompare(p, s, busy) {
+  const panels = [];
+  const ic = state.itemCompare && state.itemCompare.profileId === p.id ? state.itemCompare : null;
+  const slotSel = selectEl(Object.fromEntries(SLOTS.map((x) => [x.id, x.name])), ic ? ic.slotId : state.compareSlot, { id: 'compare-slot', 'aria-label': 'Emplacement à comparer' });
+  slotSel.addEventListener('change', () => { state.compareSlot = slotSel.value; });
+
+  panels.push(resultPanel('Comparer des objets', 'Même profil, un emplacement à la fois',
+    h('div', { class: 'runbar' },
+      slotSel,
+      h('button', { class: 'btn', type: 'button', disabled: busy, onclick: () => { state.compareSlot = slotSel.value; runItemCompare(slotSel.value); } }, state.running === 'items' ? 'Calcul…' : 'Comparer les objets'),
+      ic ? staleChip(ic) : null),
+    ic ? [
+      barChart(ic.rows.map((r) => ({
+        id: r.id || 'empty', label: `${r.name}${r.equipped ? ' (équipé)' : ''}`, value: r.mean,
+        valueText: r.equipped ? `${fmt(r.mean)} · équipé` : `${fmt(r.mean)} · ${fmtSigned(r.delta)}`,
+        tipTitle: `${fmt(r.mean)} DPS`, tip: r.equipped ? 'Objet équipé' : `${fmtSigned(r.delta)} DPS ± ${fmt(r.err)} (IC 95 %)`,
+      })), { currentId: ic.rows.find((r) => r.equipped)?.id || 'empty' }),
+      h('div', { class: 'table-wrap' }, h('table', {},
+        h('thead', {}, h('tr', {}, ['Objet', 'DPS', 'Écart (± marge)', 'Valeur PA', ''].map((t, i) => h('th', { class: i && i < 4 ? 'num' : '' }, t)))),
+        h('tbody', {}, ic.rows.map((r) => {
+          const val = r.item ? itemValue(r.item) : null;
+          return h('tr', {},
+            h('td', { class: 'wrap' }, r.name, r.equipped ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
+            h('td', { class: 'num' }, fmt(r.mean)),
+            h('td', { class: 'num' }, r.equipped ? '—' : [deltaNode(r.delta), h('small', { class: 'muted' }, ` ± ${fmt(r.err)}`)]),
+            h('td', { class: 'num' }, val === null ? '—' : fmt0(val)),
+            h('td', {}, r.equipped ? null : h('button', {
+              class: 'btn small', type: 'button', disabled: busy,
+              onclick: () => { equipItem(p, state.items, ic.slotId, r.item ? r.item.id : null); afterChange(true); runItemCompare(ic.slotId); },
+            }, 'Équiper')));
+        })))),
+      h('p', { class: 'hint' }, `${ic.iterations.toLocaleString('fr-FR')} combats par objet avec les mêmes tirages aléatoires ; la marge indique l’incertitude de l’écart. « Valeur PA » utilise les poids des stats s’ils ont été calculés.`),
+    ] : h('p', { class: 'empty' }, 'Choisissez un emplacement : le sim essaie chaque objet de la bibliothèque à cette place et classe le résultat. Le bouton « Comparer » de l’onglet Équipement fait la même chose.')));
+
+  const [aId, bId] = duelIds();
+  const opts = Object.fromEntries(state.profiles.map((x) => [x.id, `${x.name} (niv. ${x.level})`]));
+  const aSel = selectEl(opts, aId, { id: 'duel-a', 'aria-label': 'Profil A' });
+  const bSel = selectEl(opts, bId, { id: 'duel-b', 'aria-label': 'Profil B' });
+  aSel.addEventListener('change', () => { state.duelIds = [aSel.value, bSel.value]; });
+  bSel.addEventListener('change', () => { state.duelIds = [aSel.value, bSel.value]; });
+  panels.push(resultPanel('Comparer deux profils', 'A contre B, côte à côte',
+    h('div', { class: 'duel-pick' },
+      h('label', { class: 'field', for: 'duel-a' }, h('span', {}, 'Profil A'), aSel),
+      h('label', { class: 'field', for: 'duel-b' }, h('span', {}, 'Profil B'), bSel),
+      h('button', { class: 'btn', type: 'button', disabled: busy || state.profiles.length < 2, onclick: () => { state.duelIds = [aSel.value, bSel.value]; runDuel(); } }, state.running === 'duel' ? 'Calcul…' : 'Comparer A et B')),
+    state.duel ? duelTable(state.duel) : h('p', { class: 'empty' }, 'Dupliquez un profil, changez une arme, un talent ou la rotation, puis comparez : le tableau montre l’écart de DPS, technique par technique.')));
+
+  const ca = state.compareAll;
+  panels.push(resultPanel('Classement de tous les profils', `${state.profiles.length} profils`,
+    h('div', { class: 'runbar' },
+      h('button', { class: 'btn', type: 'button', disabled: busy, onclick: runCompareAll }, state.running === 'compareAll' ? 'Calcul…' : `Classer les ${state.profiles.length} profils`)),
+    ca ? [
+      barChart([...ca.rows].sort((a, b) => b.mean - a.mean).map((r) => ({
+        id: r.id, label: `${r.name} (niv. ${r.level})`, value: r.mean, valueText: fmt(r.mean),
+        tipTitle: `${fmt(r.mean)} DPS`, tip: `± ${fmt(1.96 * r.se)} (IC 95 %)\n${fmt(r.oomPct)} % du temps à sec de mana`,
+      })), { currentId: p.id }),
+      h('p', { class: 'hint' }, `${ca.iterations.toLocaleString('fr-FR')} combats par profil.`),
+    ] : h('p', { class: 'empty' }, 'Classe tous vos profils enregistrés par DPS moyen.')));
+  return panels;
+}
+
+function duelTable(d) {
+  const A = d.a;
+  const B = d.b;
+  const ids = [...new Set([...A.s.breakdown, ...B.s.breakdown].map((x) => x.id))];
+  const dpsOf = (side, id) => side.s.breakdown.find((x) => x.id === id)?.dps || 0;
+  const row = (name, a, b, digits = 1, suffix = '', node = null) => h('tr', {},
+    h('td', {}, node || name),
+    h('td', { class: 'num' }, `${fmt(a, digits)}${suffix}`),
+    h('td', { class: 'num' }, `${fmt(b, digits)}${suffix}`),
+    h('td', { class: 'num' }, deltaNode(b - a, digits, suffix)));
+  const group = (title) => h('tr', { class: 'group' }, h('td', { colspan: '4' }, title));
+  const mainDps = (side) => weaponDps(side.r.mh);
+  const pct = A.s.mean ? ((B.s.mean - A.s.mean) / A.s.mean) * 100 : 0;
+  return [
+    h('p', { class: 'duel-head' },
+      h('strong', {}, `B ${pct >= 0 ? 'fait' : 'fait'} ${fmtSigned(B.s.mean - A.s.mean)} DPS (${fmtSigned(pct)} %)`),
+      ` par rapport à A, sur ${d.iterations.toLocaleString('fr-FR')} combats chacun.`),
+    h('div', { class: 'table-wrap' }, h('table', { class: 'duel' },
+      h('thead', {}, h('tr', {}, h('th', {}, ''), h('th', { class: 'num' }, `A · ${A.name}`), h('th', { class: 'num' }, `B · ${B.name}`), h('th', { class: 'num' }, 'B − A'))),
+      h('tbody', {},
+        row('DPS moyen', A.s.mean, B.s.mean),
+        group('Dégâts par source (DPS)'),
+        ids.map((id) => row(label(id), dpsOf(A, id), dpsOf(B, id), 1, '', CAST_STYLE[id] ? castChip(id, label(id)) : null)),
+        group('Cycle'),
+        row('GCD occupé', A.s.cycle.gcdUsage, B.s.cycle.gcdUsage, 0, ' %'),
+        row('Mongoose Bite par combat', A.s.cycle.mb.used, B.s.cycle.mb.used),
+        row('Temps à sec de mana', A.s.oomPct, B.s.oomPct, 1, ' %'),
+        group('Personnage'),
+        row('PA de mêlée', A.sheet.ap, B.sheet.ap, 0),
+        row('Crit contre le boss', A.sheet.critVsBoss, B.sheet.critVsBoss, 1, ' %'),
+        row('Toucher', A.sheet.hit, B.sheet.hit, 1, ' %'),
+        row('Raté des techniques', A.sheet.yellowMiss, B.sheet.yellowMiss, 1, ' %'),
+        row('DPS d’arme (main droite)', mainDps(A), mainDps(B)),
+        row('Mana', A.sheet.mana, B.sheet.mana, 0)))),
+  ];
+}
+
+function resultsWeights(p, s, busy) {
   const w = state.weights[p.id];
-  panels.push(resultPanel('Poids des stats', 'Équivalence en PA (PA = 1)',
+  return resultPanel('Poids des stats', 'Équivalence en PA (PA = 1)',
     h('div', { class: 'runbar' },
       h('button', { class: 'btn', type: 'button', disabled: busy, onclick: runWeights }, state.running === 'weights' ? 'Calcul…' : 'Calculer les poids'),
-      w && isStale(p, w) ? h('span', { class: 'chip stale' }, 'Profil modifié depuis le calcul') : null),
-    h('div', { class: 'progress', 'aria-hidden': 'true', hidden: state.running !== 'weights' }, h('i', { id: 'progress-weights' })),
+      staleChip(w)),
     w ? [
       barChart(w.rows.map((r) => ({
         label: r.label, value: r.ep, valueText: r.epError ? `${fmt(r.ep, 2)} ± ${fmt(r.epError, 1)}` : fmt(r.ep, 2),
         tipTitle: `${fmt(r.ep, 2)} PA`,
         tip: `${r.label}\n${fmt(r.dpsPerPoint, 3)} DPS par point${r.epError ? `\nMarge (IC 95 %) : ± ${fmt(r.epError, 2)} PA` : ''}`,
       }))),
-      h('p', { class: 'hint' }, `${w.iterations.toLocaleString('fr-FR')} combats par variante avec les mêmes tirages aléatoires ; « ± » donne la marge à 95 %. Écarts testés : +100 PA, +50 Agilité ou Force, +2 % toucher, crit ou réduction, +5 compétence, +5 % hâte, +5 DPS d’arme. Le toucher vaut 0 une fois le plafond atteint.`),
-    ] : h('p', { class: 'empty' }, 'Mesure le gain de DPS de chaque stat (Agilité, Force, toucher, crit, hâte, compétence, arme) en relançant le profil avec un peu plus de cette stat.')));
-
-  const cmp = state.compare;
-  panels.push(resultPanel('Comparer les profils', 'Tous les profils enregistrés',
-    h('div', { class: 'runbar' },
-      h('button', { class: 'btn', type: 'button', disabled: busy, onclick: runCompare }, state.running === 'compare' ? 'Calcul…' : `Comparer les ${state.profiles.length} profils`)),
-    h('div', { class: 'progress', 'aria-hidden': 'true', hidden: state.running !== 'compare' }, h('i', { id: 'progress-compare' })),
-    cmp ? [
-      barChart([...cmp.rows].sort((a, b) => b.mean - a.mean).map((r) => ({
-        id: r.id, label: `${r.name} (niv. ${r.level})`, value: r.mean, valueText: fmt(r.mean),
-        tipTitle: `${fmt(r.mean)} DPS`, tip: `± ${fmt(1.96 * r.se)} (IC 95 %)\n${fmt(r.oomPct)} % du temps à sec de mana`,
-      })), { currentId: p.id }),
-      h('p', { class: 'hint' }, `${cmp.iterations.toLocaleString('fr-FR')} combats par profil. Pour comparer 2M et ambidextrie, dupliquez un profil et changez seulement les armes.`),
-    ] : h('p', { class: 'empty' }, 'Classe vos profils par DPS : pratique pour trancher entre arme à deux mains et ambidextrie, ou entre deux builds.')));
-
-  const lg = state.log[p.id];
-  panels.push(resultPanel('Journal de combat', '60 premières secondes d’un combat',
-    h('div', { class: 'runbar' },
-      h('button', { class: 'btn', type: 'button', disabled: busy, onclick: runLog }, lg ? 'Régénérer le journal' : 'Afficher le journal'),
-      lg && isStale(p, lg) ? h('span', { class: 'chip stale' }, 'Profil modifié depuis le calcul') : null),
-    lg ? h('div', { class: 'log', role: 'log' },
-      h('div', { class: 'log-row' }, h('span', { class: 't' }, 'Temps'), h('span', { class: 'm' }, 'Mana'), h('span', { class: 'txt muted' }, 'Événement')),
-      lg.rows.map((r) => {
-        const cls = r.text.startsWith('Lance') || r.text.startsWith('Utilise') ? ' cast'
-          : /^(Expose|Vous|Deadly|Furie|Potion|Rune)/.test(r.text) ? ' proc' : '';
-        return h('div', { class: `log-row${cls}` },
-          h('span', { class: 't' }, `${fmt(r.t, 2)} s`),
-          h('span', { class: 'm' }, fmt0(r.mana)),
-          h('span', { class: 'txt' }, r.text));
-      }))
-      : h('p', { class: 'empty' }, 'Montre chaque attaque, technique et proc : utile pour vérifier que la rotation fait ce que vous attendez.')));
-
-  box.replaceChildren(...panels);
-  renderStatus();
-}
-
-function stat(k, v) {
-  return h('div', { class: 'stat' }, h('span', { class: 'k' }, k), h('span', { class: 'v' }, v));
+      h('p', { class: 'hint' }, `${w.iterations.toLocaleString('fr-FR')} combats par variante avec les mêmes tirages aléatoires ; « ± » donne la marge à 95 %. Écarts testés : +100 PA, +50 Agilité ou Force, +2 % toucher, crit ou réduction, +5 compétence, +5 % hâte, +5 DPS d’arme. Le toucher vaut 0 une fois le plafond atteint. Ces poids donnent aussi une « valeur PA » à chaque objet de la bibliothèque.`),
+    ] : h('p', { class: 'empty' }, 'Mesure le gain de DPS de chaque stat en relançant le profil avec un peu plus de cette stat. Utile pour départager deux objets d’un coup d’œil.'));
 }
 
 // ---------- sources ----------
 
 function renderSources() {
-  const box = $('sources');
-  box.replaceChildren(
+  $('sources').replaceChildren(
     h('div', { class: 'panel-head' }, h('h2', {}, 'Sources et fiabilité'), h('span', { class: 'hint' }, `Données au ${new Date(DATA_INFO.updated).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} · build ${DATA_INFO.build}`)),
     h('p', {}, DATA_INFO.note),
     h('div', { class: 'legend' }, Object.entries(CONFIDENCE).map(([k, c]) => h('div', {}, chip(k), h('small', {}, c.desc)))),
@@ -959,6 +1469,7 @@ function renderSources() {
         h('li', {}, 'Monte-Carlo événementiel : chaque itération joue un combat complet (attaques automatiques, GCD, recharges, mana, procs, saignement, piège).'),
         h('li', {}, 'Table d’attaque de Classic : un seul jet pour les attaques automatiques (raté, esquive, parade, érafle, crit), deux jets pour les techniques. Formules reprises du code de wowsims et du wiki de magey.'),
         h('li', {}, 'Changements Forever appliqués : Mongoose Bite et Raptor Strike basés sur l’arme, Expose Prey, Lacerating Strikes, Strider Kick, Predator’s Edge, Aspect of the Beast avec PA de mêlée, toucher et crit unifiés, stat de réduction d’esquive/parade.'),
+        h('li', {}, 'Les objets d’exemple sont fictifs : remplacez-les par les vôtres (onglet Équipement, en collant leur tooltip).'),
         h('li', {}, 'Pas simulé : déplacements, AoE, menace, Wing Clip, procs d’objets précis, détail des capacités du familier.'))),
     h('div', { class: 'section' },
       h('h3', {}, 'Sources'),
@@ -971,7 +1482,7 @@ function renderSources() {
 function setupTooltip() {
   const tip = $('tooltip');
   const show = (el, x, y) => {
-    tip.replaceChildren(h('strong', {}, el.getAttribute('data-tip-title') || ''), ...(el.getAttribute('data-tip') || '').split('\n').map((l) => h('div', {}, l)));
+    tip.replaceChildren(h('strong', {}, el.getAttribute('data-tip-title') || ''), ...(el.getAttribute('data-tip') || '').split('\n').filter(Boolean).map((l) => h('div', {}, l)));
     tip.hidden = false;
     const r = tip.getBoundingClientRect();
     const left = Math.min(window.innerWidth - r.width - 8, x + 14);
@@ -981,12 +1492,12 @@ function setupTooltip() {
   };
   document.addEventListener('pointermove', (e) => {
     const el = e.target.closest?.('[data-tip-title]');
-    if (el) show(el, e.clientX, e.clientY);
+    if (el && el.getAttribute('data-tip-title')) show(el, e.clientX, e.clientY);
     else tip.hidden = true;
   });
   document.addEventListener('focusin', (e) => {
     const el = e.target.closest?.('[data-tip-title]');
-    if (!el) { tip.hidden = true; return; }
+    if (!el || !el.getAttribute('data-tip-title')) { tip.hidden = true; return; }
     const r = el.getBoundingClientRect();
     show(el, r.left + r.width / 2, r.bottom);
   });

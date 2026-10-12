@@ -17,20 +17,35 @@ Forever connus pendant la bêta.
 - **Tests** : `npm test` (Node 20+, aucune dépendance).
 - **Reconstruire `dist/`** après une modification : `npm run build`.
 
-Les profils sont enregistrés dans le navigateur (`localStorage`). Le bouton **Importer / exporter** permet
-de les sauvegarder ailleurs ou de les partager en JSON.
+Les profils et la bibliothèque d’objets sont enregistrés dans le navigateur (`localStorage`). Le bouton
+**Importer / exporter** permet de sauvegarder ou partager un profil en JSON, avec ses objets équipés.
 
 ## Ce que fait le sim
 
-- **Profils** : niveau 60 ou 30 (bêta), race, aspect, stats d’équipement, armes (2M ou ambidextrie),
-  enchantements, bijoux à activer, familier, talents, buffs, consommables, débuffs, rotation.
+- **Équipement** : 17 emplacements (de la tête à l’arme à distance) et une bibliothèque d’objets partagée
+  entre les profils. Pour ajouter un objet, collez son tooltip (Wowhead ou jeu, en anglais ou en français) :
+  le sim reconnaît les stats, les dégâts et la vitesse d’arme, la compétence d’arme et les effets « Utiliser ».
+  Les lignes qu’il ne comprend pas sont listées pour être saisies à la main. Les objets fournis sont des
+  exemples fictifs, à remplacer par les vôtres.
+- **Profils** : niveau 60 ou 30 (bêta), race, aspect, talents, buffs, consommables, débuffs, rotation,
+  bonus manuels (enchantements d’armure ou totaux saisis à la main).
 - **Feuille de personnage** calculée en direct : PA, crit contre le boss, plafond de toucher, raté,
   esquive, érafles, armure, coûts en mana.
 - **Simulation Monte-Carlo** : DPS moyen avec intervalle de confiance, répartition par technique,
   distribution du DPS, temps passé à sec de mana.
-- **Poids des stats** en équivalent PA, avec marge d’erreur (mêmes tirages aléatoires pour chaque variante).
-- **Comparaison** de tous les profils enregistrés (utile pour trancher 2M contre ambidextrie).
-- **Journal de combat** des 60 premières secondes pour vérifier la rotation.
+- **Cycle de sorts** :
+  - chronologie d’un combat, 30 secondes à la fois : chaque GCD coloré par technique, attaques auto,
+    fenêtres Mongoose Bite, saignement, buffs et courbe de mana ;
+  - statistiques sur des milliers de combats : part du GCD utilisée, utilisations par minute, fenêtres
+    Mongoose ouvertes, utilisées ou perdues, temps actif de chaque effet ;
+  - enchaînements de 3 techniques les plus fréquents, et journal détaillé.
+- **Comparer** :
+  - objets : le sim essaie chaque objet de la bibliothèque à un emplacement et donne l’écart de DPS avec sa
+    marge d’erreur ;
+  - deux profils A et B côte à côte : DPS par technique, cycle, stats ;
+  - classement de tous les profils.
+- **Poids des stats** en équivalent PA, avec marge d’erreur. Ils donnent aussi une « valeur PA » à chaque
+  objet de la bibliothèque.
 
 ## Modèle
 
@@ -67,10 +82,12 @@ qui critique, Predator’s Edge appliqué au total, Savage Strikes en dégâts�
 ## Fichiers
 
 - `src/data.js` : données (sorts, talents, buffs, races, sources, valeurs par défaut).
-- `src/engine.js` : moteur de simulation (sans dépendance au navigateur, testé avec Node).
-- `src/app.js`, `src/styles.css`, `index.html` : interface.
+- `src/gear.js` : emplacements, objets, analyse des tooltips, fusion des objets dans le profil.
+- `src/engine.js` : moteur de simulation, trace du combat et statistiques du cycle (sans dépendance au
+  navigateur, testé avec Node).
+- `src/app.js`, `src/ui/`, `src/styles.css`, `index.html` : interface.
 - `scripts/build.js` : assemble `dist/sim-survie-forever.html`.
-- `tests/engine.test.js` : tests du moteur.
+- `tests/` : tests du moteur et de l’équipement.
 
 ## Sources principales
 
