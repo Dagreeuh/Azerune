@@ -126,7 +126,7 @@ export function itemSummary(item, factors = null) {
   for (const s of ITEM_STATS) {
     const v = Number(item.stats?.[s.key]) || 0;
     if (!v) continue;
-    if (s.rating && factors) parts.push(`${fmtNum(Math.round((v / factors[s.rating]) * 100) / 100)} % ${PCT_SHORT[s.rating]} (${fmtNum(v)} de score)`);
+    if (s.rating && factors) parts.push(`${fmtNum(Math.round((v / factors[s.rating]) * 100) / 100)} % ${PCT_SHORT[s.rating]}`);
     else parts.push(s.pct ? `${fmtNum(v)} % ${s.short}` : `${fmtNum(v)} ${s.short}`);
   }
   if (item.onUse?.value) {
@@ -451,6 +451,9 @@ export function itemFromDb(rec) {
     ohOnly: !!rec.oh,
     unique: !!rec.uq,
     notes: rec.no || [],
+    rangedType: rec.r || null,
+    icon: rec.ic || null,
+    iconEstimated: !!rec.ie,
   };
 }
 

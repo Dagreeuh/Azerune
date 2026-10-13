@@ -2,9 +2,12 @@
 // (https://github.com/wowsims/gamedata, fichier items/items.txt, une fiche par objet).
 // Garde ce qu’un chasseur mêlée peut porter et qui a une stat utile, puis écrit src/itemdb.js.
 //
-// Usage : node scripts/import-items.js <dossier gamedata>
+// Usage : node scripts/import-items.js <dossier gamedata> [--icons <dossier>]
 //   ex. : git clone --depth 1 https://github.com/wowsims/gamedata ../gamedata
-//         node scripts/import-items.js ../gamedata
+//         node scripts/import-items.js ../gamedata --icons ../icon-data
+// --icons : dossier contenant db.json et wowhead_item_tooltips.csv de wowsims/sod (assets/database et
+// assets/db_inputs), pour le nom d’icône de chaque objet. Les objets propres à Forever, absents de ces
+// fichiers, prennent l’icône de l’objet le plus proche (même type, même armure ou arme, niveau voisin).
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -16,6 +19,8 @@ if (!src) {
   console.error('Usage : node scripts/import-items.js <dossier gamedata>');
   process.exit(1);
 }
+
+const iconDir = process.argv.includes('--icons') ? process.argv[process.argv.indexOf('--icons') + 1] : null;
 
 const state = JSON.parse(readFileSync(join(src, 'state.json'), 'utf8'));
 const text = readFileSync(join(src, 'items/items.txt'), 'utf8');
@@ -29,7 +34,7 @@ const SLOT_TYPE = {
 };
 // Armes qu’un chasseur peut manier (pas de masses, de boucliers ni de baguettes).
 const WEAPONS = { Axe: 'axe', Sword: 'sword', Polearm: 'polearm', Staff: 'staff', Dagger: 'dagger', 'Fist Weapon': 'fist' };
-const RANGED = new Set(['Bow', 'Gun', 'Crossbow', 'Thrown']);
+const RANGED = { Bow: 'bow', Gun: 'gun', Crossbow: 'crossbow', Thrown: 'thrown' };
 const ARMOR = { Cloth: 'cloth', Leather: 'leather', Mail: 'mail', Miscellaneous: 'misc' };
 
 const STAT = {
@@ -97,7 +102,7 @@ function convert(raw) {
     if (!w) return null;
     weapon = { min: Number(w[1]), max: Number(w[2]), speed: Number(w[3]), type: WEAPONS[sub] };
   } else if (type === 'ranged') {
-    if (!RANGED.has(sub)) return null;
+    if (!RANGED[sub]) return null;
   } else {
     if (!(sub in ARMOR)) return null;
     armor = ARMOR[sub];
@@ -154,6 +159,7 @@ function convert(raw) {
   if (Object.keys(stats).length) out.s = stats;
   if (skillFor) out.sf = skillFor;
   if (weapon) out.w = [weapon.min, weapon.max, weapon.speed, weapon.type];
+  if (type === 'ranged') out.r = RANGED[sub];
   if (slot === 'main hand') out.mh = 1;
   if (slot === 'off hand') out.oh = 1;
   if (onUse) out.u = onUse;
@@ -171,6 +177,29 @@ for (const card of text.split('=======\n')) {
 }
 items.sort((a, b) => a.id - b.id);
 
+// Icônes : nom de la texture du jeu (ex. inv_sword_04), d’après les données de wowsims.
+if (iconDir) {
+  const icons = new Map();
+  for (const it of JSON.parse(readFileSync(join(iconDir, 'db.json'), 'utf8')).items) if (it.icon) icons.set(it.id, it.icon);
+  for (const line of readFileSync(join(iconDir, 'wowhead_item_tooltips.csv'), 'utf8').split('\n')) {
+    const m = line.match(/^(\d+),.*?"icon":"([^"]+)"/);
+    if (m && !icons.has(Number(m[1]))) icons.set(Number(m[1]), m[2]);
+  }
+  const kind = (i) => `${i.t}|${i.a || ''}|${i.w ? i.w[3] : ''}|${i.r || ''}`;
+  const known = items.filter((i) => icons.has(i.id));
+  for (const i of items) {
+    if (icons.has(i.id)) { i.ic = icons.get(i.id).toLowerCase(); continue; }
+    // Objet propre à Forever : icône de l’objet connu le plus proche, choisi de façon stable.
+    const same = known.filter((k) => kind(k) === kind(i));
+    const pool = same.length ? same : known.filter((k) => k.t === i.t);
+    if (!pool.length) continue;
+    const best = Math.min(...pool.map((k) => Math.abs(k.i - i.i)));
+    const near = pool.filter((k) => Math.abs(k.i - i.i) === best);
+    i.ic = icons.get(near[i.id % near.length].id).toLowerCase();
+    i.ie = 1;
+  }
+}
+
 const info = {
   build: state.version,
   date: state.date,
@@ -183,7 +212,8 @@ writeFileSync(join(root, 'src/itemdb.js'), `// Généré par scripts/import-item
 // Ne pas modifier à la main : relancer le script pour mettre à jour.
 // Clés : n nom, t type, q qualité (2 vert, 3 bleu, 4 violet, 5 orange), l niveau requis (e = estimé),
 // i niveau d’objet, a armure, s stats (scores bruts), sf compétence limitée à, w arme [min, max, vitesse, type],
-// mh/oh main droite/gauche seulement, u effet à utiliser, uq unique, no effets non simulés.
+// mh/oh main droite/gauche seulement, u effet à utiliser, uq unique, no effets non simulés,
+// r type d’arme à distance, ic icône (ie = icône d’un objet voisin : celle de l’objet n’est pas connue).
 
 export const ITEM_DB_INFO = ${JSON.stringify(info)};
 

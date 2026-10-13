@@ -11,26 +11,29 @@ import {
   raceSkill, ratingFactors, resolveProfile, slotDef, wearable, weaponDps, wowheadUrl,
 } from './gear.js';
 import { ITEM_DB_INFO } from './itemdb.js';
+import { addBlocker, buildProblems, fullBuild, removeBlocker } from './talenttrees.js';
 import {
   buildCharacter, characterSheet, combatTrace, createAccumulator, label, pairedDiff, profileVariants,
   simulateBatch, statWeightsFromRuns, summarize,
 } from './engine.js';
 import { $, fmt, fmt0, fmtSigned, getPath, h, setPath, tick, uid } from './ui/dom.js';
 import { CAST_STYLE, barChart, castChip, histogram, manaChart, timelineChart } from './ui/charts.js';
+import { itemIconSrc, slotIconSrc } from './ui/icons.js';
+import { talentCalculator, talentInfo } from './ui/talentcalc.js';
 
 const STORE_KEY = 'forever-sv-sim:v1';
 const SEED = 1;
 const WINDOW = 30;
 
 const TABS = [
-  ['equip', 'Équipement'],
-  ['perso', 'Personnage'],
+  ['equip', 'Personnage'],
   ['talents', 'Talents'],
-  ['buffs', 'Buffs'],
+  ['combat', 'Combat et buffs'],
   ['rotation', 'Rotation'],
-  ['combat', 'Combat'],
   ['hypo', 'Hypothèses'],
 ];
+// Onglets des anciennes versions, regroupés depuis.
+const OLD_TABS = { perso: 'equip', buffs: 'combat' };
 
 const RESULT_TABS = [
   ['summary', 'Résumé'],
@@ -53,8 +56,6 @@ const state = {
   results: {},
   weights: {},
   compareAll: null,
-  itemCompare: null,
-  compareSlot: 'head',
   duel: null,
   duelIds: [null, null],
   traces: {},
@@ -66,17 +67,13 @@ const state = {
   ioMessage: '',
   confirmDelete: false,
   confirmItemDelete: null,
-  editor: null,
-  editorMessage: '',
-  libType: 'all',
-  libLevel: 'all',
-  dbQuery: '',
-  dbType: 'all',
-  dbQuality: 0,
-  dbUsable: true,
   autoQuality: 3,
   autoStyle: '2h',
-  compareDb: true,
+  optionsOpen: false,
+  picker: null,
+  talentTree: 'sv',
+  talentFocus: null,
+  rerun: false,
 };
 
 // ---------- profils et objets ----------
@@ -119,7 +116,9 @@ function normalizeProfile(p) {
   const L = Number(p.level) === 30 ? 30 : 60;
   const d = defaultProfile(L);
   const out = { ...d, ...p, level: L };
-  for (const k of ['gear', 'mh', 'oh', 'talents', 'fight', 'pet', 'custom', 'mechanics']) out[k] = { ...d[k], ...(p[k] || {}) };
+  for (const k of ['gear', 'mh', 'oh', 'fight', 'pet', 'custom', 'mechanics']) out[k] = { ...d[k], ...(p[k] || {}) };
+  // Un build enregistré est repris tel quel (sans le compléter avec le build par défaut).
+  out.talents = fullBuild(p.talents && typeof p.talents === 'object' ? p.talents : d.talents);
   // Les scores valaient moins de % au niveau 30 dans les anciennes versions : on reprend la valeur actuelle.
   for (const [k, old] of Object.entries(OLD_RATING_DEFAULTS)) if (out.mechanics[k] === old) out.mechanics[k] = d.mechanics[k];
   out.buffs = Array.isArray(p.buffs) ? p.buffs.filter((id) => BUFFS.some((b) => b.id === id)) : d.buffs;
@@ -171,7 +170,9 @@ function load() {
     state.profiles = data.profiles.map(normalizeProfile);
     state.currentId = data.currentId;
     state.iterations = [500, 1000, 2000, 5000, 10000].includes(data.iterations) ? data.iterations : 2000;
-    state.tab = TABS.some(([k]) => k === data.tab) ? data.tab : 'equip';
+    const tab = OLD_TABS[data.tab] || data.tab;
+    state.tab = TABS.some(([k]) => k === tab) ? tab : 'equip';
+    if (['bm', 'mm', 'sv'].includes(data.talentTree)) state.talentTree = data.talentTree;
     state.resultsTab = RESULT_TABS.some(([k]) => k === data.resultsTab) ? data.resultsTab : 'summary';
     if ([2, 3, 4, 5].includes(data.autoQuality)) state.autoQuality = data.autoQuality;
     if (['2h', 'dw'].includes(data.autoStyle)) state.autoStyle = data.autoStyle;
@@ -180,6 +181,10 @@ function load() {
     state.currentId = state.profiles[0].id;
   }
   if (!state.profiles.some((p) => p.id === state.currentId)) state.currentId = state.profiles[0].id;
+  const p = current();
+  if (buildProblems(p.talents, p.level).length) {
+    state.notice = 'Vos talents viennent d’une version précédente du sim et ne respectent pas les règles de l’arbre de Forever : ouvrez l’onglet Talents pour les corriger ou charger le build conseillé.';
+  }
 }
 
 function save() {
@@ -187,7 +192,7 @@ function save() {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       profiles: state.profiles, items: state.items, currentId: state.currentId,
       iterations: state.iterations, tab: state.tab, resultsTab: state.resultsTab,
-      autoQuality: state.autoQuality, autoStyle: state.autoStyle,
+      autoQuality: state.autoQuality, autoStyle: state.autoStyle, talentTree: state.talentTree,
     }));
   } catch {
     // Stockage indisponible (navigation privée) : le sim fonctionne sans.
@@ -218,8 +223,9 @@ function changeLevel(L) {
   for (const def of MECHANICS) {
     if (def.value !== null && typeof def.value === 'object') p.mechanics[def.key] = mechanicDefault(def, L);
   }
-  if (L < 40) p.talents.laceratingStrikes = 0;
-  state.notice = `Niveau ${L} : niveau et armure du boss, rangs des sorts et valeurs dépendantes du niveau ont été remis à jour. Vérifiez l’équipement, les buffs et les talents.`;
+  const resetTalents = buildProblems(p.talents, L).length > 0;
+  if (resetTalents) p.talents = { ...TALENT_PRESETS[L] };
+  state.notice = `Niveau ${L} : niveau et armure du boss, rangs des sorts et valeurs dépendantes du niveau ont été remis à jour.${resetTalents ? ` Vos talents ne tenaient pas dans les ${L - 9} points du niveau ${L} : le build conseillé les remplace.` : ''} Vérifiez l’équipement et les buffs.`;
   save();
   renderAll();
 }
@@ -397,18 +403,26 @@ function renderIO() {
 function renderSheet() {
   const s = characterSheet(resolved());
   const hitWarn = s.yellowMiss > 0;
-  const items = [
+  const keyStats = [
+    ['PA de mêlée', fmt0(s.ap)],
+    ['Agilité', fmt0(s.agi)],
+    ['Crit contre la cible', `${fmt(s.critVsBoss)} %`],
+    ['Toucher / plafond', `${fmt(s.hit)} / ${fmt(s.hitCap)} %`, hitWarn],
+    ['Compétence d’arme', fmt0(s.skill)],
+    ['Mana', fmt0(s.mana)],
+  ];
+  const all = [
     ['PA de mêlée', fmt0(s.ap)],
     ['Agilité / Force', `${fmt0(s.agi)} / ${fmt0(s.str)}`],
     ['Crit (feuille)', `${fmt(s.crit)} %`],
-    ['Crit contre le boss', `${fmt(s.critVsBoss)} %`],
+    ['Crit contre la cible', `${fmt(s.critVsBoss)} %`],
     ['Toucher / plafond', `${fmt(s.hit)} / ${fmt(s.hitCap)} %`, hitWarn],
     ['Raté techniques', `${fmt(s.yellowMiss)} %`, hitWarn],
     ['Raté attaques auto', `${fmt(s.whiteMiss)} %`],
-    ['Esquive du boss', `${fmt(s.dodge)} %`],
+    ['Esquive de la cible', `${fmt(s.dodge)} %`],
     ['Érafles (pénalité)', `${fmt0(s.glance)} % (−${fmt0(s.glancePenalty)} %)`],
     ['Compétence d’arme', fmt0(s.skill)],
-    ['Armure du boss', `${fmt0(s.armor)} (−${fmt(s.armorReduction)} %)`],
+    ['Armure de la cible', `${fmt0(s.armor)} (−${fmt(s.armorReduction)} %)`],
     ['Dégâts critiques', `${fmt0(s.critMultWhite * 100)} % auto · ${fmt0(s.critMult * 100)} % techniques`],
     ['Mana', fmt0(s.mana)],
     ['Expose Prey', `${fmt(s.exposePrey)} % par coup`],
@@ -417,12 +431,16 @@ function renderSheet() {
       ? ['Main gauche', `${fmt0(s.ohMult)} % des dégâts`]
       : ['Vitesse d’attaque', `${fmt(s.swing, 2)} s${s.haste > 0 ? ` (+${fmt(s.haste)} %)` : ''}`],
   ];
-  $('sheet').replaceChildren(...items.map(([k, v, warn]) => h('div', {}, h('span', { class: 'k' }, k), h('span', { class: `v${warn ? ' warn' : ''}` }, v))));
+  const cell = ([k, v, warn]) => h('div', {}, h('span', { class: 'k' }, k), h('span', { class: `v${warn ? ' warn' : ''}` }, v));
+  $('doll-stats')?.replaceChildren(...keyStats.map(cell));
+  $('sheet')?.replaceChildren(...all.map(cell));
 }
 
 // ---------- onglets de réglages ----------
 
 function renderTabs() {
+  // Les trois arbres de talents demandent plus de largeur : la colonne des réglages s’élargit.
+  document.querySelector('.layout')?.classList.toggle('wide-config', state.tab === 'talents');
   $('tabs').replaceChildren(...TABS.map(([key, text]) => h('button', {
     class: 'tab', type: 'button', role: 'tab', 'aria-selected': state.tab === key ? 'true' : 'false',
     onclick: () => { state.tab = key; save(); renderTabs(); renderPanel(); },
@@ -433,11 +451,9 @@ function renderPanel() {
   const p = current();
   const content = {
     equip: panelEquip,
-    perso: panelPerso,
     talents: panelTalents,
-    buffs: panelBuffs,
-    rotation: panelRotation,
     combat: panelCombat,
+    rotation: panelRotation,
     hypo: panelHypo,
   }[state.tab](p);
   $('panel').replaceChildren(...[
@@ -446,17 +462,17 @@ function renderPanel() {
   ].filter(Boolean));
 }
 
-// ----- Équipement -----
+// ----- Personnage : fiche d’équipement façon jeu -----
 
 const lookup = (id) => findItem(state.items, id);
 
-// Objets proposés dans les listes : la bibliothèque (niveau du profil) et les objets déjà équipés.
-function itemsForProfile(p) {
-  const equipped = new Set(Object.values(p.equipment || {}).filter(Boolean));
-  const own = state.items.filter((i) => !i.level || i.level === p.level || equipped.has(i.id));
-  const fromDb = [...equipped].filter((id) => String(id).startsWith('db')).map((id) => dbItem(id)).filter(Boolean);
-  return [...own, ...fromDb];
-}
+// Disposition de la fenêtre de personnage du jeu : deux colonnes d’emplacements et les armes en bas.
+const DOLL_LEFT = ['head', 'neck', 'shoulders', 'back', 'chest', 'wrists'];
+const DOLL_RIGHT = ['hands', 'waist', 'legs', 'feet', 'finger1', 'finger2', 'trinket1', 'trinket2'];
+const DOLL_WEAPONS = ['mainHand', 'offHand', 'ranged'];
+const RANGED_NAMES = { bow: 'Arc', gun: 'Arme à feu', crossbow: 'Arbalète', thrown: 'Arme de jet' };
+const AUTO_QUALITY = { 2: 'Objets verts au plus', 3: 'Objets bleus au plus', 4: 'Objets épiques au plus', 5: 'Objets légendaires au plus' };
+const QUALITY_FILTER = { 2: 'Verts au plus', 3: 'Bleus au plus', 4: 'Épiques au plus', 5: 'Toutes' };
 
 function currentEp(p = current()) {
   const w = state.weights[p.id];
@@ -472,115 +488,47 @@ function itemValue(item, p = current(), opts = {}) {
   return itemScore(item, currentEp(p).ep, ratingFactors(p), { ...scoreOpts(p), ...opts });
 }
 
-function itemTitle(item) {
-  const url = wowheadUrl(item);
-  return h('span', { class: 'item-name' },
-    item.quality ? h('i', { class: `qdot q${item.quality}`, title: QUALITY_NAMES[item.quality], 'aria-hidden': 'true' }) : null,
-    h('span', {}, item.name),
-    url ? h('a', { class: 'wh', href: url, target: '_blank', rel: 'noopener' }, 'Wowhead') : null);
-}
-
 function levelTag(item) {
   if (item.reqLevel) return `niv. ${item.reqEstimated ? '~' : ''}${item.reqLevel}`;
   return item.level ? `niv. ${item.level}` : null;
 }
 
-function preferredSlot(p, item) {
-  const eq = p.equipment || {};
-  if (item.type === 'finger') return !eq.finger1 ? 'finger1' : !eq.finger2 ? 'finger2' : 'finger1';
-  if (item.type === 'trinket') return !eq.trinket1 ? 'trinket1' : !eq.trinket2 ? 'trinket2' : 'trinket1';
-  if (item.type === 'weapon2h') return 'mainHand';
-  if (item.type === 'weapon1h') {
-    if (item.ohOnly) return 'offHand';
-    const main = lookup(eq.mainHand);
-    return main && main.type === 'weapon1h' && main.id !== item.id && !item.mhOnly ? 'offHand' : 'mainHand';
-  }
-  return SLOTS.find((s) => s.accepts.includes(item.type))?.id;
+function itemMeta(item) {
+  return [
+    levelTag(item),
+    item.armor ? ARMOR_NAMES[item.armor] : null,
+    item.weapon ? `${WEAPON_TYPES[item.weapon.type]}${item.type === 'weapon2h' ? ' à deux mains' : ''}` : null,
+    item.rangedType ? RANGED_NAMES[item.rangedType] : null,
+    item.source !== 'base' ? 'Objet ajouté' : null,
+  ].filter(Boolean).join(' · ');
 }
 
-function equipNow(p, item) {
-  const slot = preferredSlot(p, item);
-  if (!slot) return;
-  equipItem(p, state.items, slot, item.id);
-  state.editorMessage = '';
-  state.notice = `« ${item.name} » équipé (${slotDef(slot).name}).`;
-  afterChange(true);
+const qualityClass = (item) => `q${item && item.quality ? item.quality : 1}`;
+
+function offHandBlocked(p) {
+  const main = lookup(p.equipment?.mainHand);
+  return !!(main && main.type === 'weapon2h');
 }
 
-// L’éditeur saisit la « PA contre… » en un seul couple valeur + type.
-function withCreatureFields(draft) {
-  const entry = Object.entries(CREATURE_AP_KEYS).find(([, key]) => Number(draft.stats?.[key]));
-  draft.creatureType = entry ? entry[0] : 'beast';
-  draft.creatureValue = entry ? Number(draft.stats[entry[1]]) : 0;
-  return draft;
-}
-
-function newDraft(type = 'head') {
-  return {
-    id: null, name: '', type, stats: {}, source: 'manuel', skillFor: null, creatureType: 'beast', creatureValue: 0,
-    weapon: { min: 0, max: 0, speed: type === 'weapon2h' ? 3.5 : 2.6, type: 'axe' },
-    onUse: { type: 'ap', value: 0, duration: 20, cd: 120 },
-  };
-}
-
-// Les objets de la base ne se modifient pas : « Modifier » en crée une copie dans la bibliothèque.
-function editItem(item) {
-  const fromDb = item.source === 'base';
-  state.editor = {
-    ...newDraft(item.type),
-    ...JSON.parse(JSON.stringify(item)),
-    weapon: item.weapon ? { ...item.weapon } : newDraft(item.type).weapon,
-    onUse: item.onUse ? { ...item.onUse } : newDraft(item.type).onUse,
-  };
-  withCreatureFields(state.editor);
-  if (fromDb) {
-    Object.assign(state.editor, { id: null, dbId: undefined, source: 'manuel', name: `${item.name} (copie)`, level: current().level });
-    state.editorMessage = `Copie de « ${item.name} » : les objets de la base ne se modifient pas, la copie ira dans votre bibliothèque.`;
-  } else {
-    state.editorMessage = `Modification de « ${item.name} ».`;
-  }
-  state.tab = 'equip';
-  renderTabs();
-  renderPanel();
-  $('item-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function saveDraft(equip) {
-  const d = state.editor;
-  if (!d) return;
-  if (!String(d.name || '').trim()) {
-    state.editorMessage = 'Donnez un nom à l’objet avant de l’enregistrer.';
-    renderPanel();
-    return;
-  }
-  const stats = { ...d.stats };
-  for (const key of Object.values(CREATURE_AP_KEYS)) delete stats[key];
-  if (Number(d.creatureValue) && CREATURE_AP_KEYS[d.creatureType]) stats[CREATURE_AP_KEYS[d.creatureType]] = Number(d.creatureValue);
-  const item = sanitizeItem({ ...d, stats, id: d.id || uid('i'), level: d.level ?? current().level, source: d.source || 'manuel' });
-  const idx = state.items.findIndex((i) => i.id === item.id);
-  if (idx >= 0) state.items[idx] = item;
-  else state.items.push(item);
-  let msg = `« ${item.name} » enregistré.`;
-  if (equip) {
-    const slot = preferredSlot(current(), item);
-    if (slot) {
-      equipItem(current(), state.items, slot, item.id);
-      msg = `« ${item.name} » enregistré et équipé (${slotDef(slot).name}).`;
-    }
-  }
-  state.editor = null;
-  state.editorMessage = msg;
-  afterChange(true);
-}
-
-function deleteItems(ids) {
-  const set = new Set(ids);
-  state.items = state.items.filter((i) => !set.has(i.id));
-  for (const p of state.profiles) {
-    for (const [slot, itemId] of Object.entries(p.equipment || {})) if (set.has(itemId)) p.equipment[slot] = null;
-  }
-  state.confirmItemDelete = null;
-  afterChange(true);
+function slotButton(p, slotId, side) {
+  const slot = slotDef(slotId);
+  const blocked = slotId === 'offHand' && offHandBlocked(p);
+  const it = blocked ? null : lookup(p.equipment?.[slotId]);
+  const factors = ratingFactors(p);
+  const tip = it
+    ? [itemMeta(it), itemSummary(it, factors), ...(it.notes || []), 'Clic : changer d’objet'].filter(Boolean).join('\n')
+    : blocked ? 'Libre en retirant l’arme à deux mains.' : 'Clic : choisir un objet';
+  return h('button', {
+    type: 'button', class: `slot ${side}${it ? ` ${qualityClass(it)}` : ' empty'}`, disabled: blocked,
+    'data-slot': slotId, 'data-tip-title': it ? it.name : slot.name, 'data-tip': tip,
+    'aria-label': `${slot.name} : ${it ? it.name : 'vide'}. Changer d’objet`,
+    onclick: () => openPicker(slotId),
+  },
+  h('span', { class: 'slot-icon' }, h('img', { src: itemIconSrc(it, slotId), alt: '', width: 44, height: 44 })),
+  h('span', { class: 'slot-text' },
+    h('span', { class: 'slot-label' }, slot.name),
+    h('span', { class: `slot-item ${it ? qualityClass(it) : ''}` }, it ? it.name : blocked ? 'Arme à deux mains équipée' : 'Vide'),
+    it ? h('span', { class: 'slot-stats' }, itemSummary(it, factors)) : null));
 }
 
 function autoEquip(p) {
@@ -589,48 +537,26 @@ function autoEquip(p) {
   p.twoHand = style === '2h';
   const count = Object.values(p.equipment).filter(Boolean).length;
   const manual = Object.values(p.gear || {}).some((v) => Number(v));
-  state.notice = `${count} objets de la base équipés (${AUTO_QUALITY[state.autoQuality].toLowerCase()}, ${style === '2h' ? 'arme à deux mains' : 'ambidextrie'}), choisis selon les poids ${currentEp(p).measured ? 'mesurés' : 'par défaut'}.${manual ? ' Vos bonus manuels (onglet Personnage) s’ajoutent encore : remettez-les à zéro s’ils faisaient double emploi.' : ''} Affinez ensuite emplacement par emplacement avec « Comparer ».`;
+  state.notice = `${count} objets de la base équipés (${AUTO_QUALITY[state.autoQuality].toLowerCase()}, ${style === '2h' ? 'arme à deux mains' : 'ambidextrie'}).${manual ? ' Vos bonus manuels (réglages du personnage) s’ajoutent encore : remettez-les à zéro s’ils font double emploi.' : ''} Touchez un emplacement pour comparer les objets.`;
   afterChange(true);
 }
 
-const AUTO_QUALITY = { 2: 'Objets verts au plus', 3: 'Objets bleus au plus', 4: 'Objets épiques au plus', 5: 'Objets légendaires au plus' };
-
 function panelEquip(p) {
-  const eq = p.equipment || {};
-  const main = lookup(eq.mainHand);
-  const twoHandEquipped = main && main.type === 'weapon2h';
-  const factors = ratingFactors(p);
+  const races = Object.fromEntries(Object.entries(RACES).map(([k, v]) => [k, v.name]));
+  const raceSel = selectEl(races, p.race, { id: fieldId('race'), 'data-path': 'race', 'data-kind': 'str', 'data-rerender': '1', 'aria-label': 'Race' });
+  const levelSeg = h('div', { class: 'segmented', role: 'group', 'aria-label': 'Niveau' },
+    [30, 60].map((L) => h('button', { type: 'button', 'aria-pressed': p.level === L ? 'true' : 'false', onclick: () => changeLevel(L) }, `Niveau ${L}`)));
 
-  const rows = SLOTS.map((slot) => {
-    const options = itemsForProfile(p).filter((i) => canEquip(i, slot.id))
-      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-    const it = lookup(eq[slot.id]);
-    const disabled = slot.id === 'offHand' && twoHandEquipped;
-    const sel = h('select', { id: `slot-${slot.id}`, 'aria-label': `Objet pour ${slot.name}`, disabled },
-      h('option', { value: '' }, disabled ? '— Arme à deux mains équipée —' : '— Vide —'),
-      options.map((o) => h('option', { value: o.id }, `${o.name}${o.source === 'base' ? '' : ' · bibliothèque'}`)));
-    sel.value = it && !disabled ? it.id : '';
-    sel.addEventListener('change', () => {
-      equipItem(p, state.items, slot.id, sel.value || null);
-      afterChange(true);
-    });
-    return h('div', { class: 'slot-row' },
-      h('label', { class: 'slot-name', for: `slot-${slot.id}` }, slot.name),
-      h('div', { class: 'slot-main' }, sel,
-        it && !disabled ? h('small', { class: 'muted' },
-          it.quality ? h('i', { class: `qdot q${it.quality}`, 'aria-hidden': 'true' }) : null,
-          itemSummary(it, factors), ' ',
-          wowheadUrl(it) ? h('a', { class: 'wh', href: wowheadUrl(it), target: '_blank', rel: 'noopener' }, 'Wowhead') : null) : null),
-      h('div', { class: 'slot-actions' },
-        it && !disabled ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => editItem(it) }, it.source === 'base' ? 'Copier' : 'Modifier') : null,
-        h('button', {
-          class: 'btn small', type: 'button', disabled: disabled || !!state.running,
-          onclick: () => { state.resultsTab = 'compare'; state.compareSlot = slot.id; save(); runItemCompare(slot.id); },
-        }, 'Comparer')));
-  });
-
-  const totals = equipmentTotals(p, state.items);
-  const legacy = state.items.filter((i) => i.source === 'exemple');
+  const doll = h('div', { class: 'doll' },
+    h('div', { class: 'doll-col left' }, DOLL_LEFT.map((id) => slotButton(p, id, 'left'))),
+    h('div', { class: 'doll-center' },
+      h('div', { class: 'doll-id' }, levelSeg, raceSel),
+      h('p', { class: 'hint' }, (RACES[p.race] || RACES.orc).note),
+      h('div', { class: 'doll-stats', id: 'doll-stats' }),
+      h('details', { class: 'doll-sheet' }, h('summary', {}, 'Toutes les stats'), h('div', { class: 'sheet', id: 'sheet' }))),
+    h('div', { class: 'doll-col right' }, DOLL_RIGHT.map((id) => slotButton(p, id, 'right'))),
+    h('div', { class: 'doll-weapons' }, DOLL_WEAPONS.map((id) => slotButton(p, id, 'weapon'))));
+  queueMicrotask(renderSheet);
 
   const qualSel = selectEl(AUTO_QUALITY, state.autoQuality, { id: 'auto-quality', 'aria-label': 'Qualité maximale' });
   qualSel.addEventListener('change', () => { state.autoQuality = Number(qualSel.value); save(); });
@@ -638,192 +564,248 @@ function panelEquip(p) {
   styleSel.addEventListener('change', () => { state.autoStyle = styleSel.value; save(); });
 
   return h('div', { class: 'section-stack' },
-    legacy.length ? h('div', { class: 'notice' },
-      `Votre bibliothèque contient ${legacy.length} objets d’exemple fictifs de la version précédente. `,
-      h('button', { class: 'btn small', type: 'button', onclick: () => deleteItems(legacy.map((i) => i.id)) }, 'Les supprimer')) : null,
-    section('Objets équipés', `${ITEM_DB_INFO.count.toLocaleString('fr-FR')} objets réels de Forever disponibles`,
-      h('p', { class: 'hint' }, 'Choisissez un objet par emplacement, ou cherchez-le dans la base ci-dessous. « Comparer » simule les objets possibles pour l’emplacement, y compris les meilleurs de la base.'),
-      h('div', { class: 'slots' }, rows),
-      h('div', { class: 'totals' },
-        h('div', {}, h('span', { class: 'k' }, 'Total des objets'), h('span', {}, itemSummary({ stats: totals }, factors))),
-        h('div', {}, h('span', { class: 'k' }, 'Bonus manuels (onglet Personnage)'), h('span', {}, itemSummary({ stats: p.gear })))),
-      h('div', { class: 'io-actions' },
-        h('button', { class: 'btn small', type: 'button', onclick: () => { p.equipment = {}; afterChange(true); } }, 'Tout retirer'))),
-    section('Équiper automatiquement', null,
-      h('p', { class: 'hint' }, `Prend dans la base le meilleur objet de chaque emplacement selon les poids des stats (${currentEp(p).measured ? 'mesurés sur ce profil' : 'poids par défaut ; calculez-les dans « Poids des stats » pour les adapter au profil'}). Les bonus d’ensemble et les effets spéciaux ne comptent pas, et le plafond de toucher n’est pas pris en compte.`),
-      h('div', { class: 'io-actions' }, qualSel, styleSel,
-        h('button', { class: 'btn small primary', type: 'button', onclick: () => autoEquip(p) }, 'Équiper les meilleurs objets'))),
-    dbSearch(p),
-    itemEditor(p),
-    itemLibrary(p),
-  );
+    doll,
+    h('div', { class: 'auto-row' },
+      h('span', { class: 'hint' }, 'Remplir avec les meilleurs objets de la base :'),
+      qualSel, styleSel,
+      h('button', { class: 'btn small primary', type: 'button', onclick: () => autoEquip(p) }, 'Équiper'),
+      h('button', { class: 'btn small ghost', type: 'button', onclick: () => { p.equipment = {}; afterChange(true); } }, 'Tout retirer')),
+    characterOptions(p));
 }
+
+// ----- Choix d’un objet (fenêtre) -----
+
+const PICKER_BATCH = 8;
+const PICKER_ITERATIONS = 1000;
+const pickerCache = new Map();
+const pickerBase = new Map();
+let pickerSeq = 0;
+let pickerTimer = null;
 
 const normalizeText = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-let dbNames = null;
+const nameKeys = new Map();
+const nameKey = (item) => {
+  if (!nameKeys.has(item.id)) nameKeys.set(item.id, normalizeText(item.name));
+  return nameKeys.get(item.id);
+};
 
-function dbSearch(p) {
-  const q = h('input', { id: 'db-q', type: 'search', placeholder: 'Nom anglais de l’objet, par ex. Devilsaur…', value: state.dbQuery, 'aria-label': 'Rechercher un objet de la base' });
-  q.addEventListener('input', () => { state.dbQuery = q.value; renderDbResults(p); });
-  const typeSel = selectEl({ all: 'Tous les types', ...ITEM_TYPES }, state.dbType, { id: 'db-type', 'aria-label': 'Type d’objet' });
-  typeSel.addEventListener('change', () => { state.dbType = typeSel.value; renderDbResults(p); });
-  const qualSel = selectEl({ 0: 'Toutes qualités', ...AUTO_QUALITY }, state.dbQuality, { id: 'db-quality', 'aria-label': 'Qualité maximale' });
-  qualSel.addEventListener('change', () => { state.dbQuality = Number(qualSel.value); renderDbResults(p); });
-  const usable = h('input', { id: 'db-usable', type: 'checkbox' });
-  usable.checked = state.dbUsable;
-  usable.addEventListener('change', () => { state.dbUsable = usable.checked; renderDbResults(p); });
-
-  const box = section('Base de données Forever', `Build ${ITEM_DB_INFO.build}, lue dans le client`,
-    h('div', { class: 'db-filters' },
-      h('label', { class: 'field db-q', for: 'db-q' }, h('span', {}, 'Rechercher'), q),
-      h('label', { class: 'field', for: 'db-type' }, h('span', {}, 'Type'), typeSel),
-      h('label', { class: 'field', for: 'db-quality' }, h('span', {}, 'Qualité'), qualSel)),
-    h('label', { class: 'check', for: 'db-usable' }, usable, h('span', {}, `Seulement ce que je peux porter au niveau ${p.level}`)),
-    h('div', { id: 'db-results', 'aria-live': 'polite' }));
-  queueMicrotask(() => renderDbResults(p));
-  return box;
+function pairedSlot(slotId) {
+  return { finger1: 'finger2', finger2: 'finger1', trinket1: 'trinket2', trinket2: 'trinket1' }[slotId] || null;
 }
 
-function renderDbResults(p) {
-  const box = $('db-results');
-  if (!box) return;
-  if (!dbNames) dbNames = new Map(dbItems().map((i) => [i.id, normalizeText(i.name)]));
-  const words = normalizeText(state.dbQuery).split(/\s+/).filter(Boolean);
-  const { ep, measured } = currentEp(p);
-  const factors = ratingFactors(p);
-  const found = dbItems().filter((i) => (state.dbType === 'all' || i.type === state.dbType)
-    && (!state.dbQuality || i.quality <= state.dbQuality)
-    && (!state.dbUsable || wearable(i, p.level))
-    && words.every((w) => dbNames.get(i.id).includes(w)));
-  const opts = scoreOpts(p);
-  const scored = found.map((i) => ({ i, v: itemScore(i, ep, factors, opts) })).sort((a, b) => b.v - a.v).slice(0, 25);
-  const equipped = new Set(Object.values(p.equipment || {}));
-  box.replaceChildren(
-    h('p', { class: 'hint' }, found.length
-      ? `${found.length.toLocaleString('fr-FR')} objet${found.length > 1 ? 's' : ''} trouvé${found.length > 1 ? 's' : ''}${found.length > 25 ? ', les 25 meilleurs affichés' : ''}, classés par valeur en PA (poids ${measured ? 'mesurés' : 'par défaut'}).`
-      : 'Aucun objet ne correspond. Les noms sont en anglais, comme dans le client.'),
-    h('div', { class: 'library' }, scored.map(({ i, v }) => h('div', { class: `item-row${equipped.has(i.id) ? ' equipped' : ''}` },
-      h('div', { class: 'item-main' },
-        h('div', { class: 'item-title' },
-          itemTitle(i),
-          h('span', { class: 'tag' }, ITEM_TYPES[i.type]),
-          levelTag(i) ? h('span', { class: 'tag', title: i.reqEstimated ? 'Pas de niveau requis : estimé d’après le niveau d’objet' : '' }, levelTag(i)) : null,
-          i.armor ? h('span', { class: 'tag' }, ARMOR_NAMES[i.armor]) : null,
-          equipped.has(i.id) ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
-        h('small', { class: 'muted' }, itemSummary(i, factors)),
-        h('small', { class: 'muted' }, `≈ ${fmt0(v)} PA`),
-        i.notes.length ? h('small', { class: 'muted' }, i.notes.join(' · ')) : null),
-      h('div', { class: 'slot-actions' },
-        h('button', { class: 'btn small', type: 'button', disabled: equipped.has(i.id), onclick: () => equipNow(p, i) }, 'Équiper'),
-        h('button', {
-          class: 'btn small ghost', type: 'button', disabled: !!state.running,
-          onclick: () => { const slot = preferredSlot(p, i); state.resultsTab = 'compare'; state.compareSlot = slot; save(); runItemCompare(slot, [i.id]); },
-        }, 'Comparer'))))),
-  );
+// Objets possibles pour l’emplacement, du plus prometteur au moins prometteur (poids des stats).
+function pickerCandidates(p, pk) {
+  const eq = p.equipment || {};
+  const other = pairedSlot(pk.slotId) ? eq[pairedSlot(pk.slotId)] : null;
+  const words = normalizeText(pk.query).split(/\s+/).filter(Boolean);
+  const offHand = pk.slotId === 'offHand';
+  const cur = lookup(eq[pk.slotId]);
+  const curValue = cur ? itemValue(cur, p, { offHand }) : 0;
+  return [...state.items, ...dbItems()]
+    .filter((i) => canEquip(i, pk.slotId) && i.id !== other
+      && (!pk.myLevel || (i.source === 'base' ? wearable(i, p.level) : !i.level || i.level === p.level))
+      && (!i.quality || i.quality <= pk.maxQuality)
+      && words.every((w) => nameKey(i).includes(w)))
+    .map((i) => ({ i, v: itemValue(i, p, { offHand }) - curValue }))
+    .sort((a, b) => b.v - a.v);
 }
 
-function itemEditor(p) {
-  const d = state.editor;
-  const paste = h('textarea', { id: 'tooltipText', placeholder: 'Collez ici le tooltip d’un objet (Wowhead ou jeu, en anglais ou en français)…', 'aria-label': 'Tooltip à analyser' });
-  const analyse = () => {
-    const r = parseTooltip(paste.value);
-    if (!r.name) {
-      state.editorMessage = 'Rien à analyser : collez le texte complet du tooltip.';
-      renderPanel();
-      return;
-    }
-    const base = newDraft(r.type || 'head');
-    state.editor = withCreatureFields({
-      ...base, name: r.name, type: r.type || 'head', stats: r.stats, source: 'tooltip', skillFor: r.skillFor,
-      weapon: r.weapon || base.weapon, onUse: r.onUse || base.onUse,
-    });
-    const lines = [];
-    if (!r.type) lines.push('Type d’objet non trouvé : choisissez-le.');
-    if (r.unparsed.length) lines.push(`Lignes non reconnues, à reporter à la main si besoin : ${r.unparsed.join(' / ')}`);
-    state.editorMessage = lines.length ? lines.join(' ') : 'Tooltip analysé : vérifiez les valeurs puis enregistrez.';
-    renderPanel();
-  };
-
-  const head = section(d ? (d.id ? 'Modifier un objet' : 'Nouvel objet') : 'Ajouter un objet absent de la base', null,
-    h('div', { class: 'field' }, paste),
-    h('div', { class: 'io-actions' },
-      h('button', { class: 'btn small primary', type: 'button', onclick: analyse }, 'Analyser le tooltip'),
-      h('button', { class: 'btn small', type: 'button', onclick: () => { state.editor = newDraft(); state.editorMessage = ''; renderPanel(); } }, 'Saisir à la main')),
-    state.editorMessage ? h('p', { class: 'notice', role: 'status' }, state.editorMessage) : null);
-  head.id = 'item-editor';
-  if (!d) return head;
-
-  const typeSel = selectEl(ITEM_TYPES, d.type, { id: 'd-type', 'data-draft': 'type', 'data-kind': 'str', 'data-rerender': '1' });
-  head.append(
-    h('div', { class: 'fields' },
-      textField('Nom', 'name', { draft: true, target: d }),
-      h('label', { class: 'field', for: 'd-type' }, h('span', {}, 'Type'), typeSel)),
-    h('div', { class: 'fields' },
-      ITEM_STATS.filter((s) => !s.creature).map((s) => numField(s.label, `stats.${s.key}`, { draft: true, target: d, step: s.pct ? 0.5 : 1 })),
-      numField('PA contre un type de créature', 'creatureValue', { draft: true, target: d, step: 1 }),
-      selectField('Type de créature', 'creatureType', Object.fromEntries(Object.entries(CREATURE_TYPES).filter(([k]) => CREATURE_AP_KEYS[k])), { draft: true, target: d })),
-    isWeaponType(d.type) ? h('div', { class: 'fields' },
-      numField('Dégâts min', 'weapon.min', { draft: true, target: d, step: 1, min: 0 }),
-      numField('Dégâts max', 'weapon.max', { draft: true, target: d, step: 1, min: 0 }),
-      numField('Vitesse (s)', 'weapon.speed', { draft: true, target: d, step: 0.1, min: 0.5 }),
-      selectField('Type d’arme', 'weapon.type', WEAPON_TYPES, { draft: true, target: d })) : null,
-    d.type === 'trinket' ? h('div', { class: 'fields' },
-      selectField('Effet à activer', 'onUse.type', ON_USE_TYPES, { draft: true, target: d }),
-      numField('Valeur (0 = aucun)', 'onUse.value', { draft: true, target: d, step: 1 }),
-      numField('Durée (s)', 'onUse.duration', { draft: true, target: d, step: 1, min: 1 }),
-      numField('Recharge (s)', 'onUse.cd', { draft: true, target: d, step: 1, min: 1 })) : null,
-    d.skillFor ? h('p', { class: 'hint' }, `Compétence limitée à : ${d.skillFor.map((t) => WEAPON_TYPES[t]).join(', ')}.`) : null,
-    h('div', { class: 'io-actions' },
-      h('button', { class: 'btn small primary', type: 'button', onclick: () => saveDraft(true) }, d.id ? 'Enregistrer et équiper' : 'Ajouter et équiper'),
-      h('button', { class: 'btn small', type: 'button', onclick: () => saveDraft(false) }, d.id ? 'Enregistrer' : 'Ajouter à la bibliothèque'),
-      h('button', { class: 'btn small ghost', type: 'button', onclick: () => { state.editor = null; state.editorMessage = ''; renderPanel(); } }, 'Annuler')),
-  );
-  return head;
+function openPicker(slotId) {
+  if (slotId === 'offHand' && offHandBlocked(current())) return;
+  state.picker = { slotId, query: '', myLevel: true, maxQuality: 4, limit: 40, simCount: PICKER_BATCH, progress: null };
+  renderPicker();
+  const dlg = $('picker');
+  if (!dlg.open) dlg.showModal();
+  if (window.matchMedia('(pointer: fine)').matches) $('picker-q')?.focus();
+  else dlg.querySelector('.picker-close')?.focus();
+  runPickerSims();
 }
 
-function itemLibrary(p) {
-  if (!state.items.length) {
-    return section('Ma bibliothèque', null, h('p', { class: 'empty' }, 'Vide pour l’instant. Les objets que vous saisissez ou copiez depuis la base apparaissent ici, pour tous vos profils.'));
+function closePicker() {
+  pickerSeq++;
+  state.picker = null;
+  const dlg = $('picker');
+  if (dlg.open) dlg.close();
+}
+
+function pickItem(item) {
+  const pk = state.picker;
+  if (!pk) return;
+  equipItem(current(), state.items, pk.slotId, item ? item.id : null);
+  state.notice = '';
+  closePicker();
+  afterChange(true);
+}
+
+function addFromTooltip(text, msg) {
+  const pk = state.picker;
+  if (!pk) return;
+  const r = parseTooltip(text);
+  if (!r.name) { msg.textContent = 'Rien à lire : collez le texte complet du tooltip.'; return; }
+  const type = r.type || slotDef(pk.slotId).accepts[0];
+  if (isWeaponType(type) && !r.weapon) { msg.textContent = 'Dégâts de l’arme introuvables : collez le tooltip complet, avec la ligne « Dégâts » et la vitesse.'; return; }
+  const item = sanitizeItem({
+    id: uid('i'), name: r.name, type, stats: r.stats, source: 'tooltip', skillFor: r.skillFor,
+    weapon: r.weapon, onUse: r.onUse, level: current().level,
+  });
+  if (!canEquip(item, pk.slotId)) {
+    msg.textContent = `Ce tooltip décrit un objet « ${ITEM_TYPES[type]} », qui ne va pas dans l’emplacement ${slotDef(pk.slotId).name}.`;
+    return;
   }
-  const typeOptions = { all: 'Tous les types', ...ITEM_TYPES };
-  const levelOptions = { all: 'Tous niveaux', 60: 'Niveau 60', 30: 'Niveau 30' };
-  const typeSel = selectEl(typeOptions, state.libType, { id: 'lib-type', 'aria-label': 'Filtrer par type' });
-  typeSel.addEventListener('change', () => { state.libType = typeSel.value; renderPanel(); });
-  const levelSel = selectEl(levelOptions, state.libLevel, { id: 'lib-level', 'aria-label': 'Filtrer par niveau' });
-  levelSel.addEventListener('change', () => { state.libLevel = levelSel.value; renderPanel(); });
-
-  const equippedIds = new Set(Object.values(p.equipment || {}));
-  const factors = ratingFactors(p);
-  const list = state.items
-    .filter((i) => state.libType === 'all' || i.type === state.libType)
-    .filter((i) => state.libLevel === 'all' || String(i.level) === state.libLevel)
-    .sort((a, b) => Object.keys(ITEM_TYPES).indexOf(a.type) - Object.keys(ITEM_TYPES).indexOf(b.type) || a.name.localeCompare(b.name, 'fr'));
-  const sourceLabel = { exemple: 'Exemple fictif', manuel: 'Saisi', tooltip: 'Tooltip' };
-
-  return section(`Ma bibliothèque (${state.items.length} objets)`, 'Vos objets saisis, partagés entre tous les profils',
-    h('div', { class: 'io-actions' }, typeSel, levelSel),
-    list.length ? h('div', { class: 'library' }, list.map((it) => {
-      const confirming = state.confirmItemDelete === it.id;
-      return h('div', { class: `item-row${equippedIds.has(it.id) ? ' equipped' : ''}` },
-        h('div', { class: 'item-main' },
-          h('div', { class: 'item-title' },
-            h('span', { class: 'name' }, it.name),
-            h('span', { class: 'tag' }, ITEM_TYPES[it.type]),
-            h('span', { class: 'tag' }, sourceLabel[it.source] || 'Saisi'),
-            equippedIds.has(it.id) ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
-          h('small', { class: 'muted' }, itemSummary(it, factors)),
-          h('small', { class: 'muted' }, `≈ ${fmt0(itemValue(it, p))} PA`)),
-        h('div', { class: 'slot-actions' },
-          h('button', { class: 'btn small', type: 'button', onclick: () => equipNow(p, it) }, 'Équiper'),
-          h('button', { class: 'btn small ghost', type: 'button', onclick: () => editItem(it) }, 'Modifier'),
-          h('button', {
-            class: `btn small ghost${confirming ? ' danger' : ''}`, type: 'button',
-            onclick: () => { if (confirming) deleteItems([it.id]); else { state.confirmItemDelete = it.id; renderPanel(); } },
-          }, confirming ? 'Confirmer' : 'Supprimer')));
-    })) : h('p', { class: 'empty' }, 'Aucun objet pour ce filtre.'));
+  state.items.push(item);
+  equipItem(current(), state.items, pk.slotId, item.id);
+  closePicker();
+  state.notice = `« ${item.name} » ajouté à vos objets et équipé.${r.unparsed.length ? ` Lignes non reconnues : ${r.unparsed.join(' / ')}.` : ''}`;
+  afterChange(true);
 }
 
-// ----- Personnage -----
+function renderPicker() {
+  const pk = state.picker;
+  const dlg = $('picker');
+  if (!pk || !dlg) return;
+  const p = current();
+  const slot = slotDef(pk.slotId);
+  const cur = lookup(p.equipment?.[pk.slotId]);
+
+  const q = h('input', { id: 'picker-q', type: 'search', value: pk.query, placeholder: 'Nom anglais, ex. Devilsaur…', autocomplete: 'off', spellcheck: 'false' });
+  q.addEventListener('input', () => { pk.query = q.value; pk.limit = 40; renderPickerList(); schedulePickerSims(); });
+  const qual = selectEl(QUALITY_FILTER, pk.maxQuality, { id: 'picker-quality' });
+  qual.addEventListener('change', () => { pk.maxQuality = Number(qual.value); renderPickerList(); schedulePickerSims(); });
+  const lvl = h('input', { id: 'picker-level', type: 'checkbox' });
+  lvl.checked = pk.myLevel;
+  lvl.addEventListener('change', () => { pk.myLevel = lvl.checked; renderPickerList(); schedulePickerSims(); });
+
+  const paste = h('textarea', { id: 'picker-tooltip', placeholder: 'Collez ici le tooltip de l’objet (Wowhead ou jeu, en anglais ou en français)…' });
+  const msg = h('p', { class: 'hint', 'aria-live': 'polite' });
+
+  dlg.replaceChildren(h('div', { class: 'picker' },
+    h('header', { class: 'picker-head' },
+      h('img', { class: 'picker-slot', src: slotIconSrc(pk.slotId), alt: '', width: 40, height: 40 }),
+      h('div', { class: 'picker-title' },
+        h('h2', { id: 'picker-title' }, slot.name),
+        h('p', { class: 'hint' }, 'Touchez un objet pour l’équiper. Le gain est simulé sur votre profil.')),
+      h('button', { type: 'button', class: 'btn small ghost picker-close', 'aria-label': 'Fermer', onclick: closePicker }, '✕')),
+    cur ? h('div', { class: 'picker-current' },
+      h('img', { class: `pick-icon ${qualityClass(cur)}`, src: itemIconSrc(cur, pk.slotId), alt: '', width: 32, height: 32 }),
+      h('span', { class: 'pick-main' }, h('span', { class: 'hint' }, 'Équipé'), h('span', { class: `pick-name ${qualityClass(cur)}` }, cur.name)),
+      h('button', { type: 'button', class: 'btn small', onclick: () => pickItem(null) }, 'Retirer')) : null,
+    h('div', { class: 'picker-filters' },
+      h('label', { class: 'field picker-search', for: 'picker-q' }, h('span', {}, 'Rechercher'), q),
+      h('label', { class: 'field', for: 'picker-quality' }, h('span', {}, 'Qualité'), qual),
+      h('label', { class: 'check', for: 'picker-level' }, lvl, h('span', {}, `Portable au niveau ${p.level}`))),
+    h('div', { class: 'picker-status', id: 'picker-status', 'aria-live': 'polite' }),
+    h('div', { class: 'picker-list', id: 'picker-list' }),
+    h('details', { class: 'picker-add' },
+      h('summary', {}, 'Objet absent de la base ? Collez son tooltip'),
+      paste,
+      h('div', { class: 'io-actions' }, h('button', { type: 'button', class: 'btn small primary', onclick: () => addFromTooltip(paste.value, msg) }, 'Ajouter et équiper')),
+      msg)));
+  dlg.setAttribute('aria-labelledby', 'picker-title');
+  renderPickerList();
+}
+
+function pickerRow(p, pk, item, value, inBatch, snap, curId, factors) {
+  const sim = pickerCache.get(`${snap}|${pk.slotId}|${item.id}`);
+  const isCur = item.id === curId;
+  let gain;
+  if (isCur) gain = h('span', { class: 'chip fresh' }, 'Équipé');
+  else if (sim) {
+    const cls = sim.delta > sim.err ? 'pos' : sim.delta < -sim.err ? 'neg' : '';
+    gain = [h('b', { class: `delta ${cls} num` }, fmtSigned(sim.delta, 2)), h('small', {}, `DPS ± ${fmt(sim.err, 2)}`)];
+  } else if (inBatch) gain = h('small', { class: 'muted' }, 'calcul…');
+  else gain = h('small', { class: 'muted', title: 'Estimation rapide par les poids des stats, en puissance d’attaque' }, `≈ ${fmtSigned(value, 0)} PA`);
+  return h('button', { type: 'button', class: `pick${isCur ? ' current' : ''}`, onclick: () => pickItem(item) },
+    h('img', { class: `pick-icon ${qualityClass(item)}`, src: itemIconSrc(item, pk.slotId), alt: '', width: 36, height: 36, loading: 'lazy' }),
+    h('span', { class: 'pick-main' },
+      h('span', { class: `pick-name ${qualityClass(item)}` }, item.name),
+      h('span', { class: 'pick-meta' }, itemMeta(item)),
+      h('span', { class: 'pick-stats' }, itemSummary(item, factors)),
+      item.notes && item.notes.length ? h('span', { class: 'pick-notes' }, item.notes.join(' · ')) : null),
+    h('span', { class: 'pick-gain' }, gain));
+}
+
+function renderPickerList() {
+  const pk = state.picker;
+  const box = $('picker-list');
+  if (!pk || !box) return;
+  const p = current();
+  const snap = snapshotOf(p);
+  const curId = p.equipment?.[pk.slotId] || null;
+  const factors = ratingFactors(p);
+  let rows = pickerCandidates(p, pk);
+  // Une fois les simulations finies, les objets simulés passent en tête, du meilleur gain au moins bon.
+  if (!pk.progress) {
+    const simOf = (r) => (r.i.id === curId ? { delta: 0 } : pickerCache.get(`${snap}|${pk.slotId}|${r.i.id}`));
+    const simulated = rows.slice(0, pk.simCount).filter(simOf).sort((a, b) => simOf(b).delta - simOf(a).delta);
+    const done = new Set(simulated.map((r) => r.i.id));
+    rows = [...simulated, ...rows.filter((r) => !done.has(r.i.id))];
+  }
+  const shown = rows.slice(0, pk.limit);
+  box.replaceChildren(...[
+    shown.length
+      ? shown.map(({ i, v }, k) => pickerRow(p, pk, i, v, k < pk.simCount, snap, curId, factors))
+      : h('p', { class: 'empty' }, 'Aucun objet ne correspond. Les noms sont en anglais, comme dans le client ; décochez « Portable » pour voir les objets de plus haut niveau.'),
+    rows.length > pk.limit ? h('button', { type: 'button', class: 'btn small', onclick: () => { pk.limit += 40; renderPickerList(); } }, `Afficher 40 de plus (${rows.length - pk.limit} restants)`) : null,
+  ].flat().filter(Boolean));
+  renderPickerStatus(rows.length);
+}
+
+function renderPickerStatus(count) {
+  const pk = state.picker;
+  const box = $('picker-status');
+  if (!pk || !box) return;
+  const total = count ?? pickerCandidates(current(), pk).length;
+  box.replaceChildren(...[
+    h('span', {}, pk.progress
+      ? `Simulation des gains : ${pk.progress.done} / ${pk.progress.total}…`
+      : `${total.toLocaleString('fr-FR')} objet${total > 1 ? 's' : ''}. Gain en DPS simulé pour les ${Math.min(pk.simCount, total)} premiers (${PICKER_ITERATIONS.toLocaleString('fr-FR')} combats chacun, mêmes tirages) ; les autres : estimation en PA.`),
+    !pk.progress && total > pk.simCount
+      ? h('button', { type: 'button', class: 'btn small', onclick: () => { pk.simCount += PICKER_BATCH; renderPickerList(); runPickerSims(); } }, `Simuler les ${PICKER_BATCH} suivants`)
+      : null,
+  ].filter(Boolean));
+}
+
+function schedulePickerSims() {
+  clearTimeout(pickerTimer);
+  pickerTimer = setTimeout(runPickerSims, 350);
+}
+
+// Gain réel de DPS des premiers objets : même profil, même graine, seul l’emplacement change.
+async function runPickerSims() {
+  const pk = state.picker;
+  if (!pk) return;
+  const seq = ++pickerSeq;
+  const p = current();
+  const snap = snapshotOf(p);
+  const curId = p.equipment?.[pk.slotId] || null;
+  const todo = pickerCandidates(p, pk).slice(0, pk.simCount).map((x) => x.i)
+    .filter((i) => i.id !== curId && !pickerCache.has(`${snap}|${pk.slotId}|${i.id}`));
+  if (!todo.length) { pk.progress = null; renderPickerStatus(); return; }
+  if (pickerCache.size > 3000) pickerCache.clear();
+  pk.progress = { done: 0, total: todo.length };
+  renderPickerStatus();
+  let base = pickerBase.get(snap);
+  if (!base) {
+    base = (await simulateChunked(resolved(p), PICKER_ITERATIONS)).dps;
+    if (seq !== pickerSeq) return;
+    pickerBase.clear();
+    pickerBase.set(snap, base);
+  }
+  for (const item of todo) {
+    const variant = JSON.parse(JSON.stringify(p));
+    equipItem(variant, state.items, pk.slotId, item.id);
+    const s = await simulateChunked(resolveProfile(variant, state.items), PICKER_ITERATIONS);
+    if (seq !== pickerSeq || state.picker !== pk) return;
+    const d = pairedDiff(base, s.dps);
+    pickerCache.set(`${snap}|${pk.slotId}|${item.id}`, { delta: d.mean, err: 1.96 * d.se });
+    pk.progress.done++;
+    renderPickerList();
+  }
+  pk.progress = null;
+  renderPickerList();
+}
+
+// ----- Réglages du personnage (repliés sous la fiche) -----
 
 function weaponBlock(title, key, p) {
   const w = p[key];
@@ -839,24 +821,49 @@ function weaponBlock(title, key, p) {
       selectField('Enchantement', `${key}.enchant`, enchants)));
 }
 
-function panelPerso(p) {
-  const race = RACES[p.race] || RACES.orc;
-  const levelSel = selectEl({ 60: 'Niveau 60', 30: 'Niveau 30 (bêta)' }, p.level, { id: 'f-level', 'aria-label': 'Niveau' });
-  levelSel.addEventListener('change', () => changeLevel(Number(levelSel.value)));
+function deleteItems(ids) {
+  const set = new Set(ids);
+  state.items = state.items.filter((i) => !set.has(i.id));
+  for (const p of state.profiles) {
+    for (const [slot, itemId] of Object.entries(p.equipment || {})) if (set.has(itemId)) p.equipment[slot] = null;
+  }
+  state.confirmItemDelete = null;
+  afterChange(true);
+}
+
+function myItems(p) {
+  if (!state.items.length) return null;
+  const equipped = new Set(Object.values(p.equipment || {}));
+  const factors = ratingFactors(p);
+  return section(`Mes objets ajoutés (${state.items.length})`, 'Ajoutés par tooltip, partagés entre vos profils',
+    h('div', { class: 'library' }, state.items.map((it) => {
+      const confirming = state.confirmItemDelete === it.id;
+      return h('div', { class: `item-row${equipped.has(it.id) ? ' equipped' : ''}` },
+        h('div', { class: 'item-main' },
+          h('div', { class: 'item-title' }, h('span', { class: 'name' }, it.name), h('span', { class: 'tag' }, ITEM_TYPES[it.type]),
+            equipped.has(it.id) ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
+          h('small', { class: 'muted' }, itemSummary(it, factors))),
+        h('div', { class: 'slot-actions' },
+          h('button', {
+            class: `btn small ghost${confirming ? ' danger' : ''}`, type: 'button',
+            onclick: () => { if (confirming) deleteItems([it.id]); else { state.confirmItemDelete = it.id; renderPanel(); } },
+          }, confirming ? 'Confirmer' : 'Supprimer')));
+    })));
+}
+
+function characterOptions(p) {
   const r = resolved(p);
   const eq = p.equipment || {};
-  const byId = lookup;
-  const mainItem = byId(eq.mainHand);
+  const mainItem = lookup(eq.mainHand);
   const weaponsFromItems = !!(mainItem && mainItem.weapon);
 
   const trinketTypes = { ap: 'Puissance d’attaque', haste: 'Hâte (%)', agi: 'Agilité', str: 'Force', crit: 'Critique (%)' };
   const trinketRows = [0, 1].map((i) => {
-    const item = byId(eq[`trinket${i + 1}`]);
-    if (item && item.onUse && Number(item.onUse.value)) {
-      return h('p', { class: 'hint' }, `Bijou ${i + 1} : ${item.name} (onglet Équipement) — ${itemSummary({ stats: {}, onUse: item.onUse })}.`);
-    }
+    const item = lookup(eq[`trinket${i + 1}`]);
     if (item) {
-      return h('p', { class: 'hint' }, `Bijou ${i + 1} : ${item.name} (onglet Équipement), sans effet à activer simulé.`);
+      return h('p', { class: 'hint' }, item.onUse && Number(item.onUse.value)
+        ? `Bijou ${i + 1} : ${item.name}, ${itemSummary({ stats: {}, onUse: item.onUse })}.`
+        : `Bijou ${i + 1} : ${item.name}, sans effet à activer simulé.`);
     }
     const tr = p.trinkets[i];
     const presets = Object.fromEntries(Object.entries(ON_USE_PRESETS).map(([k, v]) => [k, v.name]));
@@ -871,15 +878,6 @@ function panelPerso(p) {
   });
 
   const enchants = Object.fromEntries(Object.entries(ENCHANTS).filter(([k]) => k !== 'counterweight' || r.twoHand).map(([k, v]) => [k, v.name]));
-  const weaponSection = weaponsFromItems
-    ? section('Armes', 'Définies par l’onglet Équipement',
-      h('p', {}, `${mainItem.name} : ${itemSummary(mainItem, ratingFactors(p))}`),
-      r.oh ? h('p', {}, `${byId(eq.offHand)?.name || 'Main gauche'} : ${itemSummary(byId(eq.offHand) || { stats: {} }, ratingFactors(p))}`) : null,
-      h('div', { class: 'fields' },
-        selectField(r.twoHand ? 'Enchantement' : 'Enchantement main droite', 'mh.enchant', enchants),
-        r.oh ? selectField('Enchantement main gauche', 'oh.enchant', enchants) : null))
-    : null;
-
   const twoHandToggle = h('div', { class: 'segmented', role: 'group', 'aria-label': 'Style d’arme' },
     h('button', { type: 'button', 'aria-pressed': p.twoHand ? 'true' : 'false', onclick: () => { p.twoHand = true; afterChange(true); } }, 'Arme à deux mains'),
     h('button', { type: 'button', 'aria-pressed': p.twoHand ? 'false' : 'true', onclick: () => { p.twoHand = false; afterChange(true); } }, 'Ambidextrie'));
@@ -893,84 +891,108 @@ function panelPerso(p) {
     afterChange(true);
   };
 
-  return h('div', { class: 'section-stack' },
-    section('Personnage', null,
-      h('div', { class: 'fields' },
-        textField('Nom du profil', 'name'),
-        h('label', { class: 'field', for: 'f-level' }, h('span', {}, 'Niveau'), levelSel),
-        selectField('Race', 'race', Object.fromEntries(Object.entries(RACES).map(([k, v]) => [k, v.name])), { rerender: true }),
-        selectField('Aspect', 'aspect', { beast: 'Aspect of the Beast', monkey: 'Aspect du singe', hawk: 'Aspect du faucon', none: 'Aucun' })),
-      h('p', { class: 'hint' }, race.note),
-      h('div', { class: 'fields' },
-        checkField('Hunter’s Mark sur la cible', 'huntersMark'),
-        checkField('Utiliser le racial offensif', 'racial'))),
-    section('Bonus manuels', 'S’ajoutent aux objets équipés : enchantements d’armure, ou vos totaux si vous ne saisissez pas les objets.',
-      h('div', { class: 'fields' },
-        numField('Force', 'gear.str', { step: 1 }),
-        numField('Agilité', 'gear.agi', { step: 1 }),
-        numField('Endurance', 'gear.sta', { step: 1 }),
-        numField('Intelligence', 'gear.int', { step: 1 }),
-        numField('Esprit', 'gear.spi', { step: 1 }),
-        numField('Puissance d’attaque', 'gear.ap', { step: 1 }),
-        numField('Toucher (%)', 'gear.hit', { step: 0.5 }),
-        numField('Critique (%)', 'gear.crit', { step: 0.5 }),
-        numField('Hâte de mêlée (%)', 'gear.haste', { step: 0.5 }),
-        numField('Mana toutes les 5 s', 'gear.mp5', { step: 1 }),
-        numField('Compétence d’arme (+)', 'gear.skill', { step: 1 }),
-        numField('Réduction esquive/parade (%)', 'gear.expertise', { step: 0.5 }))),
-    weaponSection || [
-      h('div', { class: 'section' },
-        h('div', { class: 'section-title' }, h('h3', {}, 'Armes'), twoHandToggle),
-        h('div', { class: 'io-actions' },
-          h('button', { class: 'btn small', type: 'button', onclick: loadSample }, p.twoHand ? 'Charger l’arme d’exemple' : 'Charger les armes d’exemple'),
-          h('span', { class: 'hint' }, p.twoHand ? sample.twoHand.name : `${sample.mh.name} et ${sample.oh.name}`)),
-        h('p', { class: 'hint' }, 'Équipez une arme dans l’onglet Équipement pour remplacer ces valeurs.')),
-      weaponBlock(p.twoHand ? 'Arme à deux mains' : 'Main droite', 'mh', p),
-      p.twoHand ? null : weaponBlock('Main gauche', 'oh', p),
-    ],
-    section('Bijoux à activer et procs', null,
-      trinketRows,
-      h('div', { class: 'fields' }, numField('Attaque suppl. (% par coup)', 'extraAttackChance', { min: 0, step: 0.5 })),
-      h('p', { class: 'hint' }, 'Bijoux utilisés dès que possible. Attaque supplémentaire : chance par coup qui touche, par exemple 2 % pour la Main de justice.')),
-    section('Familier et modificateurs', 'Le familier est un DPS fixe : ses stats Forever ne sont pas encore connues.',
-      h('div', { class: 'fields' },
-        checkField('Familier actif', 'pet.enabled'),
-        numField('DPS du familier', 'pet.dps', { min: 0, step: 5 }),
-        numField('Dégâts en plus (%)', 'custom.dmgPct', { step: 1 }),
-        numField('Crit en plus (%)', 'custom.crit', { step: 0.5 }),
-        numField('PA en plus', 'custom.ap', { step: 5 }))),
-  );
+  const details = h('details', { class: 'more', id: 'char-options' },
+    h('summary', {}, 'Réglages du personnage : aspect, enchantements, bonus, bijoux, familier'),
+    h('div', { class: 'section-stack' },
+      section('Profil', null,
+        h('div', { class: 'fields' },
+          textField('Nom du profil', 'name'),
+          selectField('Aspect', 'aspect', { beast: 'Aspect of the Beast', monkey: 'Aspect du singe', hawk: 'Aspect du faucon', none: 'Aucun' })),
+        h('div', { class: 'fields' },
+          checkField('Hunter’s Mark sur la cible', 'huntersMark'),
+          checkField('Utiliser le racial offensif', 'racial'))),
+      weaponsFromItems
+        ? section('Enchantements d’arme', null,
+          h('div', { class: 'fields' },
+            selectField(r.twoHand ? 'Enchantement' : 'Enchantement main droite', 'mh.enchant', enchants),
+            r.oh ? selectField('Enchantement main gauche', 'oh.enchant', enchants) : null))
+        : [
+          h('div', { class: 'section' },
+            h('div', { class: 'section-title' }, h('h3', {}, 'Armes sans objet'), twoHandToggle),
+            h('p', { class: 'hint' }, 'Utilisées tant qu’aucune arme n’est équipée dans la fiche.'),
+            h('div', { class: 'io-actions' },
+              h('button', { class: 'btn small', type: 'button', onclick: loadSample }, p.twoHand ? 'Charger l’arme d’exemple' : 'Charger les armes d’exemple'),
+              h('span', { class: 'hint' }, p.twoHand ? sample.twoHand.name : `${sample.mh.name} et ${sample.oh.name}`))),
+          weaponBlock(p.twoHand ? 'Arme à deux mains' : 'Main droite', 'mh', p),
+          p.twoHand ? null : weaponBlock('Main gauche', 'oh', p),
+        ],
+      section('Bonus manuels', 'S’ajoutent aux objets : enchantements d’armure, ou vos totaux si vous ne remplissez pas la fiche.',
+        h('div', { class: 'fields' },
+          numField('Force', 'gear.str', { step: 1 }),
+          numField('Agilité', 'gear.agi', { step: 1 }),
+          numField('Endurance', 'gear.sta', { step: 1 }),
+          numField('Intelligence', 'gear.int', { step: 1 }),
+          numField('Esprit', 'gear.spi', { step: 1 }),
+          numField('Puissance d’attaque', 'gear.ap', { step: 1 }),
+          numField('Toucher (%)', 'gear.hit', { step: 0.5 }),
+          numField('Critique (%)', 'gear.crit', { step: 0.5 }),
+          numField('Hâte de mêlée (%)', 'gear.haste', { step: 0.5 }),
+          numField('Mana toutes les 5 s', 'gear.mp5', { step: 1 }),
+          numField('Compétence d’arme (+)', 'gear.skill', { step: 1 }),
+          numField('Réduction esquive/parade (%)', 'gear.expertise', { step: 0.5 }))),
+      section('Bijoux à activer et procs', null,
+        trinketRows,
+        h('div', { class: 'fields' }, numField('Attaque suppl. (% par coup)', 'extraAttackChance', { min: 0, step: 0.5 })),
+        h('p', { class: 'hint' }, 'Bijoux utilisés dès que possible. Attaque supplémentaire : chance par coup qui touche, par exemple 2 % pour la Main de justice.')),
+      section('Familier et modificateurs', 'Le familier est un DPS fixe : ses stats Forever ne sont pas encore connues.',
+        h('div', { class: 'fields' },
+          checkField('Familier actif', 'pet.enabled'),
+          numField('DPS du familier', 'pet.dps', { min: 0, step: 5 }),
+          numField('Dégâts en plus (%)', 'custom.dmgPct', { step: 1 }),
+          numField('Crit en plus (%)', 'custom.crit', { step: 0.5 }),
+          numField('PA en plus', 'custom.ap', { step: 5 }))),
+      myItems(p)));
+  details.open = state.optionsOpen;
+  details.addEventListener('toggle', () => { state.optionsOpen = details.open; });
+  return details;
 }
 
-// ----- Talents, buffs, rotation, combat, hypothèses -----
+// ----- Talents -----
 
-function talentPoints(p) {
-  return TALENTS.reduce((s, t) => s + (Number(p.talents[t.id]) || 0), 0);
+function talentCalcFor(p) {
+  const opts = {
+    talents: p.talents,
+    level: p.level,
+    focus: state.talentFocus,
+    tree: state.talentTree,
+    onChange: (id, d) => {
+      state.talentFocus = id;
+      const blocked = d > 0 ? addBlocker(p.talents, id, p.level) : removeBlocker(p.talents, id);
+      if (!blocked) {
+        p.talents[id] = (Number(p.talents[id]) || 0) + d;
+        afterChange(false);
+      }
+      refreshTalents(id);
+    },
+    // Survol ou focus : seule la fiche du talent change, pas l’arbre.
+    onFocus: (id) => {
+      if (state.talentFocus === id) return;
+      state.talentFocus = id;
+      opts.focus = id;
+      $('tc-info')?.replaceWith(talentInfo(opts));
+      for (const el of document.querySelectorAll('.tal.focus')) el.classList.remove('focus');
+      document.querySelector(`.tal[data-talent="${id}"]`)?.classList.add('focus');
+    },
+    onTree: (id) => { state.talentTree = id; save(); refreshTalents(); },
+    onPreset: () => { p.talents = { ...TALENT_PRESETS[p.level] }; afterChange(false); refreshTalents(); },
+    onReset: () => { p.talents = fullBuild({}); afterChange(false); refreshTalents(); },
+  };
+  return talentCalculator(opts);
+}
+
+// Redessine le calculateur en gardant le focus clavier sur le talent touché.
+function refreshTalents(focusId = null) {
+  const box = $('talent-calc');
+  if (!box) return;
+  box.replaceChildren(talentCalcFor(current()));
+  if (focusId) box.querySelector(`[data-talent="${focusId}"]`)?.focus({ preventScroll: true });
 }
 
 function panelTalents(p) {
-  const available = p.level - 9;
-  const used = talentPoints(p);
-  const list = h('div', { class: 'talent-list' }, TALENTS.map((t) => {
-    const locked = t.minLevel && p.level < t.minLevel;
-    const v = locked ? 0 : Number(p.talents[t.id]) || 0;
-    const set = (nv) => { p.talents[t.id] = Math.max(0, Math.min(t.max, nv)); afterChange(true); };
-    return h('div', { class: `talent${v === 0 ? ' off' : ''}` },
-      h('div', {}, h('span', { class: 'name' }, t.name), h('span', { class: 'tree' }, `${t.tree} · ${t.need} pts requis`)),
-      h('div', { class: 'stepper' },
-        h('button', { type: 'button', 'aria-label': `Retirer un point à ${t.name}`, disabled: locked || v <= 0, onclick: () => set(v - 1) }, '−'),
-        h('span', { class: 'num', 'aria-live': 'polite' }, `${v}/${t.max}`),
-        h('button', { type: 'button', 'aria-label': `Ajouter un point à ${t.name}`, disabled: locked || v >= t.max, onclick: () => set(v + 1) }, '+')),
-      h('div', { class: 'desc' }, locked ? `Indisponible au niveau ${p.level} (31 points en Survie, niveau ${t.minLevel} minimum).` : t.desc));
-  }));
-  return h('div', { class: 'section-stack' },
-    section('Talents qui comptent pour le sim', null,
-      h('p', { class: 'hint' }, `${used} points dans ces talents, sur ${available} disponibles au niveau ${p.level}. Les autres points du build (défensifs, utilitaires) ne changent pas le DPS simulé.`),
-      h('div', { class: 'io-actions' },
-        h('button', { class: 'btn small', type: 'button', onclick: () => { p.talents = { ...TALENT_PRESETS[p.level] }; afterChange(true); } }, `Charger le build par défaut (niveau ${p.level})`)),
-      used > available ? h('div', { class: 'notice' }, `Trop de points : ${used} pour ${available} disponibles.`) : null,
-      list));
+  return h('div', { id: 'talent-calc' }, talentCalcFor(p));
 }
+
+// ----- Combat, buffs, rotation, hypothèses -----
 
 function panelBuffs(p) {
   const cats = [...new Set(BUFFS.map((b) => b.cat))];
@@ -980,7 +1002,7 @@ function panelBuffs(p) {
     'Buffs de monde': 'Présence dans Forever non confirmée.',
     'Débuffs': 'Réduisent l’armure du boss.',
   };
-  return h('div', { class: 'section-stack' }, cats.map((cat) => section(cat, notes[cat],
+  return cats.map((cat) => section(cat, notes[cat],
     h('div', { class: 'buff-grid' }, BUFFS.filter((b) => b.cat === cat).map((b) => {
       const id = `buff-${b.id}`;
       const input = h('input', { id, type: 'checkbox' });
@@ -995,7 +1017,7 @@ function panelBuffs(p) {
         afterChange(true);
       });
       return h('label', { class: 'check', for: id }, input, h('span', {}, b.name));
-    })))));
+    }))));
 }
 
 function panelRotation(p) {
@@ -1050,7 +1072,8 @@ function panelCombat(p) {
       h('div', { class: 'fields' },
         numField('Vitesse du boss (s)', 'fight.bossSwing', { min: 0.5, step: 0.1 }),
         numField('Votre esquive (%)', 'fight.playerDodge', { min: 0, step: 0.5 }),
-        numField('Votre parade (%)', 'fight.playerParry', { min: 0, step: 0.5 }))) : null);
+        numField('Votre parade (%)', 'fight.playerParry', { min: 0, step: 0.5 }))) : null,
+    panelBuffs(p));
 }
 
 function panelHypo(p) {
@@ -1109,20 +1132,12 @@ function readValue(el) {
 function onFieldEvent(e) {
   const el = e.target;
   const path = el?.dataset?.path;
-  const draftPath = el?.dataset?.draft;
-  if (!path && !draftPath) return;
+  if (!path) return;
   const isText = el.type === 'number' || el.type === 'text';
   if (e.type === 'input' && !isText) return;
   if (e.type === 'change' && isText) return;
   const { ok, v } = readValue(el);
   if (!ok) return;
-
-  if (draftPath) {
-    if (!state.editor) return;
-    setPath(state.editor, draftPath, v);
-    if (el.dataset.rerender === '1') renderPanel();
-    return;
-  }
 
   setPath(current(), path, v);
   if (path === 'name') {
@@ -1150,6 +1165,17 @@ function afterChange(rerender = false) {
   renderSheet();
   renderStatus();
   if (rerender) renderPanel();
+  scheduleRun();
+}
+
+// Relance la simulation peu après chaque changement (une seule fois pour une rafale de clics).
+let runTimer = null;
+function scheduleRun(delay = 700) {
+  clearTimeout(runTimer);
+  runTimer = setTimeout(() => {
+    if (state.running) { state.rerun = true; return; }
+    if (isStale(state.results[current().id])) runMain();
+  }, delay);
 }
 
 // ---------- calculs ----------
@@ -1188,13 +1214,15 @@ async function guarded(kind, fn) {
   if (state.running) return;
   state.running = kind;
   renderResults();
-  renderPanel();
   try {
     await fn();
   } finally {
     state.running = null;
     renderResults();
-    renderPanel();
+    if (state.rerun) {
+      state.rerun = false;
+      scheduleRun(100);
+    }
   }
 }
 
@@ -1230,57 +1258,6 @@ function runCompareAll() {
       rows.push({ id: p.id, name: p.name, level: p.level, mean: s.mean, se: s.se, oomPct: s.oomPct });
     }
     state.compareAll = { rows, iterations: n };
-  });
-}
-
-// Candidats : la bibliothèque, l’objet équipé, les meilleurs objets de la base (selon les poids)
-// et les objets demandés explicitement (`extraIds`).
-function compareCandidates(p, slotId, extraIds = []) {
-  const eq = p.equipment || {};
-  const others = new Set(Object.entries(eq).filter(([s]) => s !== slotId).map(([, id]) => id));
-  const out = new Map();
-  for (const i of itemsForProfile(p)) if (canEquip(i, slotId) && !others.has(i.id)) out.set(i.id, i);
-  if (state.compareDb) {
-    const { ep } = currentEp(p);
-    const factors = ratingFactors(p);
-    const offHand = slotId === 'offHand';
-    dbItems()
-      .filter((i) => canEquip(i, slotId) && wearable(i, p.level) && i.quality <= state.autoQuality && !others.has(i.id))
-      .map((i) => ({ i, v: itemScore(i, ep, factors, { offHand, ...scoreOpts(p) }) }))
-      .sort((a, b) => b.v - a.v)
-      .slice(0, 10)
-      .forEach(({ i }) => out.set(i.id, i));
-  }
-  for (const id of extraIds) {
-    const i = lookup(id);
-    if (i && canEquip(i, slotId)) out.set(i.id, i);
-  }
-  return [null, ...out.values()];
-}
-
-function runItemCompare(slotId, extraIds = []) {
-  return guarded('items', async () => {
-    const p = current();
-    const eq = p.equipment || {};
-    const candidates = compareCandidates(p, slotId, extraIds);
-    const n = Math.min(state.iterations, 2000);
-    const total = candidates.length + 1;
-    const base = await simulateChunked(resolved(p), n, (f) => setProgress(f / total));
-    const rows = [];
-    for (let k = 0; k < candidates.length; k++) {
-      const item = candidates[k];
-      const variant = JSON.parse(JSON.stringify(p));
-      equipItem(variant, state.items, slotId, item ? item.id : null);
-      const s = await simulateChunked(resolveProfile(variant, state.items), n, (f) => setProgress((k + 1 + f) / total));
-      const diff = pairedDiff(base.dps, s.dps);
-      rows.push({
-        id: item ? item.id : '', name: item ? item.name : 'Emplacement vide', item,
-        mean: s.mean, delta: diff.mean, err: 1.96 * diff.se, equipped: (item ? item.id : null) === (eq[slotId] || null),
-        value: item ? itemValue(item, p, { offHand: slotId === 'offHand' }) : 0,
-      });
-    }
-    rows.sort((a, b) => b.mean - a.mean);
-    state.itemCompare = { slotId, rows, iterations: n, base: base.mean, snapshot: snapshotOf(p), profileId: p.id };
   });
 }
 
@@ -1528,47 +1505,9 @@ function deltaNode(v, d = 1, suffix = '') {
 }
 
 function resultsCompare(p, s, busy) {
-  const panels = [];
-  const ic = state.itemCompare && state.itemCompare.profileId === p.id ? state.itemCompare : null;
-  const slotSel = selectEl(Object.fromEntries(SLOTS.map((x) => [x.id, x.name])), ic ? ic.slotId : state.compareSlot, { id: 'compare-slot', 'aria-label': 'Emplacement à comparer' });
-  slotSel.addEventListener('change', () => { state.compareSlot = slotSel.value; });
-
-  const withDb = h('input', { id: 'compare-db', type: 'checkbox' });
-  withDb.checked = state.compareDb;
-  withDb.addEventListener('change', () => { state.compareDb = withDb.checked; });
-  const qualSel = selectEl(AUTO_QUALITY, state.autoQuality, { id: 'compare-quality', 'aria-label': 'Qualité maximale des objets de la base' });
-  qualSel.addEventListener('change', () => { state.autoQuality = Number(qualSel.value); save(); });
-
-  panels.push(resultPanel('Comparer des objets', 'Même profil, un emplacement à la fois',
-    h('div', { class: 'runbar' },
-      slotSel,
-      h('button', { class: 'btn', type: 'button', disabled: busy, onclick: () => { state.compareSlot = slotSel.value; runItemCompare(slotSel.value); } }, state.running === 'items' ? 'Calcul…' : 'Comparer les objets'),
-      ic ? staleChip(ic) : null),
-    h('div', { class: 'runbar' },
-      h('label', { class: 'check', for: 'compare-db' }, withDb, h('span', {}, 'Inclure les 10 meilleurs objets de la base')),
-      qualSel),
-    ic ? [
-      barChart(ic.rows.map((r) => ({
-        id: r.id || 'empty', label: `${r.name}${r.equipped ? ' (équipé)' : ''}`, value: r.mean,
-        labelNode: r.item ? h('span', { class: 'item-name' }, r.item.quality ? h('i', { class: `qdot q${r.item.quality}`, 'aria-hidden': 'true' }) : null, h('span', {}, `${r.name}${r.equipped ? ' (équipé)' : ''}`)) : null,
-        valueText: r.equipped ? `${fmt(r.mean)} · équipé` : `${fmt(r.mean)} · ${fmtSigned(r.delta)}`,
-        tipTitle: `${fmt(r.mean)} DPS`, tip: r.equipped ? 'Objet équipé' : `${fmtSigned(r.delta)} DPS ± ${fmt(r.err)} (IC 95 %)`,
-      })), { currentId: ic.rows.find((r) => r.equipped)?.id || 'empty' }),
-      h('div', { class: 'table-wrap' }, h('table', {},
-        h('thead', {}, h('tr', {}, ['Objet', 'DPS', 'Écart (± marge)', 'Valeur PA', ''].map((t, i) => h('th', { class: i && i < 4 ? 'num' : '' }, t)))),
-        h('tbody', {}, ic.rows.map((r) => {
-          return h('tr', {},
-            h('td', { class: 'wrap' }, r.item ? itemTitle(r.item) : r.name, r.equipped ? h('span', { class: 'chip fresh' }, 'Équipé') : null),
-            h('td', { class: 'num' }, fmt(r.mean)),
-            h('td', { class: 'num' }, r.equipped ? '—' : [deltaNode(r.delta), h('small', { class: 'muted' }, ` ± ${fmt(r.err)}`)]),
-            h('td', { class: 'num' }, r.item ? fmt0(r.value) : '—'),
-            h('td', {}, r.equipped ? null : h('button', {
-              class: 'btn small', type: 'button', disabled: busy,
-              onclick: () => { equipItem(p, state.items, ic.slotId, r.item ? r.item.id : null); afterChange(true); runItemCompare(ic.slotId); },
-            }, 'Équiper')));
-        })))),
-      h('p', { class: 'hint' }, `${ic.iterations.toLocaleString('fr-FR')} combats par objet avec les mêmes tirages aléatoires ; la marge indique l’incertitude de l’écart. La « valeur PA » est l’estimation rapide par les poids des stats, qui sert à présélectionner les objets de la base ; le DPS simulé fait foi.`),
-    ] : h('p', { class: 'empty' }, 'Choisissez un emplacement : le sim essaie l’objet équipé, ceux de votre bibliothèque et les 10 meilleurs de la base à cette place, puis classe le résultat.')));
+  const panels = [
+    h('p', { class: 'hint panel' }, 'Pour comparer des objets, touchez un emplacement de la fiche (onglet Personnage) : le gain de chaque objet y est simulé.'),
+  ];
 
   const [aId, bId] = duelIds();
   const opts = Object.fromEntries(state.profiles.map((x) => [x.id, `${x.name} (niv. ${x.level})`]));
@@ -1665,6 +1604,7 @@ function renderSources() {
         h('li', {}, 'Changements Forever appliqués : Mongoose Bite et Raptor Strike basés sur l’arme, Expose Prey, Lacerating Strikes, Strider Kick, Predator’s Edge, Aspect of the Beast avec PA de mêlée, toucher et crit unifiés, stat de réduction d’esquive/parade.'),
         h('li', {}, `Objets : ${ITEM_DB_INFO.count.toLocaleString('fr-FR')} objets réels de Forever (build ${ITEM_DB_INFO.build}, ${ITEM_DB_INFO.date}), lus dans le client par wowsims/gamedata, la même source que Wowhead. Gardés : ce qu’un chasseur mêlée peut porter et qui a une stat utile ; exclus : objets de test et de Season of Discovery. Chaque objet a un lien vers sa page Wowhead Forever.`),
         h('li', {}, 'Valeurs des sorts du chasseur (Raptor Strike, Mongoose Bite, Expose Prey, Lacerate…) lues dans les mêmes données du client : fiabilité « Client » dans l’onglet Hypothèses.'),
+        h('li', {}, 'Icônes et fonds des arbres : textures de l’interface du jeu (Gethe/wow-ui-textures). Les objets propres à Forever empruntent l’icône d’un objet voisin. Le client ne donne pas la place des talents dans les arbres : la disposition suit Classic et les guides de la bêta, à confirmer en jeu.'),
         h('li', {}, 'Pas simulé : déplacements, AoE, menace, Wing Clip, procs d’objets précis, détail des capacités du familier.'))),
     h('div', { class: 'section' },
       h('h3', {}, 'Sources'),
@@ -1715,6 +1655,10 @@ function start() {
   const config = $('config');
   config.addEventListener('input', onFieldEvent);
   config.addEventListener('change', onFieldEvent);
+  const picker = $('picker');
+  picker.addEventListener('close', () => { if (state.picker) { pickerSeq++; state.picker = null; } });
+  // Un clic sur le fond assombri (hors de la fenêtre) la ferme.
+  picker.addEventListener('click', (e) => { if (e.target === picker) closePicker(); });
   setupTooltip();
   renderSources();
   renderAll();

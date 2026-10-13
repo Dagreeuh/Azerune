@@ -25,13 +25,6 @@
 
   <main class="layout">
     <div class="column" id="config">
-      <section class="panel" aria-labelledby="sheet-title">
-        <div class="panel-head">
-          <h2 id="sheet-title">Feuille de personnage</h2>
-          <span class="hint">Calculée en direct, buffs et talents compris</span>
-        </div>
-        <div class="sheet" id="sheet"></div>
-      </section>
       <section class="panel">
         <div class="tabs" id="tabs" role="tablist" aria-label="Réglages"></div>
         <div id="panel"></div>
@@ -42,6 +35,7 @@
 
   <footer class="panel sources" id="sources"></footer>
 </div>
+<dialog class="picker-dialog" id="picker"></dialog>
 <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
 <!-- BODY:END -->
 <script type="module" src="src/app.js"></script>

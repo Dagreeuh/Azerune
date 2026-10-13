@@ -2,6 +2,8 @@
 // Chaque valeur incertaine porte un niveau de fiabilité (`conf`) et ses sources (`src`),
 // pour pouvoir la corriger dès qu'un tooltip change en bêta.
 
+import { TALENT_BUILDS } from './talenttrees.js';
+
 export const DATA_INFO = {
   updated: '2026-10-12',
   build: '1.60.1.70338',
@@ -283,38 +285,29 @@ export const MECHANICS = [
   { key: 'windfuryChance', group: 'Aspects et raciaux', label: 'Totem Furie-des-vents, chance %', value: 20, step: 1, conf: 'classic', src: ['wowsims'] },
 ];
 
-// Talents utiles au sim. `need` = points requis dans l’arbre (pour l’affichage).
+// Talents qui changent le DPS simulé (rang maximal, niveau minimal). Leur place dans les arbres,
+// leurs textes et les règles de points sont dans talenttrees.js.
 export const TALENTS = [
-  { id: 'savageStrikes', tree: 'Survie', name: 'Savage Strikes', max: 2, need: 5, desc: '+Crit des techniques de mêlée (+20 % au rang maximal).' },
-  { id: 'lightningReflexes', tree: 'Survie', name: 'Lightning Reflexes', max: 5, need: 25, desc: '+Agilité en %.' },
-  { id: 'lethalAttacks', tree: 'Précision', name: 'Lethal Attacks', max: 5, need: 0, desc: '+1 % de crit par rang (physique et sorts).' },
-  { id: 'surefooted', tree: 'Survie', name: 'Surefooted', max: 3, need: 10, desc: '+Toucher (unifié mêlée, distance, sorts).' },
-  { id: 'predatorsEdge', tree: 'Survie', name: 'Predator’s Edge', max: 5, need: 10, desc: '+Dégâts critiques des techniques et +dégâts de la main gauche.' },
-  { id: 'counterattack', tree: 'Survie', name: 'Counterattack', max: 1, need: 15, desc: 'Après une parade : 50 % de l’arme + bonus, inévitable.' },
-  { id: 'resourcefulness', tree: 'Survie', name: 'Resourcefulness', max: 2, need: 20, desc: '−Coût en mana des techniques de mêlée et des pièges.' },
-  { id: 'exposePrey', tree: 'Survie', name: 'Expose Prey', max: 2, need: 20, desc: 'Les attaques sur une cible marquée activent Mongoose Bite.' },
-  { id: 'striderKick', tree: 'Survie', name: 'Strider Kick', max: 1, need: 20, desc: 'Coup de pied : 100 % de l’arme, 8 s de recharge.' },
-  { id: 'laceratingStrikes', tree: 'Survie', name: 'Lacerating Strikes', max: 1, need: 30, minLevel: 40, desc: 'Mongoose Bite fait saigner : 40 % de ses dégâts en 21 s.' },
-  { id: 'cleverTraps', tree: 'Survie', name: 'Clever Traps', max: 2, need: 10, desc: '+Dégâts du Piège d’immolation.' },
-  { id: 'survivalistsDiscipline', tree: 'Survie', name: 'Survivalist’s Discipline', max: 1, need: 20, desc: '−Recharge des pièges.' },
-  { id: 'survivalTactics', tree: 'Survie', name: 'Survival Tactics', max: 2, need: 10, desc: '+Toucher des pièges.' },
-  { id: 'improvedTracking', tree: 'Survie', name: 'Improved Tracking', max: 5, need: 0, desc: '+Dégâts contre le type de créature pisté (hypothèse).' },
-  { id: 'deadlyAspects', tree: 'Maîtrise des bêtes', name: 'Deadly Aspects', max: 1, need: 5, desc: 'Sous Aspect of the Beast : procs de +30 % de vitesse d’attaque.' },
-  { id: 'focusedFire', tree: 'Maîtrise des bêtes', name: 'Focused Fire', max: 2, need: 0, desc: '+Dégâts tant que le familier est actif (valeur estimée).' },
+  { id: 'savageStrikes', name: 'Savage Strikes', max: 2 },
+  { id: 'lightningReflexes', name: 'Lightning Reflexes', max: 5 },
+  { id: 'lethalAttacks', name: 'Lethal Attacks', max: 5 },
+  { id: 'surefooted', name: 'Surefooted', max: 3 },
+  { id: 'predatorsEdge', name: 'Predator’s Edge', max: 5 },
+  { id: 'counterattack', name: 'Counterattack', max: 1 },
+  { id: 'resourcefulness', name: 'Resourcefulness', max: 2 },
+  { id: 'exposePrey', name: 'Expose Prey', max: 2 },
+  { id: 'striderKick', name: 'Strider Kick', max: 1 },
+  { id: 'laceratingStrikes', name: 'Lacerating Strikes', max: 1, minLevel: 40 },
+  { id: 'cleverTraps', name: 'Clever Traps', max: 2 },
+  { id: 'survivalistsDiscipline', name: 'Survivalist’s Discipline', max: 1 },
+  { id: 'survivalTactics', name: 'Survival Tactics', max: 2 },
+  { id: 'improvedTracking', name: 'Improved Tracking', max: 5 },
+  { id: 'deadlyAspects', name: 'Deadly Aspects', max: 1 },
+  { id: 'focusedFire', name: 'Focused Fire', max: 2 },
 ];
 
-export const TALENT_PRESETS = {
-  60: {
-    savageStrikes: 2, lightningReflexes: 5, surefooted: 3, predatorsEdge: 5, counterattack: 1,
-    resourcefulness: 2, exposePrey: 2, striderKick: 1, laceratingStrikes: 1, cleverTraps: 0,
-    survivalistsDiscipline: 0, survivalTactics: 0, improvedTracking: 0, deadlyAspects: 0, focusedFire: 0, lethalAttacks: 0,
-  },
-  30: {
-    savageStrikes: 2, lightningReflexes: 0, surefooted: 0, predatorsEdge: 4, counterattack: 1,
-    resourcefulness: 2, exposePrey: 2, striderKick: 1, laceratingStrikes: 0, cleverTraps: 0,
-    survivalistsDiscipline: 0, survivalTactics: 0, improvedTracking: 0, deadlyAspects: 0, focusedFire: 0, lethalAttacks: 0,
-  },
-};
+// Builds complets par défaut (tous les talents, valides dans les arbres).
+export const TALENT_PRESETS = TALENT_BUILDS;
 
 // Buffs, débuffs et consommables (valeurs Classic : leur présence dans Forever reste à confirmer).
 // `group` = un seul actif par groupe. `stats` peut dépendre du niveau.

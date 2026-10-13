@@ -3,7 +3,7 @@
 Simulateur de DPS personnel pour le **chasseur Survie au corps à corps** de *World of Warcraft: Forever*.
 Il reprend les formules de combat de Classic (code open source de [wowsims](https://github.com/wowsims/sod)
 et wiki de [magey](https://github.com/magey/classic-warrior/wiki/Attack-table)) et y applique les valeurs de
-Forever lues dans les données du client : sorts du chasseur et 2 731 objets réels, exportés par
+Forever lues dans les données du client : sorts du chasseur et 2 740 objets réels, exportés par
 [wowsims/gamedata](https://github.com/wowsims/gamedata), la même source que Wowhead.
 
 > Données au 12 octobre 2026, bêta build 1.60.1.70338. La bêta se termine le 21 octobre et la sortie est
@@ -18,22 +18,27 @@ Forever lues dans les données du client : sorts du chasseur et 2 731 objets ré
 - **Tests** : `npm test` (Node 20+, aucune dépendance).
 - **Reconstruire `dist/`** après une modification : `npm run build`.
 
-Les profils et la bibliothèque d’objets sont enregistrés dans le navigateur (`localStorage`). Le bouton
+Les profils et les objets ajoutés par tooltip sont enregistrés dans le navigateur (`localStorage`). Le bouton
 **Importer / exporter** permet de sauvegarder ou partager un profil en JSON, avec ses objets équipés.
 
 ## Ce que fait le sim
 
-- **Équipement** : 17 emplacements (de la tête à l’arme à distance).
-  - Base de données Forever : 2 731 objets qu’un chasseur mêlée peut porter, avec recherche par nom, type et
-    qualité, valeur estimée en PA et lien vers la page Wowhead Forever de chaque objet.
-  - « Équiper les meilleurs objets » : choisit l’objet le plus fort de chaque emplacement selon les poids des
-    stats, la qualité maximale et le style (2M ou ambidextrie).
-  - Bibliothèque personnelle pour les objets absents de la base : collez leur tooltip (Wowhead ou jeu, en
-    anglais ou en français) et le sim reconnaît stats, scores, dégâts d’arme et effets « Utiliser ».
-- **Profils** : niveau 60 ou 30 (bêta), race, aspect, talents, buffs, consommables, débuffs, rotation,
-  bonus manuels (enchantements d’armure ou totaux saisis à la main).
-- **Feuille de personnage** calculée en direct : PA, crit contre le boss, plafond de toucher, raté,
-  esquive, érafles, armure, coûts en mana.
+- **Fiche de personnage** façon jeu : les 17 emplacements autour du personnage, avec les icônes des objets,
+  leur couleur de qualité et l’essentiel des stats (PA, crit contre la cible, toucher et plafond, mana).
+  - Touchez un emplacement : une fenêtre liste les objets de la base qui y vont (2 740 objets de Forever
+    qu’un chasseur mêlée peut porter), filtrés par niveau et qualité, avec recherche par nom. Le gain de DPS
+    des 8 objets les plus prometteurs est **simulé tout de suite** sur votre profil (mêmes tirages, marge
+    d’erreur affichée) ; les suivants à la demande. Un clic équipe l’objet.
+  - Un objet absent de la base ? Collez son tooltip (Wowhead ou jeu, anglais ou français) dans la même fenêtre.
+  - « Remplir avec les meilleurs objets » équipe d’un coup le meilleur objet de chaque emplacement selon les
+    poids des stats, la qualité maximale et le style (2M ou ambidextrie).
+  - Les réglages moins courants (aspect, enchantements, bonus manuels, bijoux, familier) sont repliés sous la fiche.
+- **Talents** : calculateur façon Wowhead, avec les trois arbres du chasseur, leurs icônes et leurs fonds du
+  jeu, les rangs, les flèches de prérequis et la règle des 5 points par rangée. Clic pour ajouter un point,
+  clic droit ou appui long pour en retirer. Les talents qui changent le DPS simulé sont marqués « Simulé ».
+  Sur téléphone, un arbre à la fois.
+- **Profils** : niveau 60 ou 30 (bêta), race, buffs, consommables, débuffs, rotation. La simulation se relance
+  seule après chaque changement.
 - **Simulation Monte-Carlo** : DPS moyen avec intervalle de confiance, répartition par technique,
   distribution du DPS, temps passé à sec de mana.
 - **Cycle de sorts** :
@@ -42,13 +47,10 @@ Les profils et la bibliothèque d’objets sont enregistrés dans le navigateur 
   - statistiques sur des milliers de combats : part du GCD utilisée, utilisations par minute, fenêtres
     Mongoose ouvertes, utilisées ou perdues, temps actif de chaque effet ;
   - enchaînements de 3 techniques les plus fréquents, et journal détaillé.
-- **Comparer** :
-  - objets : le sim essaie l’objet équipé, ceux de la bibliothèque et les 10 meilleurs de la base à un
-    emplacement, et donne l’écart de DPS avec sa marge d’erreur ;
-  - deux profils A et B côte à côte : DPS par technique, cycle, stats ;
-  - classement de tous les profils.
-- **Poids des stats** en équivalent PA, avec marge d’erreur. Ils donnent aussi une « valeur PA » à chaque
-  objet de la bibliothèque.
+- **Comparer** : deux profils A et B côte à côte (DPS par technique, cycle, stats) et classement de tous les
+  profils. Les objets se comparent directement depuis la fiche.
+- **Poids des stats** en équivalent PA, avec marge d’erreur. Ils servent aussi à classer les objets dans la
+  fenêtre de choix.
 
 ## Modèle
 
@@ -103,28 +105,48 @@ et le calcul « Poids des stats » en tiennent compte.
 2. Dans le code, pour changer la valeur par défaut : tableau `MECHANICS` de `src/data.js`
    (champ `value`, `conf` pour la fiabilité, `src` pour les sources), puis `npm test` et `npm run build`.
 
-## Mettre à jour la base d’objets
+## Mettre à jour la base d’objets et les icônes
 
 ```sh
 git clone --depth 1 https://github.com/wowsims/gamedata ../gamedata
-node scripts/import-items.js ../gamedata   # réécrit src/itemdb.js
+# Noms d’icône des objets : db.json et wowhead_item_tooltips.csv de wowsims/sod
+mkdir -p ../icon-data
+curl -L -o ../icon-data/db.json https://raw.githubusercontent.com/wowsims/sod/master/assets/database/db.json
+curl -L -o ../icon-data/wowhead_item_tooltips.csv https://raw.githubusercontent.com/wowsims/sod/master/assets/db_inputs/wowhead_item_tooltips.csv
+node scripts/import-items.js ../gamedata --icons ../icon-data   # réécrit src/itemdb.js
+
+# Images des icônes, intégrées à la page (aucune image externe n’est chargée) ; nécessite Pillow
+git clone --depth 1 --filter=blob:none --no-checkout https://github.com/Gethe/wow-ui-textures ../wow-ui-textures
+python3 scripts/import-icons.py ../wow-ui-textures             # réécrit src/icons.js
 npm test && npm run build
 ```
 
-Le script garde les objets verts et mieux qu’un chasseur peut porter (pas de masses, de boucliers ni de
-plaques) et qui ont une stat utile en mêlée. Il exclut les objets de test et ceux de Season of Discovery,
-présents dans le client mais absents de Forever.
+Le script d’objets garde les objets verts et mieux qu’un chasseur peut porter (pas de masses, de boucliers ni
+de plaques) et qui ont une stat utile en mêlée. Il exclut les objets de test et ceux de Season of Discovery,
+présents dans le client mais absents de Forever. Les objets propres à Forever n’ont pas encore d’icône connue :
+ils prennent celle de l’objet de Classic le plus proche (même type, même armure, niveau voisin).
+
+## Arbres de talents
+
+Disposition dans `src/talenttrees.js`, sur la grille de Classic (4 colonnes, 7 rangées). Les talents qui
+réutilisent un sort de Classic dans le client gardent sa place (Improved Tracking reprend Monster Slaying,
+Deadly Aspects Improved Aspect of the Hawk, Survival Tactics Trap Mastery) ; les rangées des nouveaux talents
+viennent des guides de la bêta. Le client ne donne pas la position des talents : **la disposition reste à
+confirmer en jeu**, et se corrige en changeant `row` et `col` dans ce fichier. Les textes des talents qui ne
+changent pas le DPS reprennent les valeurs de Classic.
 
 ## Fichiers
 
-- `src/data.js` : données (sorts, talents, buffs, races, sources, valeurs par défaut).
+- `src/data.js` : données (sorts, talents du sim, buffs, races, sources, valeurs par défaut).
+- `src/talenttrees.js` : les trois arbres de talents, leurs règles de points et les builds conseillés.
 - `src/gear.js` : emplacements, objets, base de données, équipement automatique, analyse des tooltips.
 - `src/itemdb.js` : objets de Forever, générés par `scripts/import-items.js`.
+- `src/icons.js` : icônes du jeu en WebP, générées par `scripts/import-icons.py`.
 - `src/engine.js` : moteur de simulation, trace du combat et statistiques du cycle (sans dépendance au
   navigateur, testé avec Node).
 - `src/app.js`, `src/ui/`, `src/styles.css`, `index.html` : interface.
 - `scripts/build.js` : assemble `dist/sim-survie-forever.html`.
-- `tests/` : tests du moteur et de l’équipement.
+- `tests/` : tests du moteur, de l’équipement et des arbres de talents.
 
 ## Sources principales
 
@@ -132,7 +154,9 @@ présents dans le client mais absents de Forever.
 - Blizzard — [Class Deep Dives : Hunter and Druid](https://worldofwarcraft.blizzard.com/en-us/news/24301515)
 - [wowsims/gamedata](https://github.com/wowsims/gamedata) : sorts et objets lus dans le client Forever
   (build 1.60.1.70338, 12 octobre 2026), avec liens vers [Wowhead Forever](https://www.wowhead.com/forever)
-- [wowsims/sod](https://github.com/wowsims/sod) et [magey/classic-warrior](https://github.com/magey/classic-warrior/wiki/Attack-table) pour les formules Classic
+- [wowsims/sod](https://github.com/wowsims/sod) et [magey/classic-warrior](https://github.com/magey/classic-warrior/wiki/Attack-table) pour les formules Classic,
+  et les noms d’icône des objets de Classic
+- [Gethe/wow-ui-textures](https://github.com/Gethe/wow-ui-textures) : icônes et textures de l’interface du jeu
 - Guides de la bêta : [Mobalytics](https://mobalytics.gg/wow-forever/classes/survival-hunter-guide),
   [Icy Veins](https://www.icy-veins.com/wow-forever/survival-hunter-melee-dps-pve-guide),
   [classicwow.gg](https://classicwow.gg/forever/guides/hunter/survival),
