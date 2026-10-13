@@ -122,7 +122,8 @@ export const RACES = {
     name: 'Tauren',
     offsets: { str: 5, agi: -5, sta: 2, int: -5, spi: 2 },
     skill: {},
-    note: 'Pas de racial offensif en mêlée.',
+    hit: 1,
+    note: 'Endurance : +5 % de vie et, dans Forever, +1 % de toucher.',
   },
   nightelf: {
     name: 'Elfe de la nuit',

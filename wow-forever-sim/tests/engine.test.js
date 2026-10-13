@@ -118,3 +118,11 @@ test('poids des stats : mp5 et Intelligence mesurés (nuls sans manque de mana)'
   const mp5 = rows.find((r) => r.key === 'mp5');
   assert.ok(Math.abs(mp5.ep) < 0.5, `mp5 ${mp5.ep}`);
 });
+
+test('Tauren : Endurance donne +1 % de toucher dans Forever', () => {
+  const p = defaultProfile(60);
+  p.race = 'orc';
+  const orc = characterSheet(p).hit;
+  p.race = 'tauren';
+  assert.ok(close(characterSheet(p).hit, orc + 1));
+});

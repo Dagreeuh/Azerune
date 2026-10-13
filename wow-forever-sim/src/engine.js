@@ -146,6 +146,7 @@ export function buildCharacter(profile) {
 
   if (profile.aspect === 'beast') add.ap += Number(M.beastAp) || 0;
   add.hit += T.surefooted * M.surefootedPerRank;
+  add.hit += race.hit || 0;
   add.crit += T.lethalAttacks * M.lethalAttacksPerRank;
 
   const statMult = statPct.reduce((m, p) => m * (1 + p / 100), 1);
