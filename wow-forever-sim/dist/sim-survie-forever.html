@@ -893,10 +893,10 @@ const MECHANICS = [
   { key: 'normSpeedDagger', group: 'Formules', label: 'Vitesse normalisée, dague (s)', value: 1.7, step: 0.1, conf: 'estime', src: ['gamedata'] },
 
   // Scores des objets (Forever affiche toucher, crit, hâte et expertise en scores)
-  { key: 'hitRatingPerPct', group: 'Scores des objets', label: 'Score de toucher pour 1 %', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de toucher en Classic devient +10 en Forever (Pendentif croc d’Onyxia, Heaume Cœur-de-lion). Niveau 30 estimé (échelle de TBC).' },
-  { key: 'critRatingPerPct', group: 'Scores des objets', label: 'Score de crit pour 1 %', value: { 60: 14, 30: 5.92 }, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de crit en Classic devient +14 en Forever (Jambières en diablosaure). Niveau 30 estimé.' },
-  { key: 'hasteRatingPerPct', group: 'Scores des objets', label: 'Score de hâte pour 1 %', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'estime', src: [], note: 'Valeur du niveau 60 de TBC.' },
-  { key: 'expertiseRatingPerPct', group: 'Scores des objets', label: 'Score d’expertise pour 1 % (esquive/parade)', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'estime', src: ['itemization'], note: 'Valeur du niveau 60 de TBC (2,5 par point d’expertise, 0,25 % par point).' },
+  { key: 'hitRatingPerPct', group: 'Scores des objets', label: 'Score de toucher pour 1 %', value: 10, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de toucher en Classic devient +10 en Forever (Pendentif croc d’Onyxia, Heaume Cœur-de-lion). Même valeur à tous les niveaux : vérifié en jeu au niveau 30 (Felbough Arm, +10 = 1 %).' },
+  { key: 'critRatingPerPct', group: 'Scores des objets', label: 'Score de crit pour 1 %', value: 14, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de crit en Classic devient +14 en Forever (Jambières en diablosaure). Même valeur à tous les niveaux, comme le toucher vérifié en jeu.' },
+  { key: 'hasteRatingPerPct', group: 'Scores des objets', label: 'Score de hâte pour 1 %', value: 10, step: 0.01, conf: 'estime', src: [], note: 'Valeur du niveau 60 de TBC, à tous les niveaux comme le toucher.' },
+  { key: 'expertiseRatingPerPct', group: 'Scores des objets', label: 'Score d’expertise pour 1 % (esquive/parade)', value: 10, step: 0.01, conf: 'estime', src: ['itemization'], note: 'Valeur du niveau 60 de TBC (2,5 par point d’expertise, 0,25 % par point), à tous les niveaux.' },
 
   // Raptor Strike
   { key: 'raptorBonus', group: 'Raptor Strike', label: 'Bonus de dégâts (dégâts d’arme + X)', value: { 60: 70, 30: 30 }, step: 1, conf: 'client', src: ['gamedata'], note: 'Rang 8 : arme + 70 ; rang 4 (niveau 30) : arme + 30. Dégâts d’arme non normalisés.' },
@@ -3966,7 +3966,8 @@ const ITEM_STATS = [
 
 const CREATURE_AP_KEYS = Object.fromEntries(ITEM_STATS.filter((s) => s.creature).map((s) => [s.creature, s.key]));
 
-// Conversion des scores en pourcentage, selon le niveau et les hypothèses du profil.
+// Conversion des scores en pourcentage, selon les hypothèses du profil (même valeur à tous les niveaux).
+const PCT_SHORT = { hit: 'toucher', crit: 'crit', haste: 'hâte', expertise: 'réd. esq./par.' };
 const RATING_KEYS = { hit: 'hitRatingPerPct', crit: 'critRatingPerPct', haste: 'hasteRatingPerPct', expertise: 'expertiseRatingPerPct' };
 
 function ratingFactors(profile) {
@@ -4017,7 +4018,7 @@ function itemSummary(item, factors = null) {
   for (const s of ITEM_STATS) {
     const v = Number(item.stats?.[s.key]) || 0;
     if (!v) continue;
-    if (s.rating && factors) parts.push(`${fmtNum(v)} ${s.short} (${fmtNum(Math.round((v / factors[s.rating]) * 100) / 100)} %)`);
+    if (s.rating && factors) parts.push(`${fmtNum(Math.round((v / factors[s.rating]) * 100) / 100)} % ${PCT_SHORT[s.rating]} (${fmtNum(v)} de score)`);
     else parts.push(s.pct ? `${fmtNum(v)} % ${s.short}` : `${fmtNum(v)} ${s.short}`);
   }
   if (item.onUse?.value) {
@@ -6021,11 +6022,15 @@ function sanitizeItem(i) {
   return item;
 }
 
+const OLD_RATING_DEFAULTS = { hitRatingPerPct: 4.23, critRatingPerPct: 5.92, hasteRatingPerPct: 4.23, expertiseRatingPerPct: 4.23 };
+
 function normalizeProfile(p) {
   const L = Number(p.level) === 30 ? 30 : 60;
   const d = defaultProfile(L);
   const out = { ...d, ...p, level: L };
   for (const k of ['gear', 'mh', 'oh', 'talents', 'fight', 'pet', 'custom', 'mechanics']) out[k] = { ...d[k], ...(p[k] || {}) };
+  // Les scores valaient moins de % au niveau 30 dans les anciennes versions : on reprend la valeur actuelle.
+  for (const [k, old] of Object.entries(OLD_RATING_DEFAULTS)) if (out.mechanics[k] === old) out.mechanics[k] = d.mechanics[k];
   out.buffs = Array.isArray(p.buffs) ? p.buffs.filter((id) => BUFFS.some((b) => b.id === id)) : d.buffs;
   out.trinkets = [0, 1].map((i) => ({ ...d.trinkets[i], ...((p.trinkets || [])[i] || {}) }));
   const rot = Array.isArray(p.rotation) ? p.rotation.filter((r) => ROTATION_ABILITIES[r.id]) : [];

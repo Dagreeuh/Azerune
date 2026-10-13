@@ -204,10 +204,10 @@ export const MECHANICS = [
   { key: 'normSpeedDagger', group: 'Formules', label: 'Vitesse normalisée, dague (s)', value: 1.7, step: 0.1, conf: 'estime', src: ['gamedata'] },
 
   // Scores des objets (Forever affiche toucher, crit, hâte et expertise en scores)
-  { key: 'hitRatingPerPct', group: 'Scores des objets', label: 'Score de toucher pour 1 %', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de toucher en Classic devient +10 en Forever (Pendentif croc d’Onyxia, Heaume Cœur-de-lion). Niveau 30 estimé (échelle de TBC).' },
-  { key: 'critRatingPerPct', group: 'Scores des objets', label: 'Score de crit pour 1 %', value: { 60: 14, 30: 5.92 }, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de crit en Classic devient +14 en Forever (Jambières en diablosaure). Niveau 30 estimé.' },
-  { key: 'hasteRatingPerPct', group: 'Scores des objets', label: 'Score de hâte pour 1 %', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'estime', src: [], note: 'Valeur du niveau 60 de TBC.' },
-  { key: 'expertiseRatingPerPct', group: 'Scores des objets', label: 'Score d’expertise pour 1 % (esquive/parade)', value: { 60: 10, 30: 4.23 }, step: 0.01, conf: 'estime', src: ['itemization'], note: 'Valeur du niveau 60 de TBC (2,5 par point d’expertise, 0,25 % par point).' },
+  { key: 'hitRatingPerPct', group: 'Scores des objets', label: 'Score de toucher pour 1 %', value: 10, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de toucher en Classic devient +10 en Forever (Pendentif croc d’Onyxia, Heaume Cœur-de-lion). Même valeur à tous les niveaux : vérifié en jeu au niveau 30 (Felbough Arm, +10 = 1 %).' },
+  { key: 'critRatingPerPct', group: 'Scores des objets', label: 'Score de crit pour 1 %', value: 14, step: 0.01, conf: 'client', src: ['gamedata'], note: '1 % de crit en Classic devient +14 en Forever (Jambières en diablosaure). Même valeur à tous les niveaux, comme le toucher vérifié en jeu.' },
+  { key: 'hasteRatingPerPct', group: 'Scores des objets', label: 'Score de hâte pour 1 %', value: 10, step: 0.01, conf: 'estime', src: [], note: 'Valeur du niveau 60 de TBC, à tous les niveaux comme le toucher.' },
+  { key: 'expertiseRatingPerPct', group: 'Scores des objets', label: 'Score d’expertise pour 1 % (esquive/parade)', value: 10, step: 0.01, conf: 'estime', src: ['itemization'], note: 'Valeur du niveau 60 de TBC (2,5 par point d’expertise, 0,25 % par point), à tous les niveaux.' },
 
   // Raptor Strike
   { key: 'raptorBonus', group: 'Raptor Strike', label: 'Bonus de dégâts (dégâts d’arme + X)', value: { 60: 70, 30: 30 }, step: 1, conf: 'client', src: ['gamedata'], note: 'Rang 8 : arme + 70 ; rang 4 (niveau 30) : arme + 30. Dégâts d’arme non normalisés.' },

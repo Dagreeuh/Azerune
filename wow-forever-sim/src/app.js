@@ -113,11 +113,15 @@ function sanitizeItem(i) {
   return item;
 }
 
+const OLD_RATING_DEFAULTS = { hitRatingPerPct: 4.23, critRatingPerPct: 5.92, hasteRatingPerPct: 4.23, expertiseRatingPerPct: 4.23 };
+
 function normalizeProfile(p) {
   const L = Number(p.level) === 30 ? 30 : 60;
   const d = defaultProfile(L);
   const out = { ...d, ...p, level: L };
   for (const k of ['gear', 'mh', 'oh', 'talents', 'fight', 'pet', 'custom', 'mechanics']) out[k] = { ...d[k], ...(p[k] || {}) };
+  // Les scores valaient moins de % au niveau 30 dans les anciennes versions : on reprend la valeur actuelle.
+  for (const [k, old] of Object.entries(OLD_RATING_DEFAULTS)) if (out.mechanics[k] === old) out.mechanics[k] = d.mechanics[k];
   out.buffs = Array.isArray(p.buffs) ? p.buffs.filter((id) => BUFFS.some((b) => b.id === id)) : d.buffs;
   out.trinkets = [0, 1].map((i) => ({ ...d.trinkets[i], ...((p.trinkets || [])[i] || {}) }));
   const rot = Array.isArray(p.rotation) ? p.rotation.filter((r) => ROTATION_ABILITIES[r.id]) : [];

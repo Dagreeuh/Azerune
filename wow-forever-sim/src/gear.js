@@ -74,7 +74,8 @@ export const ITEM_STATS = [
 
 export const CREATURE_AP_KEYS = Object.fromEntries(ITEM_STATS.filter((s) => s.creature).map((s) => [s.creature, s.key]));
 
-// Conversion des scores en pourcentage, selon le niveau et les hypothèses du profil.
+// Conversion des scores en pourcentage, selon les hypothèses du profil (même valeur à tous les niveaux).
+const PCT_SHORT = { hit: 'toucher', crit: 'crit', haste: 'hâte', expertise: 'réd. esq./par.' };
 const RATING_KEYS = { hit: 'hitRatingPerPct', crit: 'critRatingPerPct', haste: 'hasteRatingPerPct', expertise: 'expertiseRatingPerPct' };
 
 export function ratingFactors(profile) {
@@ -125,7 +126,7 @@ export function itemSummary(item, factors = null) {
   for (const s of ITEM_STATS) {
     const v = Number(item.stats?.[s.key]) || 0;
     if (!v) continue;
-    if (s.rating && factors) parts.push(`${fmtNum(v)} ${s.short} (${fmtNum(Math.round((v / factors[s.rating]) * 100) / 100)} %)`);
+    if (s.rating && factors) parts.push(`${fmtNum(Math.round((v / factors[s.rating]) * 100) / 100)} % ${PCT_SHORT[s.rating]} (${fmtNum(v)} de score)`);
     else parts.push(s.pct ? `${fmtNum(v)} % ${s.short}` : `${fmtNum(v)} ${s.short}`);
   }
   if (item.onUse?.value) {

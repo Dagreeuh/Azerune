@@ -65,13 +65,19 @@ test('la base contient des objets réels de Forever, sans objets de test ni de S
   }
 });
 
-test('les scores sont convertis en % selon le niveau', () => {
+test('les scores sont convertis en %, avec la même valeur à tous les niveaux', () => {
   const p = nakedProfile(60);
   p.equipment = { legs: 'db15062' }; // Devilsaur Leggings : +14 crit rating, +46 PA
   const r = resolveProfile(p, []);
   assert.ok(Math.abs(r.gear.crit - 1) < 1e-9);
   assert.equal(r.gear.ap, 46);
-  assert.equal(ratingFactors(nakedProfile(30)).crit < ratingFactors(p).crit, true);
+  assert.deepEqual(ratingFactors(nakedProfile(30)), ratingFactors(p));
+});
+
+test('niveau 30 : les 10 de score de toucher de Felbough Arm valent 1 % (vérifié en jeu)', () => {
+  const p = nakedProfile(30);
+  p.equipment = { mainHand: 'db273037' };
+  assert.ok(Math.abs(resolveProfile(p, []).gear.hit - 1) < 1e-9);
 });
 
 test('arme à deux mains de la base : la main gauche est retirée', () => {

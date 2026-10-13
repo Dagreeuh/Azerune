@@ -58,7 +58,7 @@ GCD, recharges, mana (esprit avec la règle des 5 secondes, mp5, potions), procs
 | Mécanique | Modèle par défaut | Fiabilité |
 |---|---|---|
 | Table d’attaque | Classic : un jet pour les attaques auto (raté, esquive, parade, érafle, crit), deux jets pour les techniques ; boss +3 | Classic |
-| Scores des objets | 10 de toucher = 1 %, 14 de crit = 1 % au niveau 60 ; hâte et expertise 10 = 1 % | Client (toucher, crit) / estimé |
+| Scores des objets | 10 de toucher = 1 %, 14 de crit = 1 %, à tous les niveaux (vérifié en jeu au niveau 30) ; hâte et expertise 10 = 1 % | Client (toucher, crit) / estimé |
 | Raptor Strike | Arme + 70 (rang 8), 100 mana, 6 s, sans GCD : coup sur la prochaine attaque | Client / estimé |
 | Mongoose Bite | Arme **normalisée** + 57 (rang 4), 65 mana, 5 s, après une esquive ou un proc d’Expose Prey | Client |
 | Expose Prey | 10 % sur chaque coup qui touche une cible marquée, fenêtre de 10 s | Client / officiel |
@@ -84,7 +84,7 @@ Edge appliqué au total…) se règlent dans l’onglet **Hypothèses**.
 | Stat | Effet dans le sim |
 |---|---|
 | Agilité, Force, puissance d’attaque | PA de mêlée ; l’Agilité donne aussi du crit |
-| Scores de toucher, crit, hâte, expertise | Convertis en % selon le niveau (onglet Hypothèses) |
+| Scores de toucher, crit, hâte, expertise | Convertis en % (10 de toucher = 1 %, quel que soit le niveau ; modifiable dans Hypothèses) |
 | PA contre un type de créature (bêtes, morts-vivants, démons…) | Ajoutée seulement si la cible est de ce type (onglet Combat) |
 | Compétence d’arme | Raté, esquive et érafles ; limitée au type d’arme indiqué |
 | Dégâts d’arme (+X) | Sur une arme : pour cette arme seulement ; ailleurs : pour les deux armes |
